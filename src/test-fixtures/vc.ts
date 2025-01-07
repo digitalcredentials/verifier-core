@@ -1,3 +1,4 @@
+import { expiredV2 } from "./expiredV2"   
 const signedVC1Unrevoked = {
   "type": [
     "VerifiableCredential",
@@ -142,7 +143,7 @@ const usignedVCv2 = {
     name: 'Jane Doe'
   }
 }
-const unsignedVC = {
+const unsignedVCv1 = {
   '@context': [
     'https://www.w3.org/2018/credentials/v1',
     'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json',
@@ -183,71 +184,48 @@ const unsignedVC = {
   }
 }
 
-// "credentialStatus":
-const credentialStatus = {
-  id: 'https://digitalcredentials.github.io/credential-status-jc-test/XA5AAK1PV4#16',
-  type: 'StatusList2021Entry',
-  statusPurpose: 'revocation',
-  statusListIndex: 16,
-  statusListCredential:
-    'https://digitalcredentials.github.io/credential-status-jc-test/XA5AAK1PV4'
-}
 
-const credentialStatusBitString = {
-  id: 'https://digitalcredentials.github.io/credential-status-jc-test/XA5AAK1PV4#16',
-  type: 'BitstringStatusListEntry',
-  statusPurpose: 'revocation',
-  statusListIndex: 16,
-  statusListCredential:
-    'https://digitalcredentials.github.io/credential-status-jc-test/XA5AAK1PV4'
-}
 
-const getUnsignedVC = (): any => JSON.parse(JSON.stringify(unsignedVC))
 
+
+const getUnsignedVC1 = (): any => JSON.parse(JSON.stringify(unsignedVCv1))
 const getUnsignedVCv2 = (): any => JSON.parse(JSON.stringify(usignedVCv2))
 
-const getUnsignedVCWithoutSuiteContext = (): any => {
-  const vcCopy = JSON.parse(JSON.stringify(unsignedVC))
-  const index = vcCopy['@context'].indexOf(ed25519SuiteContext)
-  if (index > -1) {
-    vcCopy['@context'].splice(index, 1)
-  }
-  return vcCopy
-}
-const getCredentialStatus = (): any => JSON.parse(JSON.stringify(credentialStatus))
-const getCredentialStatusBitString = (): any =>
-  JSON.parse(JSON.stringify(credentialStatusBitString))
 
-const getUnsignedVCWithStatus = (): any => {
-  const unsignedVCWithStatus = getUnsignedVC()
-  unsignedVCWithStatus.credentialStatus = getCredentialStatus()
-  return unsignedVCWithStatus
+const getSignedVC1 = (): any => {
+  return JSON.parse(JSON.stringify(signedVC1))
 }
 
-const getUnsignedVC2WithStatus = (): any => {
-  const unsignedVC2WithStatus = getUnsignedVCv2()
-  unsignedVC2WithStatus.credentialStatus = getCredentialStatusBitString()
-  return unsignedVC2WithStatus
-}
 
-const ed25519SuiteContext =
-  'https://w3id.org/security/suites/ed25519-2020/v1'
-
-const getSignedVC = (): any => {
-  return signedVC1
-}
 
 const getSignedUnrevokedVC2 = (): any => {
   return signedVC1Unrevoked
 }
+
+const getTamperedVC1 = (): any => {
+  const signedVC1 = getSignedVC1()
+  signedVC1.name = 'Introduction to Tampering'
+  return signedVC1
+}
+
+const getExpiredVC1 = (): any => {
+  return null
+}
+const getExpiredVC2 = (): any => {
+  return JSON.parse(JSON.stringify(expiredV2))
+}
+
+const getExpiredAndTamperedVC2 = (): any => {
+  const cred = getExpiredVC2()
+  cred.name = 'tampered!'
+  return cred
+}
+
 export {
+  getExpiredVC2,
+  getExpiredAndTamperedVC2,
+  getTamperedVC1,
   getSignedUnrevokedVC2,
-  getSignedVC,
-  getUnsignedVC,
-  getUnsignedVCWithoutSuiteContext,
-  getCredentialStatus,
-  getCredentialStatusBitString,
-  getUnsignedVCWithStatus,
-  getUnsignedVC2WithStatus,
-  ed25519SuiteContext
+  getSignedVC1,
+  getUnsignedVC1
 }
