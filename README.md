@@ -1,9 +1,9 @@
-# Example Isomorphic TS/JS Lib Template _(@digitalcredentials/isomorphic-lib-template)_
+# verifier-core _(@digitalcredentials/verifier-core)_
 
-[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/isomorphic-lib-template/main.yml?branch=main)](https://github.com/digitalcredentials/isomorphic-lib-template/actions?query=workflow%3A%22Node.js+CI%22)
-[![NPM Version](https://img.shields.io/npm/v/@digitalcredentials/isomorphic-lib-template.svg)](https://npm.im/@digitalcredentials/isomorphic-lib-template)
+[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/main.yml?branch=main)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3A%22Node.js+CI%22)
+[![NPM Version](https://img.shields.io/npm/v/@digitalcredentials/verifier-core.svg)](https://npm.im/@digitalcredentials/verifier-core)
 
-> A Typescript/Javascript isomorphic library template, for use in the browser, Node.js, and React Native.
+> For verifying Verifiable Credentials in the browser, Node.js, and React Native.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@
 
 ## Background
 
-TBD
+The Digital Credentials Consortium has a few applications that verify credentials in essentially the same way, with consequent code duplication. This package extracts that common functionality to a single shared package to make ongoing maintenance easier.
 
 ## Security
 
@@ -24,14 +24,14 @@ TBD
 
 ## Install
 
-- Node.js 16+ is recommended.
+- Node.js 18+ is recommended.
 
 ### NPM
 
 To install via NPM:
 
 ```
-npm install @digitalcredentials/isomorphic-lib-template
+npm install @digitalcredentials/verifier-core
 ```
 
 ### Development
@@ -39,8 +39,8 @@ npm install @digitalcredentials/isomorphic-lib-template
 To install locally (for development):
 
 ```
-git clone https://github.com/digitalcredentials/isomorphic-lib-template.git
-cd isomorphic-lib-template
+git clone https://github.com/digitalcredentials/verifier-core.git
+cd verifier-core
 npm install
 ```
 
@@ -57,4 +57,4 @@ If editing the Readme, please conform to the
 
 ## License
 
-[MIT License](LICENSE.md) © 2022 Digital Credentials Consortium.
+[MIT License](LICENSE.md) © 2025 Digital Credentials Consortium.
