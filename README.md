@@ -215,23 +215,27 @@ Fatal errors are errors that prevent us from saying anything conclusive about th
 ```
 Examples of fatal errors:
 
-* invalid signature
+<b>invalid signature</b>
   
 Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity
 
-* software problem
+<b>software problem</b>
   
 A software error might prevent verification
 
-* malformed credential
+<b>malformed credential</b>
   
 The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
-
-
 
 ### verifyPresentation
 
 ```verifyPresentation({presentation, reloadIssuerRegistry = true})```
+
+A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP is also cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and ofthen that DID is recorded inside the Verifiable Credentials as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to the DID we can prove we 'own' the credentials.
+
+A VP is also sometimes used without any containted VC simply to prove that we control a given DID, say for authentication, or often for the case where when an issuer is issuing a credential to a DID, the issuer wants to know that the recipient in fact does control that DID.
+
+Verifying a VP amounts to verifying the signature on the VP and that the VP hasn't expired, and also verifying all of the contained VCs, one by one.
 
 #### arguments
 
@@ -239,6 +243,8 @@ The supplied credential may not conform to the VerifiableCredential or LinkedDat
 * reloadIssuerRegistry - Whether or not to refresh the cached copy of the registry.
 
 #### result
+
+With a VP we have a result for the vp as well as for all the contained VCs.
 
 ## Install
 
