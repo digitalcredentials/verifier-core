@@ -6,6 +6,7 @@ import { getCredentialStatusChecker } from './credentialStatus';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries';
 
 import { Credential } from './types/credential';
+import { VerificationResponse } from './types/result';
 
 /* 
 // the new eddsa-rdfc-2022-cryptosuite
@@ -19,26 +20,7 @@ const suite = new DataIntegrityProof({
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 const suite = new Ed25519Signature2020();
 
-export interface VerificationError {								
-  "message": string,
-  "isFatal": boolean,
-  "name"?: string,
-  stackTrace?: string
-}
 
-export interface Step {
-  "id": string,
-  "valid": boolean,
-  "foundInRegistries"?: string[],
-}
-
-export interface VerificationResponse {
-  "verified": boolean,
-  "isFatal": boolean,			
-  "credential": object,
-  "errors"?: VerificationError[],
-  "log"?: Step[]
-}
 
 
 export async function verifyCredential({credential, reloadIssuerRegistry = true}:{credential: Credential, reloadIssuerRegistry: boolean}): Promise<VerificationResponse> {
