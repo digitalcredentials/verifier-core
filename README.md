@@ -70,7 +70,9 @@ This package exports two methods:
 
 The typescript definitions for the result can be found [here](./src/types/result.ts)
 
-##### successful verification
+There are four general flavours of result that might be returned:
+
+1. <b>successful verification</b>
 
 A verification is successful if the signature is valid (the credential hasn't been tampered with), hasn't expired, hasn't been revoked, and was signed by a trusted issuer.
 
@@ -109,11 +111,11 @@ A successful verification might look like this example:
 }
 ```
 
-##### unsucessful verification
+2. <b>unsucessful verification</b>
 
 An unsuccessful verification means that one of the steps (other than the 'valid_signature' step) returned false, so the credential has expired, and/or been revoked, and/or can't be confirmed to be signed by a known issuer. Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been changed so we can't say anything conclusive about any of them.
 
-An unsuccessful verification might look like this example:
+An unsuccessful verification (in this case because the credential has expired) might look like this example:
 
 ```
 {
@@ -147,7 +149,7 @@ An unsuccessful verification might look like this example:
 }
 ```
 
-##### partially successful verification
+3. <b> partially successful verification</b>
 
 A verification might partly succeed if it can verify the signature and the expiry date, but can't retrieve any of the revocation status, the issuer registry, or the issuer's DID document from the network to verify the revocation status and issuer identity.
 
@@ -194,7 +196,7 @@ A partially successful verification might look like this example:
 }
 ```
 
-##### fatal error
+4. <b>fatal error</b>
 
 Fatal errors are errors that prevent us from saying anything conclusive about the credential, and so we don't list the results of each step (the 'log') because we can't say decisively one way or the other if any are true or false. Reverting to saying they are all false would be misleading, because that could be interepreted to mean that the credential was, for example, revoked when really we just don't know one way or the other.
 
@@ -214,12 +216,15 @@ Fatal errors are errors that prevent us from saying anything conclusive about th
 Examples of fatal errors:
 
 * invalid signature
+  
 Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity
 
 * software problem
+  
 A software error might prevent verification
 
 * malformed credential
+  
 The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
 
 
