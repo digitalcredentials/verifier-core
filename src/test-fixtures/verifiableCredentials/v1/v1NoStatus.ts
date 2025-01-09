@@ -1,4 +1,4 @@
-export const signedVC1 = {
+export const v1NoStatus = {
     '@context': [
       'https://www.w3.org/2018/credentials/v1',
       'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json',

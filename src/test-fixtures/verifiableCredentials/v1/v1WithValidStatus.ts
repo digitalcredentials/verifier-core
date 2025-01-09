@@ -1,4 +1,4 @@
-export const signedUnrevokedVC1 = {
+export const v1WithValidStatus = {
     "type": [
       "VerifiableCredential",
       "OpenBadgeCredential"
@@ -50,5 +50,5 @@ export const signedUnrevokedVC1 = {
       "proofPurpose": "assertionMethod",
       "proofValue": "z38x1N8hFFXEQgfomjv1MvP32qqtqzx4sGQAyqqfDGXqLBcw39jKBQvcwWeiVJrqtxZJmu8RZ5DPUrrAc36ejoPyE"
     }
-  }
+}
   
