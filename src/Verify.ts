@@ -40,6 +40,7 @@ export async function verifyCredential({credential, knownDIDRegistries, reloadIs
   });
 
   verificationResponse.isFatal = false
+  verificationResponse.credential = credential
 
   if (verificationResponse.error) {
     if (verificationResponse.error.log) {

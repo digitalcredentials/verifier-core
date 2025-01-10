@@ -6,13 +6,12 @@ import { knownDIDRegistries } from '../.knownDidRegistries';
 
 describe('Verify', () => {
   it('verifies with valid status', async () => {
-    //const signedVC : any = getSignedVC() 
     const credential : any = getVCv2ValidStatus()
     const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries})
-   // console.log("result returned from verifyCredential call:")
-    //console.log(JSON.stringify(result,null,2))
-    //assert.ok(result.verified);
+    console.log("result returned from verifyCredential call:")
+    console.log(JSON.stringify(result,null,2))
     expect(result.verified).to.be.true
+    expect(result.credential).to.eql(credential)
    })
 
    it('returns fatal error when tampered', async () => {
