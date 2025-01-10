@@ -5,6 +5,7 @@
     "lib": ["es2022", "dom"],
     "module": "commonjs",
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "outDir": "dist/esm",
     "noImplicitAny": true,
     "removeComments": false,
