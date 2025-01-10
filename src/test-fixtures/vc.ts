@@ -5,9 +5,14 @@ import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWi
 
 import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus"
 import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus"
+import { v2NoStatus } from "./verifiableCredentials/v2/v2NoStatus"
 
 const getVCv1 = (): any => {
   return JSON.parse(JSON.stringify(v1NoStatus))
+}
+
+const getVCv2 = (): any => {
+  return JSON.parse(JSON.stringify(v2NoStatus))
 }
 
 const getVCv2NoProof = (): any => {
@@ -19,9 +24,7 @@ const getVCv1NoProof = (): any => {
   delete v1.proof
   return v1}
 
-const getSignedVC1 = (): any => {
-  return JSON.parse(JSON.stringify(v1NoStatus))
-}
+
 
 const getVCv1ValidStatus = (): any => {
   return v1WithValidStatus
@@ -31,7 +34,7 @@ const getVCv2ValidStatus = (): any => {
 }
 
 const getVCv1Tampered = (): any => {
-  const signedVC1 = getSignedVC1()
+  const signedVC1 = getVCv1()
   signedVC1.name = 'Introduction to Tampering'
   return signedVC1
 }
@@ -51,14 +54,23 @@ const getVCv2ExpiredAndTampered = (): any => {
   return cred
 }
 
+const getVCv2Tampered = (): any => {
+  const cred = getVCv2()
+  cred.name = 'tampered!'
+  return cred
+}
+
 export {
   getVCv2Expired,
   getVCv2Revoked,
+  getVCv2Tampered,
   getVCv2ExpiredAndTampered,
+  getVCv2NoProof,
+  getVCv2,
+
   getVCv1Tampered,
   getVCv1ValidStatus,
   getVCv2ValidStatus,
   getVCv1,
-  getVCv1NoProof,
-  getVCv2NoProof
+  getVCv1NoProof
 }

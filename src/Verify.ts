@@ -52,8 +52,8 @@ export async function verifyCredential({credential, knownDIDRegistries, reloadIs
       return buildFatalErrorObject(fatalErrorMessage, "invalidSignature", credential, stackTrace)
     }
   }
-  console.log('results from the verify call:')
-  console.log(JSON.stringify(verificationResponse))
+ // console.log('results from the verify call:')
+ // console.log(JSON.stringify(verificationResponse))
 
   delete verificationResponse.results
   delete verificationResponse.statusResult
