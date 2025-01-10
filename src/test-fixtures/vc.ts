@@ -1,8 +1,10 @@
 import { v2Expired } from "./verifiableCredentials/v2/v2Expired"
-import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus"
-import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus"
 import { v2Revoked } from "./verifiableCredentials/v2/v2Revoked"
 import { v2WithValidStatus } from "./verifiableCredentials/v2/v2WithValidStatus"
+import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWithValidStatus"
+
+import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus"
+import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus"
 
 const getVCv1 = (): any => {
   return JSON.parse(JSON.stringify(v1NoStatus))
