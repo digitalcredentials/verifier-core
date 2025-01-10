@@ -1,4 +1,4 @@
-export const knownDidRegistries = [
+export const knownDIDRegistries = [
   {
     name: 'DCC Pilot Registry',
     url: 'https://digitalcredentials.github.io/issuer-registry/registry.json'

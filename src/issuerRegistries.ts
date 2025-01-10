@@ -1,5 +1,4 @@
 import {RegistryClient} from '@digitalcredentials/issuer-registry-client';
-import {knownDidRegistries} from '../.knownDidRegistries'
 import { VerificationResponse } from './types/result';
 const registries = new RegistryClient()
 const registryNotYetLoaded = true;
@@ -9,13 +8,14 @@ const registryNotYetLoaded = true;
  * @returns A list of the names of the DID registries in which the issuer appears.
  */
 
-export async function getTrustedRegistryListForIssuer({ issuer, reloadIssuerRegistry = false }: {
+export async function getTrustedRegistryListForIssuer({ issuer, knownDIDRegistries, reloadIssuerRegistry = false }: {
   issuer: string | any,
+  knownDIDRegistries: object,
   reloadIssuerRegistry: boolean | null
 }): Promise<string[] | null> {
 
   if (reloadIssuerRegistry ?? registryNotYetLoaded) {
-    await registries.load({ config: knownDidRegistries })
+    await registries.load({ config: knownDIDRegistries })
   }
   const issuerDid = typeof issuer === 'string' ? issuer : issuer.id;
   const issuerInfo = registries.didEntry(issuerDid);
@@ -26,13 +26,14 @@ export async function getTrustedRegistryListForIssuer({ issuer, reloadIssuerRegi
     : null;
 }
 
-export async function addTrustedIssuersToVerificationResponse( {issuer, reloadIssuerRegistry = false, verificationResponse} :{
+export async function addTrustedIssuersToVerificationResponse( {issuer, knownDIDRegistries, reloadIssuerRegistry = false, verificationResponse} :{
   issuer: string | any,
-  reloadIssuerRegistry: boolean | null
+  reloadIssuerRegistry: boolean | null,
+  knownDIDRegistries: object,
   verificationResponse: VerificationResponse
 }) : Promise<void>
  {
-    const foundInRegistries = await getTrustedRegistryListForIssuer( {issuer, reloadIssuerRegistry});
+    const foundInRegistries = await getTrustedRegistryListForIssuer( {issuer, knownDIDRegistries, reloadIssuerRegistry});
 
     const registryStep = {
       "id": "registered_issuer",

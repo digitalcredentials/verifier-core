@@ -23,7 +23,7 @@ const suite = new Ed25519Signature2020();
 
 
 
-export async function verifyCredential({credential, reloadIssuerRegistry = true}:{credential: Credential, reloadIssuerRegistry: boolean}): Promise<VerificationResponse> {
+export async function verifyCredential({credential, knownDIDRegistries, reloadIssuerRegistry = true}:{credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean}): Promise<VerificationResponse> {
   
   
   const fatalErrorMessage = checkForFatalErrors(credential)
@@ -58,7 +58,7 @@ export async function verifyCredential({credential, reloadIssuerRegistry = true}
   delete verificationResponse.statusResult
   
   const { issuer } = credential
-  await addTrustedIssuersToVerificationResponse({verificationResponse, reloadIssuerRegistry, issuer})
+  await addTrustedIssuersToVerificationResponse({verificationResponse, knownDIDRegistries,reloadIssuerRegistry, issuer})
   
 
   return verificationResponse;
