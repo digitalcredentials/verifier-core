@@ -21,8 +21,6 @@ const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 const suite = new Ed25519Signature2020();
 
 
-
-
 export async function verifyCredential({credential, knownDIDRegistries, reloadIssuerRegistry = true}:{credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean}): Promise<VerificationResponse> {
   
   
@@ -39,6 +37,7 @@ export async function verifyCredential({credential, knownDIDRegistries, reloadIs
     checkStatus: getCredentialStatusChecker(credential)
   });
 
+  
   verificationResponse.isFatal = false
   verificationResponse.credential = credential
 
@@ -57,6 +56,7 @@ export async function verifyCredential({credential, knownDIDRegistries, reloadIs
 
   delete verificationResponse.results
   delete verificationResponse.statusResult
+  delete verificationResponse.verified
   
   const { issuer } = credential
   await addTrustedIssuersToVerificationResponse({verificationResponse, knownDIDRegistries,reloadIssuerRegistry, issuer})

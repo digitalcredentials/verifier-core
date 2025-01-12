@@ -6,6 +6,7 @@ import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWi
 
 import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus.js"
 import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus.js"
+import { v1Revoked } from "./verifiableCredentials/v1/v1Revoked.js"
 import { v1Expired } from "./verifiableCredentials/v1/v1Expired.js"
 
 const getVCv1 = (): any => {
@@ -49,6 +50,10 @@ const getVCv2Expired = (): any => {
 const getVCv2Revoked = (): any => {
   return JSON.parse(JSON.stringify(v2Revoked))
 }
+const getVCv1Revoked = (): any => {
+  return JSON.parse(JSON.stringify(v1Revoked))
+}
+
 const getVCv2ExpiredAndTampered = (): any => {
   const cred = getVCv2Expired()
   cred.name = 'tampered!'
@@ -71,6 +76,7 @@ export {
   getVCv2,
 
   getVCv1Expired,
+  getVCv1Revoked,
   getVCv1Tampered,
   getVCv1ValidStatus,
   getVCv1,
