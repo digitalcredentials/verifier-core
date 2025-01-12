@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "build": "npm run clear && tsc -d && tsc -p tsconfig.esm.json",
+    "build-test": "npm run clear && tsc -p tsconfig.spec.json",
     "clear": "rimraf dist/*",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
@@ -12,7 +13,8 @@
     "rebuild": "npm run clear && npm run build",
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.js",
-    "test-node": "cross-env NODE_ENV=test TS_NODE_PROJECT=tsconfig.spec.json TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --project tsconfig.spec.json 'test/*.ts'"
+    "test-node-old": "cross-env NODE_ENV=test TS_NODE_PROJECT=tsconfig.spec.json TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --project tsconfig.spec.json 'test/*.ts'",
+    "test-node": "npm run build-test && mocha dist/esm/test/*.spec.js && rm -rf dist/esm/test || true"
   },
   "files": [
     "dist",
@@ -61,23 +63,17 @@
     "prettier": "^2.8.1",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1",
+    "tsx": "^4.19.2",
     "typescript": "^4.9.4"
   },
   "publishConfig": {
     "access": "public"
   },
-  "mocha": {
-    "require": "ts-node/register",
-    "extension": [
-      "ts"
-    ],
-    "spec": "test/**/*.ts"
-  },
   "keywords": [
     "dcc"
   ],
   "engines": {
-    "node": ">=16.0"
+    "node": ">=18.0"
   },
   "author": {
     "name": "Digital Credentials Consortium",
@@ -89,5 +85,6 @@
     "url": "https://github.com/digitalcredentials/isomorphic-lib-template"
   },
   "homepage": "https://github.com/digitalcredentials/isomorphic-lib-template",
-  "bugs": "https://github.com/digitalcredentials/isomorphic-lib-template/issues"
+  "bugs": "https://github.com/digitalcredentials/isomorphic-lib-template/issues",
+  "type": "module"
 }

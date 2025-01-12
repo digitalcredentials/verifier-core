@@ -1,11 +1,12 @@
-import { v2Expired } from "./verifiableCredentials/v2/v2Expired"
-import { v2Revoked } from "./verifiableCredentials/v2/v2Revoked"
-import { v2WithValidStatus } from "./verifiableCredentials/v2/v2WithValidStatus"
-import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWithValidStatus"
+import { v2NoStatus } from "./verifiableCredentials/v2/v2NoStatus.js"
+import { v2Expired } from "./verifiableCredentials/v2/v2Expired.js"
+import { v2Revoked } from "./verifiableCredentials/v2/v2Revoked.js"
+import { v2WithValidStatus } from "./verifiableCredentials/v2/v2WithValidStatus.js"
+import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWithValidStatus.js"
 
-import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus"
-import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus"
-import { v2NoStatus } from "./verifiableCredentials/v2/v2NoStatus"
+import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus.js"
+import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus.js"
+import { v1Expired } from "./verifiableCredentials/v1/v1Expired.js"
 
 const getVCv1 = (): any => {
   return JSON.parse(JSON.stringify(v1NoStatus))
@@ -39,8 +40,8 @@ const getVCv1Tampered = (): any => {
   return signedVC1
 }
 
-const getExpiredVC1 = (): any => {
-  return null
+const getVCv1Expired = (): any => {
+  return JSON.parse(JSON.stringify(v1Expired))
 }
 const getVCv2Expired = (): any => {
   return JSON.parse(JSON.stringify(v2Expired))
@@ -64,13 +65,14 @@ export {
   getVCv2Expired,
   getVCv2Revoked,
   getVCv2Tampered,
+  getVCv2ValidStatus,
   getVCv2ExpiredAndTampered,
   getVCv2NoProof,
   getVCv2,
 
+  getVCv1Expired,
   getVCv1Tampered,
   getVCv1ValidStatus,
-  getVCv2ValidStatus,
   getVCv1,
   getVCv1NoProof
 }

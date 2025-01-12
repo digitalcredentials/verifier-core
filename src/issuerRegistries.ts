@@ -1,5 +1,5 @@
 import {RegistryClient} from '@digitalcredentials/issuer-registry-client';
-import { VerificationResponse } from './types/result';
+import { VerificationResponse } from './types/result.js';
 const registries = new RegistryClient()
 const registryNotYetLoaded = true;
 /**
