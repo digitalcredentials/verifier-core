@@ -2,7 +2,7 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { strict as assert } from 'assert';
 import { verifyCredential } from '../src/Verify.js'
-import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof } from '../src/test-fixtures/vc.js'
+import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof, getCredentialWithoutContext } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { getExpectedVerifiedResult, getExpectedUnverifiedResult, getExpectedFatalResult } from '../src/test-fixtures/expectedResults.js';
 
@@ -12,6 +12,20 @@ const {expect} = chai;
 describe('Verify', () => {
 
   describe('.verifyCredential', () => {
+
+    describe('general fatal errors', () => {
+      it('when not jsonld', async () => {
+        const credential : any = getCredentialWithoutContext() 
+        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+
+        const expectedResult = getExpectedFatalResult({
+          credential, 
+          errorMessage: 'The credential does not appear to be a valid jsonld document - there is no context.',
+          errorName: 'invalid_jsonld'
+        })
+        expect(result).to.deep.equalInAnyOrder(expectedResult) 
+      })
+    })
 
     describe('with VC version 1', () => {
 
@@ -75,7 +89,7 @@ describe('Verify', () => {
             errorMessage: 'The signature is not valid.',
             errorName: 'invalid_signature'
           })
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
 
          it('when no proof', async () => {
@@ -87,8 +101,10 @@ describe('Verify', () => {
             errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
             errorName: 'no_proof'
           })
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
+
+        
       })
 
       describe('returns as verified', () => {

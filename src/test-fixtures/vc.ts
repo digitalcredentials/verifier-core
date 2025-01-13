@@ -73,7 +73,15 @@ const getVCv2Tampered = (): any => {
   return cred
 }
 
+const getCredentialWithoutContext = (): any => {
+  const cred = getVCv2()
+  delete cred['@context']
+  return cred
+}
+
 export {
+
+  getCredentialWithoutContext,
   getVCv2,
   getVCv2Expired,
   getVCv2Revoked,

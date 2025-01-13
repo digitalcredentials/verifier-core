@@ -64,11 +64,24 @@ function buildFatalErrorObject(fatalErrorMessage: string, name: string, credenti
 }
 
 function checkForFatalErrors(credential: Credential) : VerificationResponse | null {
-  
- /*  if (!credential.doesn't have context with vc) {
-  }
- */
+  const validVCContexts = [
+    'https://www.w3.org/2018/credentials/v1',
+    'https://www.w3.org/ns/credentials/v2'
+  ]
+  const suppliedContexts = credential['@context']
 
+  if (!suppliedContexts) {
+    const fatalErrorMessage = "The credential does not appear to be a valid jsonld document - there is no context."
+    const name = 'invalid_jsonld'
+    return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
+  }
+  
+  if (! validVCContexts.some(contextURI => suppliedContexts.includes(contextURI))) {
+    const fatalErrorMessage = "The credential doesn't have a verifiable credential context."
+    const name = 'no_vc_context'
+    return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
+  }
+ 
   try {
     // eslint-disable-next-line no-new
     new URL(credential.id as string);
