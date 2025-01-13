@@ -87,7 +87,7 @@ function checkForFatalErrors(credential: Credential) : VerificationResponse | nu
     new URL(credential.id as string);
   } catch (e) {
     const fatalErrorMessage = "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement."
-    const name = 'invalid_issuer_id'
+    const name = 'invalid_credential_id'
     return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
   }
   

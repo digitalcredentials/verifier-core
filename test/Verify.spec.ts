@@ -2,7 +2,7 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { strict as assert } from 'assert';
 import { verifyCredential } from '../src/Verify.js'
-import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof, getCredentialWithoutContext, getCredentialWithoutVCContext } from '../src/test-fixtures/vc.js'
+import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof, getCredentialWithoutContext, getCredentialWithoutVCContext, getCredentialWithNonURIId } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { getExpectedVerifiedResult, getExpectedUnverifiedResult, getExpectedFatalResult } from '../src/test-fixtures/expectedResults.js';
 
@@ -38,6 +38,18 @@ describe('Verify', () => {
         expect(result).to.deep.equalInAnyOrder(expectedResult) 
       })
 
+      it('when credential id is not a uri', async () => {
+        const credential : any = getCredentialWithNonURIId() 
+        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+
+        const expectedResult = getExpectedFatalResult({
+          credential, 
+          errorMessage: "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement.",
+          errorName: 'invalid_credential_id'
+        })
+        expect(result).to.deep.equalInAnyOrder(expectedResult) 
+      })
+
     })
 
     describe('with VC version 1', () => {
@@ -64,6 +76,7 @@ describe('Verify', () => {
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
+
       })
 
       describe('returns as verified', () => {

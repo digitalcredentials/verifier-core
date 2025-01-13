@@ -85,10 +85,17 @@ const getCredentialWithoutVCContext = (): any => {
   return cred
 }
 
+const getCredentialWithNonURIId = (): any => {
+  const cred = getVCv2()
+  cred.id = "0923lksjf"
+  return cred
+}
+
 export {
 
   getCredentialWithoutContext,
   getCredentialWithoutVCContext,
+  getCredentialWithNonURIId,
 
   getVCv2,
   getVCv2Expired,
