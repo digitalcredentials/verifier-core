@@ -19,9 +19,14 @@ describe('Verify', () => {
         it('when tampered with', async () => {
           const credential : any = getVCv1Tampered() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-          assert.ok(result.isFatal === true);
+          const expectedResult = getExpectedFatalResult({
+            credential, 
+            errorMessage: 'The signature is not valid.',
+            errorName: 'invalid_signature'
+          })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
-        it.only('when no proof', async () => {
+        it('when no proof', async () => {
           const credential : any = getVCv1NoProof() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
 
@@ -63,12 +68,17 @@ describe('Verify', () => {
   
       describe('returns fatal error', () => {
         it('when tampered with', async () => {
-          const tamperedVC2 : any = getVCv2Tampered() 
-          const result = await verifyCredential({credential: tamperedVC2, reloadIssuerRegistry: false, knownDIDRegistries})
-        // TODO add check here
+          const credential : any = getVCv2Tampered() 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const expectedResult = getExpectedFatalResult({
+            credential, 
+            errorMessage: 'The signature is not valid.',
+            errorName: 'invalid_signature'
+          })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
-         it.only('when no proof', async () => {
+         it('when no proof', async () => {
           const credential : any = getVCv2NoProof() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
 

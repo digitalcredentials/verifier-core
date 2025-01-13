@@ -49,7 +49,7 @@ const fatalError = checkForFatalErrors(credential)
     } else if (verificationResponse?.error?.name === 'VerificationError') {
       const fatalErrorMessage = 'The signature is not valid.'
       const stackTrace = verificationResponse?.error?.errors?.stack
-      return buildFatalErrorObject(fatalErrorMessage, "invalidSignature", credential, stackTrace)
+      return buildFatalErrorObject(fatalErrorMessage, "invalid_signature", credential, stackTrace)
     }
   }
 
