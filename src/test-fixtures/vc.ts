@@ -79,9 +79,17 @@ const getCredentialWithoutContext = (): any => {
   return cred
 }
 
+const getCredentialWithoutVCContext = (): any => {
+  const cred = getVCv2()  
+  cred['@context'] = cred['@context'].filter((context : string) => context !== 'https://www.w3.org/ns/credentials/v2')   // remove the vc context
+  return cred
+}
+
 export {
 
   getCredentialWithoutContext,
+  getCredentialWithoutVCContext,
+
   getVCv2,
   getVCv2Expired,
   getVCv2Revoked,

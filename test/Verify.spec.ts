@@ -2,7 +2,7 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { strict as assert } from 'assert';
 import { verifyCredential } from '../src/Verify.js'
-import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof, getCredentialWithoutContext } from '../src/test-fixtures/vc.js'
+import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof, getCredentialWithoutContext, getCredentialWithoutVCContext } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { getExpectedVerifiedResult, getExpectedUnverifiedResult, getExpectedFatalResult } from '../src/test-fixtures/expectedResults.js';
 
@@ -13,7 +13,7 @@ describe('Verify', () => {
 
   describe('.verifyCredential', () => {
 
-    describe('general fatal errors', () => {
+    describe('returns general fatal errors', () => {
       it('when not jsonld', async () => {
         const credential : any = getCredentialWithoutContext() 
         const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
@@ -25,6 +25,19 @@ describe('Verify', () => {
         })
         expect(result).to.deep.equalInAnyOrder(expectedResult) 
       })
+
+      it('when no vc context', async () => {
+        const credential : any = getCredentialWithoutVCContext() 
+        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+
+        const expectedResult = getExpectedFatalResult({
+          credential, 
+          errorMessage: "The credential doesn't have a verifiable credential context.",
+          errorName: 'no_vc_context'
+        })
+        expect(result).to.deep.equalInAnyOrder(expectedResult) 
+      })
+
     })
 
     describe('with VC version 1', () => {
