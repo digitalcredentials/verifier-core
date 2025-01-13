@@ -14,7 +14,7 @@ export async function getTrustedRegistryListForIssuer({ issuer, knownDIDRegistri
   reloadIssuerRegistry: boolean | null
 }): Promise<string[] | null> {
 
-  if (reloadIssuerRegistry ?? registryNotYetLoaded) {
+  if (reloadIssuerRegistry || registryNotYetLoaded) {
     await registries.load({ config: knownDIDRegistries })
   }
   const issuerDid = typeof issuer === 'string' ? issuer : issuer.id;
