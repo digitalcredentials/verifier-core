@@ -2,9 +2,9 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { strict as assert } from 'assert';
 import { verifyCredential } from '../src/Verify.js'
-import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered } from '../src/test-fixtures/vc.js'
+import { getVCv2Expired, getVCv1Tampered, getVCv1Expired,  getVCv1Revoked, getVCv2Revoked, getVCv1ValidStatus, getVCv2ValidStatus, getVCv2Tampered, getVCv1NoProof, getVCv2NoProof } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
-import { getExpectedVerifiedResult, getExpectedUnverifiedResult } from '../src/test-fixtures/expectedResults.js';
+import { getExpectedVerifiedResult, getExpectedUnverifiedResult, getExpectedFatalResult } from '../src/test-fixtures/expectedResults.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -17,9 +17,20 @@ describe('Verify', () => {
 
       describe('returns fatal error', () => {
         it('when tampered with', async () => {
-          const tamperedVC1 : any = getVCv1Tampered() 
-          const result = await verifyCredential({credential: tamperedVC1, reloadIssuerRegistry: false, knownDIDRegistries})
-          assert.ok(result.verified === false);
+          const credential : any = getVCv1Tampered() 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          assert.ok(result.isFatal === true);
+        })
+        it.only('when no proof', async () => {
+          const credential : any = getVCv1NoProof() 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+
+          const expectedResult = getExpectedFatalResult({
+            credential, 
+            errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
+            errorName: 'no_proof'
+          })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
       })
 
@@ -54,7 +65,20 @@ describe('Verify', () => {
         it('when tampered with', async () => {
           const tamperedVC2 : any = getVCv2Tampered() 
           const result = await verifyCredential({credential: tamperedVC2, reloadIssuerRegistry: false, knownDIDRegistries})
-         })
+        // TODO add check here
+        })
+
+         it.only('when no proof', async () => {
+          const credential : any = getVCv2NoProof() 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+
+          const expectedResult = getExpectedFatalResult({
+            credential, 
+            errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
+            errorName: 'no_proof'
+          })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
       })
 
       describe('returns as verified', () => {

@@ -18,13 +18,16 @@ const getVCv2 = (): any => {
 }
 
 const getVCv2NoProof = (): any => {
-  // TODO
+  const v2 = getVCv2()
+  delete v2.proof
+  return v2
   }
 
 const getVCv1NoProof = (): any => {
   const v1 = getVCv1()
   delete v1.proof
-  return v1}
+  return v1
+}
 
 
 
@@ -59,7 +62,11 @@ const getVCv2ExpiredAndTampered = (): any => {
   cred.name = 'tampered!'
   return cred
 }
-
+const getVCv1ExpiredAndTampered = (): any => {
+  const cred = getVCv1Expired()
+  cred.name = 'tampered!'
+  return cred
+}
 const getVCv2Tampered = (): any => {
   const cred = getVCv2()
   cred.name = 'tampered!'
@@ -67,18 +74,20 @@ const getVCv2Tampered = (): any => {
 }
 
 export {
+  getVCv2,
   getVCv2Expired,
   getVCv2Revoked,
   getVCv2Tampered,
   getVCv2ValidStatus,
   getVCv2ExpiredAndTampered,
   getVCv2NoProof,
-  getVCv2,
+  
 
+  getVCv1,
   getVCv1Expired,
   getVCv1Revoked,
   getVCv1Tampered,
   getVCv1ValidStatus,
-  getVCv1,
+  getVCv1ExpiredAndTampered,
   getVCv1NoProof
 }
