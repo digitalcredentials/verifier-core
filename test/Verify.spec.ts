@@ -23,7 +23,11 @@ import {
   getVCv2ExpiredWithValidStatus
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
-import { getExpectedVerifiedResult, getExpectedUnverifiedResult, getExpectedFatalResult } from '../src/test-fixtures/expectedResults.js';
+import { 
+  getExpectedVerifiedResult, 
+  getExpectedUnverifiedResult, 
+  getExpectedFatalResult
+ } from '../src/test-fixtures/expectedResults.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -88,9 +92,7 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
-        describe('returns fatal error', () => {
-
-          it.only('when expired and tampered with', async () => {
+          it('when expired and tampered with', async () => {
             const credential : any = getVCv1ExpiredAndTampered() 
             const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
             const expectedResult = getExpectedFatalResult({
@@ -135,17 +137,26 @@ describe('Verify', () => {
         })
       })
 
-      describe('returns as unverified', () => {
+      describe('returns unverified', () => {
         it('when expired', async () => {
           const credential : any = getVCv1Expired() 
+          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:false})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-          assert.ok(result.log);
+          expect(result).to.deep.equalInAnyOrder(expectedResult)
         })
         it('when revoked', async () => {
           const credential : any = getVCv1Revoked() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           assert.ok(result.log);
         })
+        it('when expired with valid status', async () => {
+          const credential : any = getVCv1ExpiredWithValidStatus() 
+          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        // NOTE: this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
+
       })
 
 
@@ -165,7 +176,7 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
 
-        it.only('when expired and tampered with', async () => {
+        it('when expired and tampered with', async () => {
           const credential : any = getVCv2ExpiredAndTampered() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           const expectedResult = getExpectedFatalResult({
@@ -222,8 +233,16 @@ describe('Verify', () => {
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           assert.ok(result.log);
         })
+        it('when expired with valid status', async () => {
+          const credential : any = getVCv2ExpiredWithValidStatus() 
+          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        // NOTE: this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
+
       })
   })
 })
 })
-})
+
