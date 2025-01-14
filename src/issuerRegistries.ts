@@ -14,6 +14,8 @@ export async function getTrustedRegistryListForIssuer({ issuer, knownDIDRegistri
   reloadIssuerRegistry: boolean | null
 }): Promise<string[] | null> {
 
+
+  // eslint-disable-next-line no-use-before-define
   if (reloadIssuerRegistry || registryNotYetLoaded) {
     await registries.load({ config: knownDIDRegistries })
   }

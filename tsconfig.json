@@ -3,9 +3,9 @@
     "strict": true,
     "target": "es2022",
     "lib": ["es2022", "dom"],
-    "module": "commonjs",
+    "module": "es6",
     "moduleResolution": "node",
-    "outDir": "dist/esm",
+    "outDir": "dist",
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
@@ -19,7 +19,7 @@
   },
   "include": [
     "src/**/*",
-    ".eslintrc.js",
+    ".eslintrc.cjs",
     "karma.conf.js"
   ],
   "exclude": ["node_modules", "dist", "test"]

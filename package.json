@@ -14,7 +14,7 @@
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.js",
     "test-node-old": "cross-env NODE_ENV=test TS_NODE_PROJECT=tsconfig.spec.json TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --project tsconfig.spec.json 'test/*.ts'",
-    "test-node": "npm run build-test && mocha dist/esm/test/*.spec.js && rm -rf dist/esm/test || true"
+    "test-node": "npm run build-test && mocha dist/test/*.spec.js && rm -rf dist/esm/test || true"
   },
   "files": [
     "dist",

@@ -1,4 +1,3 @@
-import { error } from "console";
 import { VerificationResponse, VerificationStep } from "src/types/result";
 
 const expectedResult = {

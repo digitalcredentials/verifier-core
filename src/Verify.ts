@@ -9,11 +9,11 @@ import { Credential } from './types/credential.js';
 import { VerificationResponse } from './types/result.js';
 
 // the new eddsa-rdfc-2022-cryptosuite
-import {DataIntegrityProof} from '@digitalbazaar/data-integrity';
+/* import {DataIntegrityProof} from '@digitalbazaar/data-integrity';
 import {cryptosuite as eddsaRdfc2022CryptoSuite} from '@digitalbazaar/eddsa-rdfc-2022-cryptosuite';
 const eddsaSuite = new DataIntegrityProof({
   cryptosuite: eddsaRdfc2022CryptoSuite
-});  
+});   */
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 const suite = new Ed25519Signature2020();

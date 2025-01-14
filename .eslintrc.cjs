@@ -14,6 +14,7 @@ module.exports = {
     '@typescript-eslint/prefer-ts-expect-error': 'off',
     '@typescript-eslint/return-await': 'off',
     '@typescript-eslint/strict-boolean-expressions': 'off',
+    '@typescript-eslint/prefer-nullish-coalescing': 'off',
     'no-empty-pattern': 'off'
   }
 }
