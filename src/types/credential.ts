@@ -87,6 +87,7 @@ export interface Proof {
   verificationMethod: string;
   proofPurpose: string;
   proofValue: string;
+  cryptosuite?: string;
   challenge?: string;
   jws?: string;
 }

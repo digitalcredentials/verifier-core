@@ -8,24 +8,26 @@ import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 import { Credential } from './types/credential.js';
 import { VerificationResponse } from './types/result.js';
 
-// the new eddsa-rdfc-2022-cryptosuite
-/* import {DataIntegrityProof} from '@digitalbazaar/data-integrity';
-import {cryptosuite as eddsaRdfc2022CryptoSuite} from '@digitalbazaar/eddsa-rdfc-2022-cryptosuite';
-const eddsaSuite = new DataIntegrityProof({
-  cryptosuite: eddsaRdfc2022CryptoSuite
-});   */
-
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
-const suite = new Ed25519Signature2020();
 
-export async function verifyCredential({credential, knownDIDRegistries, reloadIssuerRegistry = true}:{credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean}): Promise<VerificationResponse> {
-  
+// for verifying eddsa-2022 signatures
+import { DataIntegrityProof } from '@digitalbazaar/data-integrity';
+import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalbazaar/eddsa-rdfc-2022-cryptosuite';
+const eddsaSuite = new DataIntegrityProof({ cryptosuite: eddsaRdfc2022CryptoSuite });
 
-const fatalError = checkForFatalErrors(credential)
+// for verifying ed25519-2020 signatures
+const ed25519Suite = new Ed25519Signature2020();
+
+export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
+
+  const fatalError = checkForFatalErrors(credential)
 
   if (fatalError) {
     return fatalError
   }
+
+  const suite = (credential?.proof?.cryptosuite === 'eddsa-rdfc-2022') ?
+    eddsaSuite : ed25519Suite
 
   const verificationResponse = await vc.verifyCredential({
     credential,
@@ -34,7 +36,7 @@ const fatalError = checkForFatalErrors(credential)
     checkStatus: getCredentialStatusChecker(credential)
   });
 
-  // remove things we don't need in the result or that are duplicated elsewhere
+  // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
   delete verificationResponse.statusResult
   delete verificationResponse.verified
@@ -44,9 +46,17 @@ const fatalError = checkForFatalErrors(credential)
 
   if (verificationResponse.error) {
     if (verificationResponse.error.log) {
+      // move the log out of the error to the response, since it
+      // isn't part of the error, but rather the true/false values
+      // for each step in verification
       verificationResponse.log = verificationResponse.error.log
+      // delete the error, because again, this wasn't an error, just
+      // a false value on one of the steps
       delete verificationResponse.error
     } else if (verificationResponse?.error?.name === 'VerificationError') {
+      // this is in fact an error so return a fatal error.
+      // this means something happened (likely a bad signature) that prevents us from 
+      // saying anything conclusive about the various steps in verification
       const fatalErrorMessage = 'The signature is not valid.'
       const stackTrace = verificationResponse?.error?.errors?.stack
       return buildFatalErrorObject(fatalErrorMessage, "invalid_signature", credential, stackTrace)
@@ -54,16 +64,16 @@ const fatalError = checkForFatalErrors(credential)
   }
 
   const { issuer } = credential
-  await addTrustedIssuersToVerificationResponse({verificationResponse, knownDIDRegistries,reloadIssuerRegistry, issuer})
-  
+  await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
+
   return verificationResponse;
 }
 
-function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null) : VerificationResponse {
-  return {credential, isFatal: true, errors: [{name, message: fatalErrorMessage, isFatal: true, ...stackTrace?{stackTrace}:null}]}
+function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
+  return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, isFatal: true, ...stackTrace ? { stackTrace } : null }] }
 }
 
-function checkForFatalErrors(credential: Credential) : VerificationResponse | null {
+function checkForFatalErrors(credential: Credential): VerificationResponse | null {
   const validVCContexts = [
     'https://www.w3.org/2018/credentials/v1',
     'https://www.w3.org/ns/credentials/v2'
@@ -75,13 +85,13 @@ function checkForFatalErrors(credential: Credential) : VerificationResponse | nu
     const name = 'invalid_jsonld'
     return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
   }
-  
-  if (! validVCContexts.some(contextURI => suppliedContexts.includes(contextURI))) {
+
+  if (!validVCContexts.some(contextURI => suppliedContexts.includes(contextURI))) {
     const fatalErrorMessage = "The credential doesn't have a verifiable credential context."
     const name = 'no_vc_context'
     return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
   }
- 
+
   try {
     // eslint-disable-next-line no-new
     new URL(credential.id as string);
@@ -90,15 +100,12 @@ function checkForFatalErrors(credential: Credential) : VerificationResponse | nu
     const name = 'invalid_credential_id'
     return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
   }
-  
+
   if (!credential.proof) {
     const fatalErrorMessage = 'This is not a Verifiable Credential - it does not have a digital signature.'
     const name = 'no_proof'
-    return buildFatalErrorObject(fatalErrorMessage, name, credential,null)
+    return buildFatalErrorObject(fatalErrorMessage, name, credential, null)
   }
-
-  
-
 
   return null
 }
