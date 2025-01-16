@@ -20,6 +20,8 @@ Verifies the following versions of W3C Verifiable Credentials:
 * [1.1](https://www.w3.org/TR/2022/REC-vc-data-model-20220303/)
 * [2.0](https://www.w3.org/TR/vc-data-model-2.0/)
 
+And verifies signatures from both [eddsa-rdfc-2022 Data Integrity Proof](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite) and [ed25519-signature-2020 Linked Data Proof](https://github.com/digitalbazaar/ed25519-signature-2020) cryptosuites.
+
 The verification checks that the credential:
 
 * has a valid signature (i.e, that the credential hasn't been tampered with)
@@ -48,7 +50,7 @@ As of January 2025 issuers are trusted if they are listed in one of the Digital 
   }
   ```
 
-  The DCC is actively working on a new trust registry model that will likely extend the registry scope.
+  The DCC is actively working on a new trust registry model that will extend the registry scope.
 
 ## API
 
@@ -70,17 +72,18 @@ This package exports two methods:
 
 The typescript definitions for the result can be found [here](./src/types/result.ts)
 
-There are four general flavours of result that might be returned:
+Note that the verification result doesn't make any conclusion about the overall validity of a credential. It only checks the validity of each of the four steps, leaving it up to the consumer of the result to decide on the overall validity. The consumer might not, for example, consider a credential that had expired or had been revoked to be 'invalid'. The credential might still in fact be useful as a record of history, i.e, I had a driver's licence that expired two years ago, but did have it during the period 2018 to 2023, and that information might be useful.
 
-1. <b>successful verification</b>
+There are three general flavours of result that might be returned:
 
-A verification is successful if the signature is valid (the credential hasn't been tampered with), hasn't expired, hasn't been revoked, and was signed by a trusted issuer.
+1. <b>all checks were conclusive</b>
 
-A successful verification might look like this example:
+All of the checks were run *conclusively*, meaning that we determined wether each of the four steps in verification (signature, expiry, revocation, known issuer) was true or false.
+
+A conclusive verification might look like this example where all steps returned valid=true:
 
 ```
 {
-  "verified": true,
   "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
@@ -111,15 +114,12 @@ A successful verification might look like this example:
 }
 ```
 
-2. <b>unsucessful verification</b>
+Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been changed so we can't say anything conclusive about any of them.
 
-An unsuccessful verification means that one of the steps (other than the 'valid_signature' step) returned false, so the credential has expired, and/or been revoked, and/or can't be confirmed to be signed by a known issuer. Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been changed so we can't say anything conclusive about any of them.
-
-An unsuccessful verification (in this case because the credential has expired) might look like this example:
+Here is what the verification result for an expired credential might look like, where we have still made conclusive determinations about each step, and all are true except for the expiry:
 
 ```
 {
-  "verified": false,
   "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
@@ -149,17 +149,27 @@ An unsuccessful verification (in this case because the credential has expired) m
 }
 ```
 
-3. <b> partially successful verification</b>
+2. <b> partially successful verification</b>
 
-A verification might partly succeed if it can verify the signature and the expiry date, but can't retrieve any of the revocation status, the issuer registry, or the issuer's DID document from the network to verify the revocation status and issuer identity.
+A verification might partly succeed if it can verify:
 
-For those steps that we couldn't verify conclusively one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
+* the signature
+* the expiry date
+
+But can't retrieve (from the network) any one of the:
+
+* revocation status
+* the issuer registry
+* the issuer's DID document 
+
+to verify the revocation status and issuer identity.
+
+For steps that we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
 
 A partially successful verification might look like this example:
 
 ```
 {
-  "verified": false,
   "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
@@ -196,15 +206,14 @@ A partially successful verification might look like this example:
 }
 ```
 
-4. <b>fatal error</b>
+3. <b>fatal error</b>
 
-Fatal errors are errors that prevent us from saying anything conclusive about the credential, and so we don't list the results of each step (the 'log') because we can't say decisively one way or the other if any are true or false. Reverting to saying they are all false would be misleading, because that could be interepreted to mean that the credential was, for example, revoked when really we just don't know one way or the other.
+Fatal errors are errors that prevent us from saying anything conclusive about the credential, and so we don't list the results of each step (the 'log') because we can't decisively say if any are true or false. Reverting to saying they are all false would be misleading, because that could be interepreted to mean that the credential was, for example, revoked when really we just don't know one way or the other.
 
 ```
 {
   "credential": {the vc goes here},
   "isFatal": true,
-  "verified": false,
   "errors": [
     {
       "name": "invalidSignature",
