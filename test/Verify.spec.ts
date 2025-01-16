@@ -151,7 +151,7 @@ describe('Verify', () => {
           assert.ok(result.log);
         })
         
-        it.skip('when expired with valid status', async () => {
+        it('when expired with valid status', async () => {
           // NOTE: this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
           const credential : any = getVCv1ExpiredWithValidStatus() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
@@ -243,7 +243,7 @@ describe('Verify', () => {
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           assert.ok(result.log);
         })
-        it.skip('when expired with valid status', async () => {
+        it('when expired with valid status', async () => {
           // NOTE: TODO - this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
           const credential : any = getVCv2ExpiredWithValidStatus() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
