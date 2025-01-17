@@ -51,6 +51,19 @@ describe('Verify', () => {
 
   describe('.verifyCredential', () => {
 
+    describe('with eddsa signature and', () => { 
+      describe('with VC version 1', () => {
+      describe('it returns as verified', () => {
+      it('when status is valid', async () => {
+        const credential : any = getVCv2EddsaWithValidStatus()
+        const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
+        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        expect(result).to.deep.equalInAnyOrder(expectedResult) 
+      })
+    })
+  })
+
+    })
     describe('returns general fatal errors', () => {
 
       it('when not jsonld', async () => {
@@ -152,8 +165,7 @@ describe('Verify', () => {
         })
         
         it('when expired with valid status', async () => {
-          // NOTE: this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
-          const credential : any = getVCv1ExpiredWithValidStatus() 
+           const credential : any = getVCv1ExpiredWithValidStatus() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
@@ -221,14 +233,7 @@ describe('Verify', () => {
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
-        it('when status is valid for eddsa', async () => {
-          const credential : any = getVCv2EddsaWithValidStatus()
-        //  const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-         console.log("result from the eddsa verification:")
-          console.log(result)
-          // expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
-        })
+        
       })
 
       describe('returns as unverified', () => {

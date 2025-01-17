@@ -17,7 +17,7 @@ export async function getTrustedRegistryListForIssuer({ issuer, knownDIDRegistri
 
   // eslint-disable-next-line no-use-before-define
   if (reloadIssuerRegistry || registryNotYetLoaded) {
-    await registries.load({ config: knownDIDRegistries })
+    const result = await registries.load({ config: knownDIDRegistries })
   }
   const issuerDid = typeof issuer === 'string' ? issuer : issuer.id;
   const issuerInfo = registries.didEntry(issuerDid);

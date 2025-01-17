@@ -11,6 +11,7 @@ export function getCredentialStatusChecker(credential: Credential) : (() => bool
   if (!credential.credentialStatus) {
     return null;
   }
+
   const credentialStatuses = Array.isArray(credential.credentialStatus) ?
     credential.credentialStatus :
     [credential.credentialStatus];

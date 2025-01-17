@@ -26,14 +26,17 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
     return fatalError
   }
 
-  const suite = (credential?.proof?.cryptosuite === 'eddsa-rdfc-2022') ?
-    eddsaSuite : ed25519Suite
+const suite = [ed25519Suite, eddsaSuite]
+ /*  const suite = (credential?.proof?.cryptosuite === 'eddsa-rdfc-2022') ?
+    eddsaSuite : ed25519Suite */
 
-  const verificationResponse = await vc.verifyCredential({
+  const checkStatus = getCredentialStatusChecker(credential)
+
+  const verificationResponse = await vc.verifyCredential({  
     credential,
     suite,
     documentLoader,
-    checkStatus: getCredentialStatusChecker(credential)
+    checkStatus
   });
 
   // remove things we don't need from the result or that are duplicated elsewhere
@@ -64,7 +67,9 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
   }
 
   const { issuer } = credential
+
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
+ 
 
   return verificationResponse;
 }
