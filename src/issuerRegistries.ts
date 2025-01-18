@@ -1,5 +1,5 @@
 import {RegistryClient, LoadResult} from '@digitalcredentials/issuer-registry-client';
-import { VerificationResponse, RegistriesNotLoaded, RegistryListResult } from './types/result.js';
+import { VerificationResponse, RegistryListResult } from './types/result.js';
 const registries = new RegistryClient()
 const registryNotYetLoaded = true;
 
@@ -21,7 +21,7 @@ export async function getTrustedRegistryListForIssuer({ issuer, knownDIDRegistri
   if (reloadIssuerRegistry || registryNotYetLoaded) {
      registryLoadResult = await registries.load({ config: knownDIDRegistries })
   }
-  const registriesNotLoaded : {name: string, url: string}[] = registryLoadResult.filter((registry:LoadResult)=>registry.loaded===false).map(entry=>{return {name:entry.name, url:entry.url}})
+  const registriesNotLoaded : Array<{name: string, url: string}> = registryLoadResult.filter((registry:LoadResult)=>!registry.loaded).map(entry=>{return {name:entry.name, url:entry.url}})
   const issuerDid = typeof issuer === 'string' ? issuer : issuer.id;
   const issuerInfo = registries.didEntry(issuerDid);
   // See if the issuer DID appears in any of the known registries
