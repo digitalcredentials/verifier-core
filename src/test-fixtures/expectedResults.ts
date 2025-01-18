@@ -21,7 +21,8 @@ const expectedResult = {
         "valid": true,
         "foundInRegistries": [
           "DCC Sandbox Registry"
-        ]
+        ],
+        "registriesNotLoaded": []
       }
     ]
   }

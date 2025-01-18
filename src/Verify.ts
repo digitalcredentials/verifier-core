@@ -70,7 +70,6 @@ const suite = [ed25519Suite, eddsaSuite]
 
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
  
-
   return verificationResponse;
 }
 
