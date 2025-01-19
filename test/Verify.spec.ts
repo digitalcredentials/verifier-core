@@ -171,7 +171,7 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
-        it.only('when no matching registry', async () => {
+        it('when no matching registry', async () => {
           const credential : any = getVCv1ValidStatus() 
           const noMatchingRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           // set the one matching registry to a url that won't load
