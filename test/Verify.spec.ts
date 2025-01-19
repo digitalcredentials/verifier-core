@@ -21,7 +21,8 @@ import {
   getVCv2ExpiredAndTampered,
   getVCv1ExpiredWithValidStatus,
   getVCv2ExpiredWithValidStatus,
-  getVCv2EddsaWithValidStatus
+  getVCv2EddsaWithValidStatus,
+  getVCv2DoubleSigWithBadStatusUrl
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
@@ -51,6 +52,26 @@ describe('Verify', () => {
 
   describe('.verifyCredential', () => {
 
+    describe('ed25519 and eddsa signature', () => { 
+      describe('with VC version 2', () => {
+      describe('returns notfound error', () => {
+      it('when statuslist url is unreachable', async () => {
+        const credential : any = getVCv2DoubleSigWithBadStatusUrl()
+        const expectedResult = getExpectedVerifiedResult({credential, withStatus: false})
+        expectedResult.log?.push(
+        {
+          "id": "revocation_status",
+          "error": {
+            "name": "status_list_not_found",
+            "message": "NotFoundError loading \"https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj\": Request failed with status code 404 Not Found: GET https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj"
+          }
+        })
+        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        expect(result).to.deep.equalInAnyOrder(expectedResult) 
+      })
+    })
+  })
+})
     describe('with eddsa signature and', () => { 
       describe('with VC version 1', () => {
       describe('it returns as verified', () => {
