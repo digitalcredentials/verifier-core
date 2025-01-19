@@ -171,6 +171,53 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
+        it.only('when no matching registry', async () => {
+          const credential : any = getVCv1ValidStatus() 
+          const noMatchingRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
+          // set the one matching registry to a url that won't load
+          noMatchingRegistryList[1].url = 'https://onlynoyrt.com/registry.json'
+          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+          const expectedRsultRegistryLogEntry = expectedResult.log.find((entry:any)=>entry.id==='registered_issuer')
+          expectedRsultRegistryLogEntry.registriesNotLoaded = [
+            {
+              "name": "DCC Pilot Registry",
+              "url": "https://onlynoyrt.com/registry.json"
+            }
+          ]
+          expectedRsultRegistryLogEntry.valid = false;
+
+          const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries: noMatchingRegistryList})
+          console.log(JSON.parse(JSON.stringify(result)))
+          assert.ok(result.log);
+        })
+
+
+      })
+
+      describe('returns accurate registry list', () => {
+
+        it('for non-existant registry url', async () => {
+          const credential : any = getVCv1ValidStatus()
+          const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
+          badRegistryList[0].url = 'https://onlynoyrt.com/registry.json'
+          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+          expectedResult.log.find((entry:any)=>entry.id==='registered_issuer').registriesNotLoaded = [
+            {
+              "name": "DCC Pilot Registry",
+              "url": "https://onlynoyrt.com/registry.json"
+            }
+          ]
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries: badRegistryList}) 
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
+
+        it('when all registries exist', async () => {
+          const credential : any = getVCv1ValidStatus()
+          const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})      
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
+
       })
 
 
