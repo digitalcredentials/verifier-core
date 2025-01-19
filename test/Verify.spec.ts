@@ -187,7 +187,6 @@ describe('Verify', () => {
           expectedRsultRegistryLogEntry.valid = false;
 
           const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries: noMatchingRegistryList})
-          console.log(JSON.parse(JSON.stringify(result)))
           assert.ok(result.log);
         })
 
@@ -196,7 +195,7 @@ describe('Verify', () => {
 
       describe('returns accurate registry list', () => {
 
-        it('for non-existant registry url', async () => {
+        it('when one registry url does not exist', async () => {
           const credential : any = getVCv1ValidStatus()
           const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           badRegistryList[0].url = 'https://onlynoyrt.com/registry.json'
@@ -211,6 +210,25 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
+        it('when two registry urls do not exist', async () => {
+          const credential : any = getVCv1ValidStatus()
+          const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
+          badRegistryList[0].url = 'https://onlynoyrt.com/registry.json'
+          badRegistryList[2].url = 'https://onlynoyrrrt.com/registry.json'
+          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+          expectedResult.log.find((entry:any)=>entry.id==='registered_issuer').registriesNotLoaded = [
+            {
+             "name": "DCC Community Registry",
+             "url": "https://onlynoyrrrt.com/registry.json"
+           },
+           {
+              "name": "DCC Pilot Registry",
+              "url": "https://onlynoyrt.com/registry.json"
+            }
+          ]
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries: badRegistryList}) 
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
         it('when all registries exist', async () => {
           const credential : any = getVCv1ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
