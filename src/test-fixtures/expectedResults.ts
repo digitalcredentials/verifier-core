@@ -33,8 +33,7 @@ const expectedResult = {
     errors: [
       {
         name: 'error name goes here, e.g., no_proof',
-        message: 'error message goes here',
-        isFatal: true
+        message: 'error message goes here'
       }
     ]
   }

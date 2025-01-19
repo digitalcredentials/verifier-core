@@ -39,14 +39,16 @@ const suite = [ed25519Suite, eddsaSuite]
     checkStatus
   });
 
+  processAnyStatusError({verificationResponse, statusResult: verificationResponse.statusResult});
+ 
   // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
   delete verificationResponse.statusResult
   delete verificationResponse.verified
-
-  verificationResponse.isFatal = false
   verificationResponse.credential = credential
 
+  verificationResponse.isFatal = false
+  
   if (verificationResponse.error) {
     if (verificationResponse.error.log) {
       // move the log out of the error to the response, since it
@@ -74,7 +76,7 @@ const suite = [ed25519Suite, eddsaSuite]
 }
 
 function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
-  return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, isFatal: true, ...stackTrace ? { stackTrace } : null }] }
+  return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
 }
 
 function checkForFatalErrors(credential: Credential): VerificationResponse | null {
@@ -114,6 +116,22 @@ function checkForFatalErrors(credential: Credential): VerificationResponse | nul
   return null
 }
 
+function processAnyStatusError( {verificationResponse, statusResult} :{
+  verificationResponse: VerificationResponse,
+  statusResult: any
+}) : void
+ {
+  if (statusResult?.error?.cause?.message?.startsWith('NotFoundError')) {
+    const statusStep = {
+      "id": "revocation_status",
+      "error": {
+        name: 'status_list_not_found',
+        message: statusResult.error.cause.message 
+      }
+  };
+    (verificationResponse.log ??= []).push(statusStep)
+  }
+}
 
 // import { purposes } from '@digitalcredentials/jsonld-signatures';
 // import { VerifiablePresentation, PresentationError } from './types/presentation';
