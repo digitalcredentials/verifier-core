@@ -22,7 +22,8 @@ import {
   getVCv1ExpiredWithValidStatus,
   getVCv2ExpiredWithValidStatus,
   getVCv2EddsaWithValidStatus,
-  getVCv2DoubleSigWithBadStatusUrl
+  getVCv2DoubleSigWithBadStatusUrl,
+  getVCv2DidWebWithValidStatus
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
@@ -48,7 +49,26 @@ tests to add:
 */
 
 
+
 describe('Verify', () => {
+
+  const originalLogFunction = console.log;
+  let output:string;
+
+  beforeEach(function(done) {
+    output = '';
+    console.log = (msg) => {
+      output += msg + '\n';
+    };
+    done()
+  });
+
+  afterEach(function() {
+    console.log = originalLogFunction; // undo dummy log function
+    if (this?.currentTest?.state === 'failed') {
+      console.log(output);
+    }
+  });
 
   describe('.verifyCredential', () => {
 
@@ -319,6 +339,23 @@ describe('Verify', () => {
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
+        describe('with did:web issuer', () => {
+
+          it('when status is valid', async () => {
+            const credential : any = getVCv2DidWebWithValidStatus()
+            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
+            const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          })
+        
+          it('with different issuer for vc and statusList ', async () => {
+            const credential : any = getVCv2DidWebWithValidStatus()
+            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
+            const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          })
+
+      })
         
       })
 

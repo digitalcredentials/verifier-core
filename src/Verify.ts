@@ -36,7 +36,8 @@ const suite = [ed25519Suite, eddsaSuite]
     credential,
     suite,
     documentLoader,
-    checkStatus
+    checkStatus,
+    verifyMatchingIssuers: false
   });
 
   processAnyStatusError({verificationResponse, statusResult: verificationResponse.statusResult});
