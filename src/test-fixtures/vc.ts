@@ -14,6 +14,7 @@ import { v2EddsaWithValidStatus } from "./verifiableCredentials/eddsa/v2/v2Eddsa
 import { v2DoubleSigWithBadStatusUrl } from "./verifiableCredentials/eddsaAndEd25519/v2/v2DoubleSigWithBadStatusUrl.js"
 
 import { v2didWebWithValidStatus } from "./verifiableCredentials/v2/didWeb/v2didWebWithValidStatus.js"
+import { v2WithBadDidWeb } from "./verifiableCredentials/v2/didWeb/v2WithBadDidWeb.js"
 
 const getVCv1 = (): any => {
   return JSON.parse(JSON.stringify(v1NoStatus))
@@ -123,6 +124,10 @@ const getVCv2DidWebWithValidStatus = (): any => {
   return JSON.parse(JSON.stringify(v2didWebWithValidStatus))
 }
 
+const getVCv2WithBadDidWebUrl = (): any => {
+  return JSON.parse(JSON.stringify(v2WithBadDidWeb))
+}
+
 
 export {
 
@@ -142,6 +147,7 @@ export {
   getVCv2NoProof,
   getVCv2NonURIId,
   getVCv2DidWebWithValidStatus,
+  getVCv2WithBadDidWebUrl,
 
   getVCv1,
   getVCv1Expired,

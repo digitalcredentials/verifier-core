@@ -14,65 +14,51 @@ const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
 // for verifying eddsa-2022 signatures
 const eddsaSuite = new DataIntegrityProof({ cryptosuite: eddsaRdfc2022CryptoSuite });
-
 // for verifying ed25519-2020 signatures
 const ed25519Suite = new Ed25519Signature2020();
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
 
-  const fatalError = checkForFatalErrors(credential)
+  const fatalCredentialError = checkForFatalCredentialErrors(credential)
 
-  if (fatalError) {
-    return fatalError
+  if (fatalCredentialError) {
+    return fatalCredentialError
   }
 
-const suite = [ed25519Suite, eddsaSuite]
- /*  const suite = (credential?.proof?.cryptosuite === 'eddsa-rdfc-2022') ?
-    eddsaSuite : ed25519Suite */
+  // add both suites - the vc lib will use whichever is appropriate
+  const suite = [ed25519Suite, eddsaSuite]
 
-  const checkStatus = getCredentialStatusChecker(credential)
+  // a statusCheck is returned only if the credential has a status
+  // that needs checking, otherwise null
+  const statusChecker = getCredentialStatusChecker(credential)
 
-  const verificationResponse = await vc.verifyCredential({  
+  const verificationResponse = await vc.verifyCredential({
     credential,
     suite,
     documentLoader,
-    checkStatus,
+    checkStatus: statusChecker,
     verifyMatchingIssuers: false
   });
 
-  processAnyStatusError({verificationResponse, statusResult: verificationResponse.statusResult});
- 
+
+  processAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
+
   // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
   delete verificationResponse.statusResult
   delete verificationResponse.verified
+  // add things we always want in the response
   verificationResponse.credential = credential
-
   verificationResponse.isFatal = false
-  
-  if (verificationResponse.error) {
-    if (verificationResponse.error.log) {
-      // move the log out of the error to the response, since it
-      // isn't part of the error, but rather the true/false values
-      // for each step in verification
-      verificationResponse.log = verificationResponse.error.log
-      // delete the error, because again, this wasn't an error, just
-      // a false value on one of the steps
-      delete verificationResponse.error
-    } else if (verificationResponse?.error?.name === 'VerificationError') {
-      // this is in fact an error so return a fatal error.
-      // this means something happened (likely a bad signature) that prevents us from 
-      // saying anything conclusive about the various steps in verification
-      const fatalErrorMessage = 'The signature is not valid.'
-      const stackTrace = verificationResponse?.error?.errors?.stack
-      return buildFatalErrorObject(fatalErrorMessage, "invalid_signature", credential, stackTrace)
-    }
+
+  const fatalSignatureError = processAnySignatureError({ verificationResponse, credential })
+  if (fatalSignatureError) {
+    return fatalSignatureError
   }
 
   const { issuer } = credential
-
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
- 
+
   return verificationResponse;
 }
 
@@ -80,7 +66,7 @@ function buildFatalErrorObject(fatalErrorMessage: string, name: string, credenti
   return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
 }
 
-function checkForFatalErrors(credential: Credential): VerificationResponse | null {
+function checkForFatalCredentialErrors(credential: Credential): VerificationResponse | null {
   const validVCContexts = [
     'https://www.w3.org/2018/credentials/v1',
     'https://www.w3.org/ns/credentials/v2'
@@ -117,22 +103,76 @@ function checkForFatalErrors(credential: Credential): VerificationResponse | nul
   return null
 }
 
-function processAnyStatusError( {verificationResponse, statusResult} :{
+function processAnyStatusError({ verificationResponse, statusResult }: {
   verificationResponse: VerificationResponse,
   statusResult: any
-}) : void
- {
+}): void {
   if (statusResult?.error?.cause?.message?.startsWith('NotFoundError')) {
     const statusStep = {
       "id": "revocation_status",
       "error": {
         name: 'status_list_not_found',
-        message: statusResult.error.cause.message 
+        message: statusResult.error.cause.message
       }
-  };
+    };
     (verificationResponse.log ??= []).push(statusStep)
   }
 }
+
+function processAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }) {
+  if (verificationResponse.error) {
+
+    if (verificationResponse?.error?.name === 'VerificationError') {
+      // Can't validate the signature. 
+      // Either a bad signature or maybe a did:web that can't
+      // be resolved. Because we can't validate the signature, we
+      // can't therefore say anything conclusive about the various 
+      // steps in verification.
+      // So, return a fatal error and no log (because we can't say
+      // anything meaningful about the steps in the log)
+      let fatalErrorMessage = ""
+      let errorName = ""
+      // check to see if the error is http related
+      const httpError = verificationResponse.error.errors.find((error: any) => error.name === 'HTTPError')
+      if (httpError) {
+        // was it caused by a did:web that couldn't be resolved???
+        const issuerDID: string = (((credential.issuer) as any).id) || credential.issuer
+        if (issuerDID.toLowerCase().startsWith('did:web')) {
+          // change did to a url:
+          const didUrl = issuerDID.slice(8).replaceAll(':', '/').toLowerCase()
+          if (httpError.requestUrl.toLowerCase().includes(didUrl)) {
+            fatalErrorMessage = `The signature could not be checked because the public signing key could not be retrieved from ${httpError.requestUrl}`
+            errorName = 'did_web_unresolved'
+          } else {
+            // some other kind of http error
+            fatalErrorMessage = 'An http error prevented the signature check.'
+            errorName = 'http_error_with_signature_check'
+          }
+        }
+      } else {
+          // not an http error, so likely bad signature
+          fatalErrorMessage = 'The signature is not valid.'
+          errorName = 'invalid_signature'
+      }
+      const stackTrace = verificationResponse?.error?.errors?.stack
+      return buildFatalErrorObject(fatalErrorMessage, errorName, credential, stackTrace)
+      
+    
+      } else if (verificationResponse.error.log) {
+        // There wasn't actually an error, it is just that one of the
+        // steps returned false.
+        // So move the log out of the error to the response, since it
+        // isn't part of the error
+        verificationResponse.log = verificationResponse.error.log
+        // delete the error, because again, this wasn't an error, just
+        // a false value on one of the steps
+        delete verificationResponse.error
+      }
+    }
+  }
+
+  
+
 
 // import { purposes } from '@digitalcredentials/jsonld-signatures';
 // import { VerifiablePresentation, PresentationError } from './types/presentation';

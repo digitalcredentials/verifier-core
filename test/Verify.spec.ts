@@ -23,7 +23,8 @@ import {
   getVCv2ExpiredWithValidStatus,
   getVCv2EddsaWithValidStatus,
   getVCv2DoubleSigWithBadStatusUrl,
-  getVCv2DidWebWithValidStatus
+  getVCv2DidWebWithValidStatus,
+  getVCv2WithBadDidWebUrl
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
@@ -74,21 +75,22 @@ describe('Verify', () => {
 
     describe('ed25519 and eddsa signature', () => { 
       describe('with VC version 2', () => {
-      describe('returns notfound error', () => {
-      it('when statuslist url is unreachable', async () => {
-        const credential : any = getVCv2DoubleSigWithBadStatusUrl()
-        const expectedResult = getExpectedVerifiedResult({credential, withStatus: false})
-        expectedResult.log?.push(
-        {
-          "id": "revocation_status",
-          "error": {
-            "name": "status_list_not_found",
-            "message": "NotFoundError loading \"https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj\": Request failed with status code 404 Not Found: GET https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj"
-          }
+      describe('returns log error', () => {
+        it('when statuslist url is unreachable', async () => {
+          const credential : any = getVCv2DoubleSigWithBadStatusUrl()
+          const expectedResult = getExpectedVerifiedResult({credential, withStatus: false})
+          expectedResult.log?.push(
+          {
+            "id": "revocation_status",
+            "error": {
+              "name": "status_list_not_found",
+              "message": "NotFoundError loading \"https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj\": Request failed with status code 404 Not Found: GET https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj"
+            }
+          })
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
-        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-        expect(result).to.deep.equalInAnyOrder(expectedResult) 
-      })
+        
     })
   })
 })
@@ -105,7 +107,7 @@ describe('Verify', () => {
   })
 
     })
-    describe('returns general fatal errors', () => {
+    describe('returns fatal errors', () => {
 
       it('when not jsonld', async () => {
         const credential : any = getCredentialWithoutContext() 
@@ -330,6 +332,15 @@ describe('Verify', () => {
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
         
+        it('when did:web url is unreachable', async () => {
+          const credential : any = getVCv2WithBadDidWebUrl()
+          const errorName = "did_web_unresolved"
+          const errorMessage = "The signature could not be checked because the public signing key could not be retrieved from https://digitalcredentials.github.io/dcc-did-web-bad/did.json"
+          const expectedResult = getExpectedFatalResult({credential, errorName, errorMessage}) 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          expect(result).to.deep.equalInAnyOrder(expectedResult) 
+        })
+
       })
 
       describe('returns as verified', () => {
