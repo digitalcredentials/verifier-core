@@ -119,7 +119,7 @@ function processAnyStatusError({ verificationResponse, statusResult }: {
   }
 }
 
-function processAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }) {
+function processAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }) : null | VerificationResponse {
   if (verificationResponse.error) {
 
     if (verificationResponse?.error?.name === 'VerificationError') {
@@ -141,7 +141,7 @@ function processAnySignatureError({ verificationResponse, credential }: { verifi
           // change did to a url:
           const didUrl = issuerDID.slice(8).replaceAll(':', '/').toLowerCase()
           if (httpError.requestUrl.toLowerCase().includes(didUrl)) {
-            fatalErrorMessage = `The signature could not be checked because the public signing key could not be retrieved from ${httpError.requestUrl}`
+            fatalErrorMessage = `The signature could not be checked because the public signing key could not be retrieved from ${httpError.requestUrl as string}`
             errorName = 'did_web_unresolved'
           } else {
             // some other kind of http error
@@ -169,6 +169,7 @@ function processAnySignatureError({ verificationResponse, credential }: { verifi
         delete verificationResponse.error
       }
     }
+    return null
   }
 
   
