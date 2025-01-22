@@ -40,9 +40,6 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
     verifyMatchingIssuers: false
   });
 
-  //console.log("the verification response:")
-  //console.log(JSON.stringify(verificationResponse, null, 2))
-
   handleAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
 
   const fatalSignatureError = handleAnySignatureError({ verificationResponse, credential })

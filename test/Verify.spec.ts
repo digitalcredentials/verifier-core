@@ -295,6 +295,18 @@ describe('Verify', () => {
       
       //console.log(JSON.stringify(result, null, 2))
       describe('returns fatal error', () => {
+
+        it('when no context', async () => {
+          const credential : any = getVCv2NoContext() 
+          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const expectedResult = getExpectedFatalResult({
+            credential, 
+            errorMessage: 'The signature is not valid.',
+            errorName: 'invalid_signature'
+          })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) 
+        })
+
         it('when tampered with', async () => {
           const credential : any = getVCv2Tampered() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
