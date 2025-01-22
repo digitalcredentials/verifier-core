@@ -36,6 +36,7 @@ import {
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
 
+const DISABLE_CONSOLE_WHEN_NO_ERRORS = false
 /*
 tests to add:
 
@@ -57,17 +58,21 @@ describe('Verify', () => {
   let output:string;
 
   beforeEach(function(done) {
-    output = '';
-    console.log = (msg) => {
-      output += msg + '\n';
-    };
+    if (DISABLE_CONSOLE_WHEN_NO_ERRORS) {
+      output = '';
+      console.log = (msg) => {
+        output += msg + '\n';
+      };
+    }
     done()
   });
 
   afterEach(function() {
-    console.log = originalLogFunction; // undo dummy log function
-    if (this?.currentTest?.state === 'failed') {
-      console.log(output);
+    if (DISABLE_CONSOLE_WHEN_NO_ERRORS) {
+      console.log = originalLogFunction; // undo dummy log function
+      if (this?.currentTest?.state === 'failed') {
+        console.log(output);
+      }
     }
   });
 
@@ -218,22 +223,23 @@ describe('Verify', () => {
           const credential : any = getVCv1ValidStatus() 
           const noMatchingRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           // set the one matching registry to a url that won't load
-          noMatchingRegistryList[1].url = 'https://onlynoyrt.com/registry.json'
+          noMatchingRegistryList[1].url = 'https://onldynoyrt.com/registry.json'
           const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
-          const expectedRsultRegistryLogEntry = expectedResult.log.find((entry:any)=>entry.id==='registered_issuer')
-          expectedRsultRegistryLogEntry.registriesNotLoaded = [
+          const expectedResultRegistryLogEntry = expectedResult.log.find((entry:any)=>entry.id==='registered_issuer')
+          expectedResultRegistryLogEntry.registriesNotLoaded = [
             {
-              "name": "DCC Pilot Registry",
-              "url": "https://onlynoyrt.com/registry.json"
+              "name": "DCC Sandbox Registry",
+              "url": "https://onldynoyrt.com/registry.json"
             }
           ]
-          expectedRsultRegistryLogEntry.valid = false;
+          expectedResultRegistryLogEntry.valid = false;
+          expectedResultRegistryLogEntry.foundInRegistries = []
 
           const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries: noMatchingRegistryList})
-          assert.ok(result.log);
+          
+          //console.log(JSON.stringify(result, null, 2))
+          expect(result).to.deep.equalInAnyOrder(expectedResult)
         })
-
-
       })
 
       describe('returns accurate registry list', () => {
@@ -241,12 +247,12 @@ describe('Verify', () => {
         it('when one registry url does not exist', async () => {
           const credential : any = getVCv1ValidStatus()
           const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
-          badRegistryList[0].url = 'https://onlynoyrt.com/registry.json'
+          badRegistryList[0].url = 'https://onldynoyrt.com/registry.json'
           const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
           expectedResult.log.find((entry:any)=>entry.id==='registered_issuer').registriesNotLoaded = [
             {
               "name": "DCC Pilot Registry",
-              "url": "https://onlynoyrt.com/registry.json"
+              "url": "https://onldynoyrt.com/registry.json"
             }
           ]
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries: badRegistryList}) 
@@ -256,17 +262,17 @@ describe('Verify', () => {
         it('when two registry urls do not exist', async () => {
           const credential : any = getVCv1ValidStatus()
           const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
-          badRegistryList[0].url = 'https://onlynoyrt.com/registry.json'
-          badRegistryList[2].url = 'https://onlynoyrrrt.com/registry.json'
+          badRegistryList[0].url = 'https://onldynoyrt.com/registry.json'
+          badRegistryList[2].url = 'https://onldynoyrrrt.com/registry.json'
           const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
           expectedResult.log.find((entry:any)=>entry.id==='registered_issuer').registriesNotLoaded = [
             {
              "name": "DCC Community Registry",
-             "url": "https://onlynoyrrrt.com/registry.json"
+             "url": "https://onldynoyrrrt.com/registry.json"
            },
            {
               "name": "DCC Pilot Registry",
-              "url": "https://onlynoyrt.com/registry.json"
+              "url": "https://onldynoyrt.com/registry.json"
             }
           ]
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries: badRegistryList}) 
@@ -286,6 +292,8 @@ describe('Verify', () => {
 
     describe('with VC version 2', () => {
   
+      
+      //console.log(JSON.stringify(result, null, 2))
       describe('returns fatal error', () => {
         it('when tampered with', async () => {
           const credential : any = getVCv2Tampered() 

@@ -8,7 +8,7 @@ import { getCredentialStatusChecker } from './credentialStatus.js';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 
 import { Credential } from './types/credential.js';
-import { VerificationResponse } from './types/result.js';
+import { VerificationResponse, VerificationStep } from './types/result.js';
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
@@ -19,7 +19,7 @@ const ed25519Suite = new Ed25519Signature2020();
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
 
-  const fatalCredentialError = checkForFatalCredentialErrors(credential)
+  const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
 
   if (fatalCredentialError) {
     return fatalCredentialError
@@ -40,24 +40,28 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
     verifyMatchingIssuers: false
   });
 
+  //console.log("the verification response:")
+  //console.log(JSON.stringify(verificationResponse, null, 2))
 
-  processAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
+  handleAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
 
-  // remove things we don't need from the result or that are duplicated elsewhere
-  delete verificationResponse.results
-  delete verificationResponse.statusResult
-  delete verificationResponse.verified
-  // add things we always want in the response
-  verificationResponse.credential = credential
-  verificationResponse.isFatal = false
-
-  const fatalSignatureError = processAnySignatureError({ verificationResponse, credential })
+  const fatalSignatureError = handleAnySignatureError({ verificationResponse, credential })
   if (fatalSignatureError) {
     return fatalSignatureError
   }
 
   const { issuer } = credential
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
+
+  // remove things we don't need from the result or that are duplicated elsewhere
+  delete verificationResponse.results
+  delete verificationResponse.statusResult
+  delete verificationResponse.verified
+  verificationResponse.log = verificationResponse.log.filter((entry:VerificationStep)=>entry.id !== 'issuer_did_resolves')
+
+  // add things we always want in the response
+  verificationResponse.credential = credential
+  verificationResponse.isFatal = false
 
   return verificationResponse;
 }
@@ -66,7 +70,7 @@ function buildFatalErrorObject(fatalErrorMessage: string, name: string, credenti
   return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
 }
 
-function checkForFatalCredentialErrors(credential: Credential): VerificationResponse | null {
+function handleAnyFatalCredentialErrors(credential: Credential): VerificationResponse | null {
   const validVCContexts = [
     'https://www.w3.org/2018/credentials/v1',
     'https://www.w3.org/ns/credentials/v2'
@@ -103,7 +107,7 @@ function checkForFatalCredentialErrors(credential: Credential): VerificationResp
   return null
 }
 
-function processAnyStatusError({ verificationResponse, statusResult }: {
+function handleAnyStatusError({ verificationResponse, statusResult }: {
   verificationResponse: VerificationResponse,
   statusResult: any
 }): void {
@@ -119,7 +123,7 @@ function processAnyStatusError({ verificationResponse, statusResult }: {
   }
 }
 
-function processAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }) : null | VerificationResponse {
+function handleAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }) : null | VerificationResponse {
   if (verificationResponse.error) {
 
     if (verificationResponse?.error?.name === 'VerificationError') {

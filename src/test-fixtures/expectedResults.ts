@@ -9,10 +9,6 @@ const expectedResult = {
         "valid": true
       },
       {
-        "id": "issuer_did_resolves",
-        "valid": true
-      },
-      {
         "id": "expiration",
         "valid": true
       },

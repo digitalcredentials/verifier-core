@@ -50,7 +50,7 @@ As of January 2025 issuers are trusted if they are listed in one of the Digital 
   }
   ```
 
-  The DCC is actively working on a new trust registry model that will extend the registry scope.
+  The DCC is working on a new trust registry model that will extend the registry scope.
 
 ## API
 
@@ -66,7 +66,8 @@ This package exports two methods:
 #### arguments
 
 * credential - The W3C Verifiable Credential to be verified.
-* reloadIssuerRegistry - A boolean (true/false) indication whether or not to refresh the cached copy of the registry.
+* knownDidRegistries - a list of trusted registries.
+* reloadIssuerRegistry - A boolean (true/false) indication whether or not to refresh the cached copy of the registries.
 
 #### result
 
@@ -78,7 +79,7 @@ There are three general flavours of result that might be returned:
 
 1. <b>all checks were conclusive</b>
 
-All of the checks were run *conclusively*, meaning that we determined wether each of the four steps in verification (signature, expiry, revocation, known issuer) was true or false.
+All of the checks were run *conclusively*, meaning that we determined whether each of the four steps in verification (signature, expiry, revocation, known issuer) was true or false.
 
 A conclusive verification might look like this example where all steps returned valid=true:
 
@@ -89,10 +90,6 @@ A conclusive verification might look like this example where all steps returned 
   "log": [
     {
       "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "issuer_did_resolves",
       "valid": true
     },
     {
@@ -108,15 +105,16 @@ A conclusive verification might look like this example where all steps returned 
       "valid": true,
       "foundInRegistries": [
         "DCC Sandbox Registry"
-      ]
+      ],
+      "registriesNotLoaded":[]
     }
   ]
 }
 ```
 
-Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been changed so we can't say anything conclusive about any of them.
+Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been tampered with, and so we can't say anything conclusive about any of them.
 
-Here is what the verification result for an expired credential might look like, where we have still made conclusive determinations about each step, and all are true except for the expiry:
+Here is what the verification result for an expired credential might look like, where we have made conclusive determinations about each step, and all are true except for the expiry:
 
 ```
 {
@@ -125,10 +123,6 @@ Here is what the verification result for an expired credential might look like, 
   "log": [
     {
       "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "issuer_did_resolves",
       "valid": true
     },
     {
@@ -143,7 +137,8 @@ Here is what the verification result for an expired credential might look like, 
       "valid": true,
       "foundInRegistries": [
         "DCC Sandbox Registry"
-      ]
+      ],
+      "registriesNotLoaded":[]
     }
   ]
 }
@@ -162,7 +157,7 @@ But can't retrieve (from the network) any one of the:
 * the issuer registry
 * the issuer's DID document 
 
-to verify the revocation status and issuer identity.
+which are needed to verify the revocation status and issuer identity.
 
 For steps that we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
 
@@ -190,17 +185,14 @@ A partially successful verification might look like this example:
     },
     {
       "id": "registered_issuer",
-      "error": {
-            "name": "network-error",
-            "message": "Could not retrieve the issuer registry."
-      }   
-    },
-    {
-      "id": "issuer_did_resolves",
-      "error": {
-            "name": "network-error",
-            "message": "Could not retrieve the issuer DID."
-      }   
+      "valid": false,
+      "foundInRegistries": [],
+      "registriesNotLoaded": [
+        {
+          "name": "DCC Sandbox Registry",
+          "url": "https://onlynoyrt.com/registry.json"
+        }
+      ]
     }
   ]
 }
@@ -210,9 +202,15 @@ A partially successful verification might look like this example:
 
 Fatal errors are errors that prevent us from saying anything conclusive about the credential, and so we don't list the results of each step (the 'log') because we can't decisively say if any are true or false. Reverting to saying they are all false would be misleading, because that could be interepreted to mean that the credential was, for example, revoked when really we just don't know one way or the other.
 
+Examples of fatal errors:
+
+<b>invalid signature</b>
+  
+Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity.
+
 ```
 {
-  "credential": {the vc goes here},
+  "credential": {vc removed for brevity/clarity},
   "isFatal": true,
   "errors": [
     {
@@ -222,19 +220,38 @@ Fatal errors are errors that prevent us from saying anything conclusive about th
   ]
 }
 ```
-Examples of fatal errors:
 
-<b>invalid signature</b>
+
+<b>unresolvable did</b>
+
+Fatal because we couldn't retrieve the DID document containing the public signing key with which to check the signature. This error is most likely to happen with a did:web if the url for the did:web document is wrong or
+has been taken down, or there is a network error.
+
+```
+{
+  "credential": {vc removed for brevity/clarity},
+  "isFatal": true,
+  "errors": [
+    {
+      "name": "did_web_unresolved",
+      "message": "The signature could not be checked because the public signing key could not be retrieved from https://digitalcredentials.github.io/dcc-did-web-bad/did.json"
+    }
+  ]
+}
+```
+
+<b>malformed credential</b>
   
-Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity
+The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
+
+```
+
+```
 
 <b>software problem</b>
   
 A software error might prevent verification
 
-<b>malformed credential</b>
-  
-The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
 
 ### verifyPresentation
 
