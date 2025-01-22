@@ -9,6 +9,13 @@ import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep } from './types/result.js';
+import { VerifiablePresentation, PresentationError } from './types/presentation.js';
+
+import { extractCredentialsFrom} from './extractCredentialsFrom.js';
+
+// import { purposes } from '@digitalcredentials/jsonld-signatures';
+// const presentationPurpose = new purposes.AssertionProofPurpose();
+// import { extractCredentialsFrom } from './verifiableObject';
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
@@ -16,6 +23,63 @@ const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 const eddsaSuite = new DataIntegrityProof({ cryptosuite: eddsaRdfc2022CryptoSuite });
 // for verifying ed25519-2020 signatures
 const ed25519Suite = new Ed25519Signature2020();
+  // add both suites - the vc lib will use whichever is appropriate
+const suite = [ed25519Suite, eddsaSuite]
+
+
+export async function verifyPresentation(
+  presentation: VerifiablePresentation,
+  challenge: string,
+  unsignedPresentation = false,
+): Promise<VerificationResponse> {
+  try {
+    const credential = extractCredentialsFrom(presentation)?.find(
+      vc => vc.credentialStatus);
+    const checkStatus = credential ? getCredentialStatusChecker(credential) : undefined;
+    const result = await vc.verify({
+      presentation,
+    //  presentationPurpose,
+      suite,
+      documentLoader,
+      unsignedPresentation,
+      checkStatus,
+      challenge,
+      verifyMatchingIssuers: false
+    });
+
+    if (!result.verified) {
+      console.warn('VP not verified:', JSON.stringify(result, null, 2));
+    }
+    return result;
+  } catch (err) {
+    console.warn(err);
+
+    throw new Error(PresentationError.CouldNotBeVerified);
+  }
+}
+/* 
+
+from Verifier Plus:
+
+export async function verifyPresentation(
+  presentation: VerifiablePresentation,
+  unsignedPresentation = true,
+): Promise<VerifyResponse> {
+  try {
+    const result = await vc.verify({
+      presentation,
+      presentationPurpose,
+      suite,
+      documentLoader,
+      unsignedPresentation,
+    });
+
+    return result;
+  } catch (err) {
+    console.warn(err);
+    throw new Error(PresentationError.CouldNotBeVerified);
+  }
+} */
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
 
@@ -24,9 +88,6 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
   if (fatalCredentialError) {
     return fatalCredentialError
   }
-
-  // add both suites - the vc lib will use whichever is appropriate
-  const suite = [ed25519Suite, eddsaSuite]
 
   // a statusCheck is returned only if the credential has a status
   // that needs checking, otherwise null
@@ -176,7 +237,3 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
   
 
 
-// import { purposes } from '@digitalcredentials/jsonld-signatures';
-// import { VerifiablePresentation, PresentationError } from './types/presentation';
-// const presentationPurpose = new purposes.AssertionProofPurpose();
-// import { extractCredentialsFrom } from './verifiableObject';
