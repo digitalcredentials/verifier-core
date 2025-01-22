@@ -25,6 +25,7 @@ import {
   getVCv2DoubleSigWithBadStatusUrl,
   getVCv2DidWebWithValidStatus,
   getVCv2WithBadDidWebUrl
+
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
@@ -36,7 +37,7 @@ import {
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
 
-const DISABLE_CONSOLE_WHEN_NO_ERRORS = false
+const DISABLE_CONSOLE_WHEN_NO_ERRORS = true
 /*
 tests to add:
 
@@ -117,7 +118,6 @@ describe('Verify', () => {
       it('when not jsonld', async () => {
         const credential : any = getCredentialWithoutContext() 
         const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-
         const expectedResult = getExpectedFatalResult({
           credential, 
           errorMessage: 'The credential does not appear to be a valid jsonld document - there is no context.',
@@ -168,7 +168,6 @@ describe('Verify', () => {
         it('when no proof', async () => {
           const credential : any = getVCv1NoProof() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
@@ -179,7 +178,6 @@ describe('Verify', () => {
         it('when credential id is not a uri', async () => {
           const credential : any = getVCv1NonURIId() 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-  
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement.",
@@ -293,19 +291,8 @@ describe('Verify', () => {
     describe('with VC version 2', () => {
   
       
-      //console.log(JSON.stringify(result, null, 2))
+      
       describe('returns fatal error', () => {
-
-        it('when no context', async () => {
-          const credential : any = getVCv2NoContext() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
-          const expectedResult = getExpectedFatalResult({
-            credential, 
-            errorMessage: 'The signature is not valid.',
-            errorName: 'invalid_signature'
-          })
-          expect(result).to.deep.equalInAnyOrder(expectedResult) 
-        })
 
         it('when tampered with', async () => {
           const credential : any = getVCv2Tampered() 

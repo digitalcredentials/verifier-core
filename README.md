@@ -210,17 +210,16 @@ Fatal because if the signature is invalid it means any part of the credential co
 
 ```
 {
-  "credential": {vc removed for brevity/clarity},
+  "credential": {vc removed for brevity/clarity in this example},
   "isFatal": true,
   "errors": [
     {
-      "name": "invalidSignature",
+      "name": "invalid_signature",
       "message": "The signature is not valid."
     }
   ]
 }
 ```
-
 
 <b>unresolvable did</b>
 
@@ -244,9 +243,255 @@ has been taken down, or there is a network error.
   
 The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
 
-```
+Some specific examples:
+
+<b><i>invalid_jsonld</i></b>
+
+There is no @context property at the top level of the credential:
 
 ```
+{
+  "credential": {
+    "id": "http://example.com/credentials/3527",
+    "type": [
+      "VerifiableCredential",
+      "OpenBadgeCredential"
+    ],
+    "issuer": {
+      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "type": [
+        "Profile"
+      ],
+      "name": "Example Corp"
+    },
+    "validFrom": "2010-01-01T00:00:00Z",
+    "name": "Teamwork Badge",
+    "credentialSubject": {
+      "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+      "type": [
+        "AchievementSubject"
+      ],
+      "achievement": {
+        "id": "https://example.com/achievements/21st-century-skills/teamwork",
+        "type": [
+          "Achievement"
+        ],
+        "criteria": {
+          "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
+        },
+        "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
+        "name": "Teamwork"
+      }
+    },
+    "proof": {
+      "type": "Ed25519Signature2020",
+      "created": "2025-01-09T17:58:33Z",
+      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
+    }
+  },
+  "isFatal": true,
+  "errors": [
+    {
+      "name": "invalid_jsonld",
+      "message": "The credential does not appear to be a valid jsonld document - there is no context."
+    }
+  ]
+}
+```
+
+<b><i>no_vc_context</i></b>
+
+Although this is a linked data document, with an @context property, the Verifiable Credential context (i.e, "https://www.w3.org/2018/credentials/v1") is missing:
+
+```
+{
+  "credential": {
+    "@context": [
+      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "http://example.com/credentials/3527",
+    "type": [
+      "VerifiableCredential",
+      "OpenBadgeCredential"
+    ],
+    "issuer": {
+      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "type": [
+        "Profile"
+      ],
+      "name": "Example Corp"
+    },
+    "validFrom": "2010-01-01T00:00:00Z",
+    "name": "Teamwork Badge",
+    "credentialSubject": {
+      "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+      "type": [
+        "AchievementSubject"
+      ],
+      "achievement": {
+        "id": "https://example.com/achievements/21st-century-skills/teamwork",
+        "type": [
+          "Achievement"
+        ],
+        "criteria": {
+          "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
+        },
+        "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
+        "name": "Teamwork"
+      }
+    },
+    "proof": {
+      "type": "Ed25519Signature2020",
+      "created": "2025-01-09T17:58:33Z",
+      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
+    }
+  },
+  "isFatal": true,
+  "errors": [
+    {
+      "name": "no_vc_context",
+      "message": "The credential doesn't have a verifiable credential context."
+    }
+  ]
+}
+```
+
+<b><i>invalid_credential_id</i></b>
+
+In this example, the top level id property on the credential is not a uri, but should be:
+
+```
+{
+  "credential": {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "0923lksjf",
+    "type": [
+      "VerifiableCredential",
+      "OpenBadgeCredential"
+    ],
+    "name": "DCC Test Credential",
+    "issuer": {
+      "type": [
+        "Profile"
+      ],
+      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "name": "Digital Credentials Consortium Test Issuer",
+      "url": "https://dcconsortium.org",
+      "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
+    },
+    "issuanceDate": "2023-08-02T17:43:32.903Z",
+    "credentialSubject": {
+      "type": [
+        "AchievementSubject"
+      ],
+      "achievement": {
+        "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
+        "type": [
+          "Achievement"
+        ],
+        "achievementType": "Diploma",
+        "name": "Badge",
+        "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
+        "criteria": {
+          "type": "Criteria",
+          "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
+        },
+        "image": {
+          "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
+          "type": "Image"
+        }
+      },
+      "name": "Jane Doe"
+    },
+    "proof": {
+      "type": "Ed25519Signature2020",
+      "created": "2023-10-05T11:17:41Z",
+      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z5fk6gq9upyZvcFvJdRdeL5KmvHr69jxEkyDEd2HyQdyhk9VnDEonNSmrfLAcLEDT9j4gGdCG24WHhojVHPbRsNER"
+    }
+  },
+  "isFatal": true,
+  "errors": [
+    {
+      "name": "invalid_credential_id",
+      "message": "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement."
+    }
+  ]
+}
+```
+
+<b><i>no_proof</i></b>
+
+The proof property is missing, likely because the credential hasn't been signed:
+
+```
+{
+  "credential": {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "urn:uuid:2fe53dc9-b2ec-4939-9b2c-0d00f6663b6c",
+    "type": [
+      "VerifiableCredential",
+      "OpenBadgeCredential"
+    ],
+    "name": "DCC Test Credential",
+    "issuer": {
+      "type": [
+        "Profile"
+      ],
+      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+      "name": "Digital Credentials Consortium Test Issuer",
+      "url": "https://dcconsortium.org",
+      "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
+    },
+    "issuanceDate": "2023-08-02T17:43:32.903Z",
+    "credentialSubject": {
+      "type": [
+        "AchievementSubject"
+      ],
+      "achievement": {
+        "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
+        "type": [
+          "Achievement"
+        ],
+        "achievementType": "Diploma",
+        "name": "Badge",
+        "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
+        "criteria": {
+          "type": "Criteria",
+          "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
+        },
+        "image": {
+          "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
+          "type": "Image"
+        }
+      },
+      "name": "Jane Doe"
+    }
+  },
+  "isFatal": true,
+  "errors": [
+    {
+      "name": "no_proof",
+      "message": "This is not a Verifiable Credential - it does not have a digital signature."
+    }
+  ]
+}
+```
+
 
 <b>software problem</b>
   
