@@ -1,10 +1,14 @@
-import {verify,signPresentation, createPresentation} from '@digitalcredentials/vc';
+import {verify,signPresentation,createPresentation} from '@digitalcredentials/vc';
 
 import {Ed25519Signature2020} from '@digitalcredentials/ed25519-signature-2020';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
 import {Ed25519VerificationKey2020} from '@digitalcredentials/ed25519-verification-key-2020';
 
 const documentLoader = securityLoader().build()
+
+import pkg from '@digitalcredentials/jsonld-signatures';
+const { purposes } = pkg;
+const presentationPurpose = new purposes.AssertionProofPurpose();
 
 const key = await Ed25519VerificationKey2020.generate(
     {
@@ -21,10 +25,11 @@ const key = await Ed25519VerificationKey2020.generate(
 
 const signingSuite = new Ed25519Signature2020({key});
 
-export const getSignedDIDAuth = async ({holder, challenge, verifiableCredential}:{holder:string,challenge:string,verifiableCredential:any}):Promise<any> => {
+export const getSignedDIDAuth = async ({holder, verifiableCredential}:{holder:string,verifiableCredential:any}):Promise<any> => {
     const presentation = createPresentation({holder, verifiableCredential});
+    const challenge = 'canbeanything33'
     return await signPresentation({
-        presentation, suite:signingSuite, challenge, documentLoader
+        presentation, suite:signingSuite, documentLoader, challenge, purpose: presentationPurpose
     });
 }
 

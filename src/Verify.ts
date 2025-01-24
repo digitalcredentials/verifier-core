@@ -13,9 +13,9 @@ import { VerifiablePresentation, PresentationError } from './types/presentation.
 
 import { extractCredentialsFrom} from './extractCredentialsFrom.js';
 
-// import { purposes } from '@digitalcredentials/jsonld-signatures';
-// const presentationPurpose = new purposes.AssertionProofPurpose();
-// import { extractCredentialsFrom } from './verifiableObject';
+import pkg from '@digitalcredentials/jsonld-signatures';
+const { purposes } = pkg;
+const presentationPurpose = new purposes.AssertionProofPurpose();
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
@@ -29,7 +29,7 @@ const suite = [ed25519Suite, eddsaSuite]
 
 export async function verifyPresentation(
   presentation: VerifiablePresentation,
-  challenge: string,
+  challenge: string = 'canbeanything',
   unsignedPresentation = false,
 ): Promise<VerificationResponse> {
   try {
@@ -38,7 +38,7 @@ export async function verifyPresentation(
     const checkStatus = credential ? getCredentialStatusChecker(credential) : undefined;
     const result = await vc.verify({
       presentation,
-    //  presentationPurpose,
+      presentationPurpose,
       suite,
       documentLoader,
       unsignedPresentation,
@@ -57,37 +57,15 @@ export async function verifyPresentation(
     throw new Error(PresentationError.CouldNotBeVerified);
   }
 }
-/* 
 
-from Verifier Plus:
-
-export async function verifyPresentation(
-  presentation: VerifiablePresentation,
-  unsignedPresentation = true,
-): Promise<VerifyResponse> {
-  try {
-    const result = await vc.verify({
-      presentation,
-      presentationPurpose,
-      suite,
-      documentLoader,
-      unsignedPresentation,
-    });
-
-    return result;
-  } catch (err) {
-    console.warn(err);
-    throw new Error(PresentationError.CouldNotBeVerified);
-  }
-} */
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
 
-  const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
+   const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
 
   if (fatalCredentialError) {
     return fatalCredentialError
-  }
+  } 
 
   // a statusCheck is returned only if the credential has a status
   // that needs checking, otherwise null
