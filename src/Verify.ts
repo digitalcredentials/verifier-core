@@ -61,14 +61,7 @@ export async function verifyPresentation(
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
 
-   const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
-
-  if (fatalCredentialError) {
-    return fatalCredentialError
-  } 
-
-  // a statusCheck is returned only if the credential has a status
-  // that needs checking, otherwise null
+  // null unless credential has a status
   const statusChecker = getCredentialStatusChecker(credential)
 
   const verificationResponse = await vc.verifyCredential({
@@ -78,6 +71,18 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
     checkStatus: statusChecker,
     verifyMatchingIssuers: false
   });
+
+  const adjustedResponse = transformResponse(verificationResponse, credential, knownDIDRegistries, reloadIssuerRegistry)
+  return adjustedResponse;
+}
+
+async function transformResponse(verificationResponse:any, credential:Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean  ) : Promise<VerificationResponse> {
+  
+  const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
+
+  if (fatalCredentialError) {
+    return fatalCredentialError
+  } 
 
   handleAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
 
@@ -99,7 +104,7 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
   verificationResponse.credential = credential
   verificationResponse.isFatal = false
 
-  return verificationResponse;
+  return verificationResponse as VerificationResponse;
 }
 
 function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
@@ -143,10 +148,11 @@ function handleAnyFatalCredentialErrors(credential: Credential): VerificationRes
   return null
 }
 
-function handleAnyStatusError({ verificationResponse, statusResult }: {
-  verificationResponse: VerificationResponse,
+function handleAnyStatusError({ verificationResponse }: {
+  verificationResponse: any,
   statusResult: any
 }): void {
+  const statusResult = verificationResponse.statusResult
   if (statusResult?.error?.cause?.message?.startsWith('NotFoundError')) {
     const statusStep = {
       "id": "revocation_status",

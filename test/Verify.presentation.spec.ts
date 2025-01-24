@@ -47,7 +47,7 @@ describe('Verify', () => {
 
       describe('it returns as verified', () => {
 
-      it.only('when presentation is valid', async () => {
+      it('when presentation is valid', async () => {
         const challenge = '2223q23'
         const firstVC : any = getVCv2DidWebWithValidStatus()
         const secondVC : any = getVCv2ValidStatus()
