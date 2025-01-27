@@ -26,11 +26,12 @@ const ed25519Suite = new Ed25519Signature2020();
   // add both suites - the vc lib will use whichever is appropriate
 const suite = [ed25519Suite, eddsaSuite]
 
-
-export async function verifyPresentation(
-  presentation: VerifiablePresentation,
-  challenge: string = 'canbeanything',
-  unsignedPresentation = false,
+export async function verifyPresentation({presentation, challenge = 'blah', unsignedPresentation = false, knownDIDRegistries, reloadIssuerRegistry=true}:
+  {presentation: VerifiablePresentation,
+  challenge?: string | null,
+  unsignedPresentation? : boolean,
+  knownDIDRegistries: object, 
+  reloadIssuerRegistry?: boolean}
 ): Promise<VerificationResponse> {
   try {
     const credential = extractCredentialsFrom(presentation)?.find(
@@ -47,9 +48,12 @@ export async function verifyPresentation(
       verifyMatchingIssuers: false
     });
 
-    if (!result.verified) {
-      console.warn('VP not verified:', JSON.stringify(result, null, 2));
-    }
+    const transformedVCResults = await Promise.all(result.credentialResults.map(async (credentialResult:any) => {
+      return transformResponse(credentialResult, credentialResult.credential, knownDIDRegistries, reloadIssuerRegistry)
+    }));
+
+    result.credentialResults = transformedVCResults
+
     return result;
   } catch (err) {
     console.warn(err);

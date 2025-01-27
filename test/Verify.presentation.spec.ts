@@ -5,6 +5,8 @@ import {
   getVCv2DidWebWithValidStatus,
   getVCv2EddsaWithValidStatus,
   getVCv2ValidStatus,
+  getVCv1NoProof,
+  getVCv2NonURIId
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
@@ -12,6 +14,7 @@ import {
  } from '../src/test-fixtures/expectedResults.js';
 
  import { getSignedDIDAuth, verifyDIDAuth } from './didAuth.js';
+import { VerifiablePresentation } from '../src/types/presentation.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -48,17 +51,18 @@ describe('Verify', () => {
       describe('it returns as verified', () => {
 
       it('when presentation is valid', async () => {
-        const challenge = '2223q23'
         const firstVC : any = getVCv2DidWebWithValidStatus()
         const secondVC : any = getVCv2ValidStatus()
-        const verifiableCredential = [firstVC, secondVC]
+        const noProofVC : any = getVCv1NoProof()
+        const badIdVC : any = getVCv2NonURIId()
+        const verifiableCredential = [firstVC, secondVC, firstVC]
        // const expectedResult = getExpectedVerifiedResult({credential: verifiableCredential, withStatus: true})
-        const presentation = await getSignedDIDAuth({verifiableCredential, holder: 'did:ex:12345'})
+        const presentation = await getSignedDIDAuth({verifiableCredential, holder: 'did:ex:12345'}) as VerifiablePresentation
        // console.log(JSON.stringify(presentation, null, 2))
-        const result = await verifyPresentation(presentation)
+        const result = await verifyPresentation({presentation, knownDIDRegistries})
         //await verifyDIDAuth({presentation, challenge})
-       // console.log("====================== verification result")
-        //console.log(JSON.stringify(result,null,2))
+        console.log("====================== verification result")
+        console.log(JSON.stringify(result,null,2))
         expect(true)
       })
     })

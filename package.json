@@ -31,7 +31,7 @@
     "@digitalcredentials/issuer-registry-client": "^3.0.1-beta.1",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
     "@digitalcredentials/security-document-loader": "^6.0.1",
-    "@digitalcredentials/vc": "^9.0.1-beta.1",
+    "@digitalcredentials/vc": "^9.0.1-beta.2",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0",
     "@digitalcredentials/vc-status-list": "^9.0.0"
   },
