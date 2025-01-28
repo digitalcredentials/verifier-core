@@ -8,7 +8,7 @@ import { getCredentialStatusChecker } from './credentialStatus.js';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 
 import { Credential } from './types/credential.js';
-import { VerificationResponse, VerificationStep } from './types/result.js';
+import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
 import { VerifiablePresentation, PresentationError } from './types/presentation.js';
 
 import { extractCredentialsFrom} from './extractCredentialsFrom.js';
@@ -32,7 +32,7 @@ export async function verifyPresentation({presentation, challenge = 'blah', unsi
   unsignedPresentation? : boolean,
   knownDIDRegistries: object, 
   reloadIssuerRegistry?: boolean}
-): Promise<VerificationResponse> {
+): Promise<PresentationVerificationResponse> {
   try {
     const credential = extractCredentialsFrom(presentation)?.find(
       vc => vc.credentialStatus);
@@ -48,18 +48,25 @@ export async function verifyPresentation({presentation, challenge = 'blah', unsi
       verifyMatchingIssuers: false
     });
 
-    const transformedVCResults = await Promise.all(result.credentialResults.map(async (credentialResult:any) => {
+    const transformedCredentialResults = await Promise.all(result.credentialResults.map(async (credentialResult:any) => {
       return transformResponse(credentialResult, credentialResult.credential, knownDIDRegistries, reloadIssuerRegistry)
     }));
+    
+    // take what we need from the presentation part of the result
+    let signature : PresentationSignatureResult;
+    if (unsignedPresentation) {
+      signature = 'unsigned'
+    } else {
+      signature =  result.presentationResult.verified ? 'valid' : 'invalid'
+    }
+    const errors = result.error ? [{message: result.error, name: 'presentation_error'}] : null
+    const presentationResult = {signature, ...(errors && {errors} ) }
 
-    result.credentialResults = transformedVCResults
-
-    return result;
-  } catch (err) {
-    console.warn(err);
-
-    throw new Error(PresentationError.CouldNotBeVerified);
+    return {presentationResult, credentialResults: transformedCredentialResults, isFatal: false};
+  } catch (error) {
+      return {isFatal: true, errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}], 
   }
+}
 }
 
 
@@ -102,6 +109,7 @@ async function transformResponse(verificationResponse:any, credential:Credential
   delete verificationResponse.results
   delete verificationResponse.statusResult
   delete verificationResponse.verified
+  delete verificationResponse.credentialId
   verificationResponse.log = verificationResponse.log.filter((entry:VerificationStep)=>entry.id !== 'issuer_did_resolves')
 
   // add things we always want in the response

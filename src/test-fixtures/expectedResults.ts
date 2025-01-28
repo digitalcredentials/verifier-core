@@ -1,5 +1,11 @@
-import { VerificationResponse, VerificationStep } from "src/types/result";
+import { VerificationResponse, VerificationStep, PresentationVerificationResponse } from "src/types/result";
 
+const expectedPresentationResult = {
+  "isFatal": false,
+  "presentationResult": {
+    "signature": 'valid',
+  }
+}
 const expectedResult = {
     "credential": {},
     "isFatal": false,
@@ -56,6 +62,11 @@ const expectedResult = {
     return expectedResultCopy;
   }
 
+  const getCopyOfExpectedVPResult = () : PresentationVerificationResponse => {
+    return JSON.parse(JSON.stringify(expectedPresentationResult))
+  }
+
+
   const getExpectedVerifiedResult = ({credential, withStatus }: {credential:object, withStatus:boolean}) : VerificationResponse => {
     return getCopyOfExpectedResult(credential, withStatus);
   }
@@ -72,8 +83,15 @@ const expectedResult = {
     return expectedResult;
   }
 
+  const getExpectedVerifiedPresentationResult = ({credentialResults}: {credentialResults:VerificationResponse[]}) : PresentationVerificationResponse => {
+    const expectedResult = getCopyOfExpectedVPResult();
+    expectedResult.credentialResults = credentialResults
+    return expectedResult;
+  }
+
   export {
     getExpectedVerifiedResult,
     getExpectedUnverifiedResult,
-    getExpectedFatalResult
+    getExpectedFatalResult,
+    getExpectedVerifiedPresentationResult
   }

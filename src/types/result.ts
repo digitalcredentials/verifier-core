@@ -2,7 +2,7 @@
 export interface VerificationError {								
     "message": string,
     "name"?: string,
-    "stackTrace"?: string
+    "stackTrace"?: any
   }
   
   export interface VerificationStep {
@@ -18,6 +18,22 @@ export interface VerificationError {
     "credential": object,
     "errors"?: VerificationError[],
     "log"?: VerificationStep[]
+  }
+
+
+  const signatureOptions = ['valid', 'invalid', 'unsigned'] as const;
+  export type PresentationSignatureResult = typeof signatureOptions[number]; //'valid', 'invalid', 'unsigned'
+
+  export interface PresentationResult {
+    "signature":PresentationSignatureResult,
+    "error"?: any
+  }
+
+  export interface PresentationVerificationResponse {
+    "isFatal": boolean,			
+    "credentialResults"?: VerificationResponse[],
+    "presentationResult"?: PresentationResult,
+    "errors"?: VerificationError[]
   }
 
   export interface RegistryListResult {

@@ -25,7 +25,7 @@ const key = await Ed25519VerificationKey2020.generate(
 
 const signingSuite = new Ed25519Signature2020({key});
 
-export const getSignedDIDAuth = async ({holder, verifiableCredential}:{holder:string,verifiableCredential:any}):Promise<any> => {
+export const getSignedDIDAuth = async ({holder, verifiableCredential}:{holder:string,verifiableCredential?:any}):Promise<any> => {
     const presentation = createPresentation({holder, verifiableCredential});
     const challenge = 'canbeanything33'
     return await signPresentation({
