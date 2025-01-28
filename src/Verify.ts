@@ -9,7 +9,7 @@ import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
-import { VerifiablePresentation, PresentationError } from './types/presentation.js';
+import { VerifiablePresentation } from './types/presentation.js';
 
 import { extractCredentialsFrom} from './extractCredentialsFrom.js';
 

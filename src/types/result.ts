@@ -22,7 +22,7 @@ export interface VerificationError {
 
 
   const signatureOptions = ['valid', 'invalid', 'unsigned'] as const;
-  export type PresentationSignatureResult = typeof signatureOptions[number]; //'valid', 'invalid', 'unsigned'
+  export type PresentationSignatureResult = typeof signatureOptions[number]; // i.e., 'valid', 'invalid', 'unsigned'
 
   export interface PresentationResult {
     "signature":PresentationSignatureResult,
