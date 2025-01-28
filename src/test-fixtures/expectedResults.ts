@@ -80,9 +80,12 @@ const expectedResult = {
     return expectedResult;
   }
 
-  const getExpectedVerifiedPresentationResult = ({credentialResults}: {credentialResults:VerificationResponse[]}) : PresentationVerificationResponse => {
+  const getExpectedVerifiedPresentationResult = ({credentialResults, unsigned = false}: {credentialResults:VerificationResponse[], unsigned?:boolean}) : PresentationVerificationResponse => {
     const expectedResult = getCopyOfExpectedVPResult();
     expectedResult.credentialResults = credentialResults
+    if (unsigned && expectedResult.presentationResult) {
+      expectedResult.presentationResult.signature = 'unsigned'
+    }
     return expectedResult;
   }
 

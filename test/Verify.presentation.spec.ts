@@ -38,7 +38,7 @@ import {
   getVCv1ExpiredWithValidStatus
 } from '../src/test-fixtures/vc.js'
 
-import { getSignedVP, getUnSignedVP } from './didAuth.js';
+import { getSignedVP, getUnSignedVP } from './vpUtils.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
 
 
@@ -135,20 +135,19 @@ describe('Verify.verifyPresentation', () => {
 
   describe('it returns as unverified', () => {
     
-    it.skip('when signed presentation has bad vc', async () => {
-      /// hmmmmm, this returns an error because of that check on jsonLD.getValue.
-      // Think I need to catch the error and return a fatal error of some sort.
+    it('when unsigned presentation has bad vc', async () => {
+      /// NOTE that this is an unsigned vp because the vc libs signing
+      // method doesn't allow signing a VP with a 'bad' VC, so
+      // we can't easily get a test vp
       const verifiableCredential= [badIdVC]
-      const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
+      const presentation = await getUnSignedVP({verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedBadIdResult]
-      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
-      const result = await verifyPresentation({presentation, knownDIDRegistries})
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults, unsigned: true})
+      const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation: true})
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 
     it('when signed presentation has no proof vc', async () => {
-      /// hmmmmm, this returns an error because of that check on jsonLD.getValue.
-      // Think I need to catch the error and return a fatal error of some sort.
       const verifiableCredential= [noProofVC]
       const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedNoProofResult]
@@ -158,32 +157,24 @@ describe('Verify.verifyPresentation', () => {
     })
 
     it('when unsigned presentation', async () => {
-      /// hmmmmm, this returns an error because of that check on jsonLD.getValue.
-      // Think I need to catch the error and return a fatal error of some sort.
       const verifiableCredential= [noProofVC]
       const presentation = getUnSignedVP({verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedNoProofResult]
-      // this should return isFatal=true on the whole thing, but isn't
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
-      
       if (expectedPresentationResult?.presentationResult) {
         expectedPresentationResult.presentationResult.signature = 'unsigned'
       }
-      
       const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation:true})
-      console.log(result)
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
    
-    it.skip('when unsigned presentation not properly specified', async () => {
+    it('when unsigned presentation not properly specified', async () => {
       /// hmmmmm, NEED TO HAVE AN ERROR FOR EXPECTED RESULT
       const verifiableCredential= [noProofVC]
       const presentation = await getUnSignedVP({verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedNoProofResult]
-      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       const result = await verifyPresentation({presentation, knownDIDRegistries})
-      console.log(result)
-      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+      expect(result?.presentationResult?.signature).to.equal('invalid')
     })
 
   })
