@@ -100,20 +100,9 @@ describe('Verify.verifyPresentation', () => {
     }
   });
 
-  /* 
-  - vp signed
-  - vp unsigned
-  - passing in good challenge
-  - passing in bad challenge
-  - vp with bad vc
-  - vp with no vcs
-   */
-
-
   describe('it returns as verified', () => {
     
     it('when signed presentation has one vc', async () => {
-      
       const verifiableCredential= [v2WithStatus]
       const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedV2WithStatusResult]
@@ -128,6 +117,15 @@ describe('Verify.verifyPresentation', () => {
       const credentialResults = [expectedV2WithStatusResult, expectedv2EddsaResult, expectedDidWebResult]
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       const result = await verifyPresentation({presentation, knownDIDRegistries})
+      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+    })
+
+    it('when wrong challenge and presentation purpose', async () => {
+      const verifiableCredential= [v2WithStatus]
+      const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
+      const credentialResults = [expectedV2WithStatusResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
+      const result = await verifyPresentation({presentation, knownDIDRegistries, challenge: 'blahblahblue'})
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 
