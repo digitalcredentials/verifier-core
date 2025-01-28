@@ -62,9 +62,9 @@ export async function verifyPresentation({presentation, challenge = 'blah', unsi
     const errors = result.error ? [{message: result.error, name: 'presentation_error'}] : null
     const presentationResult = {signature, ...(errors && {errors} ) }
 
-    return {presentationResult, credentialResults: transformedCredentialResults, isFatal: false};
+    return {presentationResult, credentialResults: transformedCredentialResults};
   } catch (error) {
-      return {isFatal: true, errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}], 
+      return {errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}], 
   }
 }
 }
@@ -114,13 +114,12 @@ async function transformResponse(verificationResponse:any, credential:Credential
 
   // add things we always want in the response
   verificationResponse.credential = credential
-  verificationResponse.isFatal = false
 
   return verificationResponse as VerificationResponse;
 }
 
 function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
-  return { credential, isFatal: true, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
+  return { credential, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
 }
 
 function handleAnyFatalCredentialErrors(credential: Credential): VerificationResponse | null {

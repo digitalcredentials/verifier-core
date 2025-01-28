@@ -1,14 +1,12 @@
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse } from "src/types/result";
 
 const expectedPresentationResult = {
-  "isFatal": false,
   "presentationResult": {
     "signature": 'valid',
   }
 }
 const expectedResult = {
     "credential": {},
-    "isFatal": false,
     "log": [
       {
         "id": "valid_signature",
@@ -31,7 +29,6 @@ const expectedResult = {
 
   const fatalResult = {
     credential: {},
-    isFatal: true,
     errors: [
       {
         name: 'error name goes here, e.g., no_proof',

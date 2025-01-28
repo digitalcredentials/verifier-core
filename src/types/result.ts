@@ -14,7 +14,6 @@ export interface VerificationError {
   }
   
   export interface VerificationResponse {
-    "isFatal": boolean,			
     "credential": object,
     "errors"?: VerificationError[],
     "log"?: VerificationStep[]
@@ -30,7 +29,6 @@ export interface VerificationError {
   }
 
   export interface PresentationVerificationResponse {
-    "isFatal": boolean,			
     "credentialResults"?: VerificationResponse[],
     "presentationResult"?: PresentationResult,
     "errors"?: VerificationError[]

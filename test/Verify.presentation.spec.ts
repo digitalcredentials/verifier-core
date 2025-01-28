@@ -171,7 +171,7 @@ describe('Verify.verifyPresentation', () => {
       }
       
       const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation:true})
-      //console.log(result)
+      console.log(result)
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
    
