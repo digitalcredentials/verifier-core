@@ -64,7 +64,7 @@ export async function verifyPresentation({presentation, challenge = 'blah', unsi
 
     return {presentationResult, credentialResults: transformedCredentialResults};
   } catch (error) {
-      return {errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}], 
+      return {errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}]
   }
 }
 }
@@ -119,7 +119,7 @@ async function transformResponse(verificationResponse:any, credential:Credential
 }
 
 function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
-  return { credential, errors: [{ name, message: fatalErrorMessage, ...stackTrace ? { stackTrace } : null }] }
+  return { credential, errors: [{ name, message: fatalErrorMessage, ...(stackTrace ? { stackTrace } : null) }] };
 }
 
 function handleAnyFatalCredentialErrors(credential: Credential): VerificationResponse | null {
@@ -192,6 +192,8 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
       // check to see if the error is http related
       const httpError = verificationResponse.error.errors.find((error: any) => error.name === 'HTTPError')
       if (httpError) {
+          fatalErrorMessage = 'An http error prevented the signature check.'
+          errorName = 'http_error_with_signature_check'
         // was it caused by a did:web that couldn't be resolved???
         const issuerDID: string = (((credential.issuer) as any).id) || credential.issuer
         if (issuerDID.toLowerCase().startsWith('did:web')) {
@@ -200,11 +202,7 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
           if (httpError.requestUrl.toLowerCase().includes(didUrl)) {
             fatalErrorMessage = `The signature could not be checked because the public signing key could not be retrieved from ${httpError.requestUrl as string}`
             errorName = 'did_web_unresolved'
-          } else {
-            // some other kind of http error
-            fatalErrorMessage = 'An http error prevented the signature check.'
-            errorName = 'http_error_with_signature_check'
-          }
+          }           
         }
       } else {
           // not an http error, so likely bad signature

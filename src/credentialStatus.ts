@@ -26,15 +26,3 @@ export function getCredentialStatusChecker(credential: Credential) : (() => bool
   }
 }
 
-export function hasStatusPurpose(
-  credential: Credential,
-  statusPurpose: StatusPurpose
-) : boolean {
-  if (!credential.credentialStatus) {
-    return false;
-  }
-  const credentialStatuses = Array.isArray(credential.credentialStatus) ?
-    credential.credentialStatus :
-    [credential.credentialStatus];
-  return credentialStatuses.some(s => s.statusPurpose === statusPurpose);
-}

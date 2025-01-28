@@ -167,12 +167,23 @@ describe('Verify.verifyPresentation', () => {
     })
    
     it('when unsigned presentation not properly specified', async () => {
-      /// hmmmmm, NEED TO HAVE AN ERROR FOR EXPECTED RESULT
       const verifiableCredential= [noProofVC]
       const presentation = await getUnSignedVP({verifiableCredential}) as VerifiablePresentation
-      const credentialResults = [expectedNoProofResult]
       const result = await verifyPresentation({presentation, knownDIDRegistries})
       expect(result?.presentationResult?.signature).to.equal('invalid')
+    })
+
+    it('when bad presentation', async () => {
+      const verifiableCredential= [noProofVC]
+      const presentation = await getUnSignedVP({verifiableCredential}) as any
+      delete presentation['@context']
+      const result = await verifyPresentation({presentation, knownDIDRegistries})
+      if (result?.errors) {
+        expect(result.errors[0].name).to.equal('presentation_error')
+      } else {
+        expect(false).to.equal(true)
+      }
+      
     })
 
   })
