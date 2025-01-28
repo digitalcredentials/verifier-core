@@ -8,8 +8,6 @@ import {
   getVCv1Revoked, 
   getVCv1ValidStatus, 
   getVCv1NoProof, 
-  getCredentialWithoutContext, 
-  getCredentialWithoutVCContext, 
   getVCv1NonURIId,
   getVCv1ExpiredAndTampered,
   getVCv1ExpiredWithValidStatus

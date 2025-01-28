@@ -1,21 +1,66 @@
 import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
-import { verifyCredential, verifyPresentation } from '../src/Verify.js'
+import { verifyPresentation } from '../src/Verify.js'
 import { 
-  getVCv2DidWebWithValidStatus,
+  getVCv2Expired, 
+  getVCv2Revoked, 
+  getVCv2ValidStatus, 
+  getVCv2Tampered, 
+  getVCv2NoProof, 
+  getCredentialWithoutContext, 
+  getCredentialWithoutVCContext, 
+  getVCv2NonURIId,
+  getVCv2ExpiredAndTampered,
+  getVCv2ExpiredWithValidStatus,
   getVCv2EddsaWithValidStatus,
-  getVCv2ValidStatus,
-  getVCv1NoProof,
-  getVCv2NonURIId
+  getVCv2DoubleSigWithBadStatusUrl,
+  getVCv2DidWebWithValidStatus,
+  getVCv2WithBadDidWebUrl
+
 } from '../src/test-fixtures/vc.js'
+
 import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import { 
   getExpectedVerifiedResult,
+  getExpectedUnverifiedResult, 
+  getExpectedFatalResult,
   getExpectedVerifiedPresentationResult
  } from '../src/test-fixtures/expectedResults.js';
 
- import { getSignedDIDAuth, verifyDIDAuth } from './didAuth.js';
+ import { 
+  getVCv1Tampered, 
+  getVCv1Expired,  
+  getVCv1Revoked, 
+  getVCv1ValidStatus, 
+  getVCv1NoProof, 
+  getVCv1NonURIId,
+  getVCv1ExpiredAndTampered,
+  getVCv1ExpiredWithValidStatus
+} from '../src/test-fixtures/vc.js'
+
+import { getSignedDIDAuth } from './didAuth.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
+
+
+    const noProofVC : any = getVCv1NoProof()
+    const expectedNoProofResult = getExpectedFatalResult({
+                credential: noProofVC, 
+                errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
+                errorName: 'no_proof'
+              })
+      
+
+    const badIdVC : any = getVCv2NonURIId()
+    
+    const didWebVC : any = getVCv2DidWebWithValidStatus()
+    const expectedDidWebResult = getExpectedVerifiedResult({credential:didWebVC, withStatus: true})
+  
+    const v2WithStatus : any = getVCv2ValidStatus()
+    const expectedV2WithStatusResult = getExpectedVerifiedResult({credential:v2WithStatus, withStatus: true})
+      
+    const v2Eddsa : any = getVCv2EddsaWithValidStatus()
+    const expectedv2EddsaResult = getExpectedVerifiedResult({credential: v2Eddsa, withStatus: true})
+
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -60,34 +105,24 @@ describe('Verify.verifyPresentation', () => {
 
 
   describe('it returns as verified', () => {
-
-    it.only('when signed presentation has one vc', async () => {
-      const singleVC : any = getVCv2ValidStatus()
-      const verifiableCredential= [singleVC]
+    
+    it('when signed presentation has one vc', async () => {
+      
+      const verifiableCredential= [v2WithStatus]
       const presentation = await getSignedDIDAuth({holder, verifiableCredential}) as VerifiablePresentation
-      const expectedVCResult = getExpectedVerifiedResult({credential:singleVC, withStatus: true})
-      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults:[expectedVCResult]})
-  
+      const credentialResults = [expectedV2WithStatusResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       const result = await verifyPresentation({presentation, knownDIDRegistries})
-      console.log("====================== verification result")
-      console.log(JSON.stringify(result,null,2))
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 
-    it('when presentation is valid', async () => {
-      const firstVC : any = getVCv2DidWebWithValidStatus()
-      const secondVC : any = getVCv2ValidStatus()
-      const noProofVC : any = getVCv1NoProof()
-      const badIdVC : any = getVCv2NonURIId()
-      const verifiableCredential = [firstVC, secondVC, firstVC]
-      // const expectedResult = getExpectedVerifiedResult({credential: verifiableCredential, withStatus: true})
+    it('when signed presentation has mix of VCs', async () => {
+      const verifiableCredential = [v2WithStatus, v2Eddsa, didWebVC]
       const presentation = await getSignedDIDAuth({verifiableCredential, holder: 'did:ex:12345'}) as VerifiablePresentation
-      // console.log(JSON.stringify(presentation, null, 2))
+      const credentialResults = [expectedV2WithStatusResult, expectedv2EddsaResult, expectedDidWebResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       const result = await verifyPresentation({presentation, knownDIDRegistries})
-      //await verifyDIDAuth({presentation, challenge})
-      //console.log("====================== verification result")
-      //console.log(JSON.stringify(result,null,2))
-      expect(true)
+      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 
 
