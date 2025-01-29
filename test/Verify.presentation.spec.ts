@@ -102,12 +102,22 @@ describe('Verify.verifyPresentation', () => {
 
   describe('it returns as verified', () => {
     
-    it('when signed presentation has one vc', async () => {
+    it('when signed presentation has one vc in an array', async () => {
       const verifiableCredential= [v2WithStatus]
       const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
       const credentialResults = [expectedV2WithStatusResult]
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       const result = await verifyPresentation({presentation, knownDIDRegistries})
+      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+    })
+
+    it('when unsigned presentation has one vc not in an array', async () => {
+      const verifiableCredential= v2WithStatus
+      const presentation = await getUnSignedVP({verifiableCredential}) as any
+      presentation.verifiableCredential = presentation.verifiableCredential[0]
+      const credentialResults = [expectedV2WithStatusResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults, unsigned:true})
+      const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation: true})
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 

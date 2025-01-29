@@ -25,10 +25,14 @@ And verifies signatures from both [eddsa-rdfc-2022 Data Integrity Proof](https:/
 
 The verification checks that the credential:
 
-* has a valid signature (i.e, that the credential hasn't been tampered with)
+* has a valid signature, so:
+  * credential hasn't been tampered with
+  * the signing key was retrieved from the did document
 * hasn't expired
 * hasn't been revoked
 * was signed by a trusted issuer
+
+The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded, which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
 
 As of January 2025 issuers are trusted if they are listed in one of the Digital Credentials Issuer Registries:
 
@@ -74,7 +78,7 @@ This package exports two methods:
 
 The typescript definitions for the result can be found [here](./src/types/result.ts)
 
-Note that the verification result doesn't make any conclusion about the overall validity of a credential. It only checks the validity of each of the four steps, leaving it up to the consumer of the result to decide on the overall validity. The consumer might not, for example, consider a credential that had expired or had been revoked to be 'invalid'. The credential might still in fact be useful as a record of history, i.e, I had a driver's licence that expired two years ago, but did have it during the period 2018 to 2023, and that information might be useful.
+Note that the verification result doesn't make any conclusion about the overall validity of a credential. It only checks the validity of each of the four steps, leaving it up to the consumer of the result to decide on the overall validity. The consumer might not, for example, consider a credential that had expired or had been revoked to be 'invalid'. The credential might still in fact be useful as a record of history, i.e, I had a driver's licence that expired two years ago, but it was valid during the period 2018 to 2023, and that information might be useful.
 
 There are three general flavours of result that might be returned:
 
@@ -86,7 +90,6 @@ A conclusive verification might look like this example where all steps returned 
 
 ```
 {
-  "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
     {
@@ -115,11 +118,10 @@ A conclusive verification might look like this example where all steps returned 
 
 Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been tampered with, and so we can't say anything conclusive about any of them.
 
-Here is what the verification result for an expired credential might look like, where we have made conclusive determinations about each step, and all are true except for the expiry:
+And here is a slightly different verification result where we have still made conclusive determinations about each step, and all are true except for the expiry:
 
 ```
 {
-  "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
     {
@@ -152,21 +154,22 @@ A verification might partly succeed if it can verify:
 * the signature
 * the expiry date
 
-But can't retrieve (from the network) any one of the:
+But can't retrieve (from the network) any one of:
 
-* revocation status
-* the issuer registry
+* the revocation status
+* an issuer registry from our list of trusted issuers
 * the issuer's DID document 
 
 which are needed to verify the revocation status and issuer identity.
 
-For steps that we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
+For the valid_signature and revocation_status steps, if we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
 
-A partially successful verification might look like this example:
+For the registered_issuer step we always return false if the issuer isn't found in a loaded registry, but with the caveat that if the 'registriesNotLoaded' property does contain one or more registries, then the credential *might* have been in one of those registries. It is up to the consumer of the result to decide how to deal with that.
+
+A partially successful verification might look like this example, where we couldn't retrieve the status list or one of the registries:
 
 ```
 {
-  "isFatal": false,
   "credential": {the supplied vc - left out here for brevity/clarity},
   "log": [
     {
@@ -207,12 +210,11 @@ Examples of fatal errors:
 
 <b>invalid signature</b>
   
-Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity.
+Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity. In these cases we don't return a 'valid' property, but instead an 'errors' property
 
 ```
 {
   "credential": {vc removed for brevity/clarity in this example},
-  "isFatal": true,
   "errors": [
     {
       "name": "invalid_signature",
@@ -230,7 +232,6 @@ has been taken down, or there is a network error.
 ```
 {
   "credential": {vc removed for brevity/clarity},
-  "isFatal": true,
   "errors": [
     {
       "name": "did_web_unresolved",
@@ -292,7 +293,6 @@ There is no @context property at the top level of the credential:
       "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
     }
   },
-  "isFatal": true,
   "errors": [
     {
       "name": "invalid_jsonld",
@@ -352,7 +352,6 @@ Although this is a linked data document, with an @context property, the Verifiab
       "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
     }
   },
-  "isFatal": true,
   "errors": [
     {
       "name": "no_vc_context",
@@ -421,7 +420,6 @@ In this example, the top level id property on the credential is not a uri, but s
       "proofValue": "z5fk6gq9upyZvcFvJdRdeL5KmvHr69jxEkyDEd2HyQdyhk9VnDEonNSmrfLAcLEDT9j4gGdCG24WHhojVHPbRsNER"
     }
   },
-  "isFatal": true,
   "errors": [
     {
       "name": "invalid_credential_id",
@@ -483,7 +481,6 @@ The proof property is missing, likely because the credential hasn't been signed:
       "name": "Jane Doe"
     }
   },
-  "isFatal": true,
   "errors": [
     {
       "name": "no_proof",
@@ -494,29 +491,52 @@ The proof property is missing, likely because the credential hasn't been signed:
 ```
 
 
-<b>software problem</b>
+<b>other problem</b>
   
-A software error might prevent verification
+Some other error might also prevent verification, and a stack trace might be returned:
+
+```
+{
+  "errors": [
+    {
+      "name": "unknown_error",
+      "message": "Some kind of error - this message will depend on the error",
+      "stackTrace": "some kind of stack trace"
+    }
+  ]
+}
+```
 
 
 ### verifyPresentation
 
-```verifyPresentation({presentation, reloadIssuerRegistry = true})```
+```verifyPresentation({presentation, reloadIssuerRegistry = true, unsignedPresentation = false})```
 
-A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP is also cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and ofthen that DID is recorded inside the Verifiable Credentials as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to the DID we can prove we 'own' the credentials.
+A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP can also be cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and often that DID is recorded inside the Verifiable Credentials as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to that DID we can prove we 'own' the credentials.
 
-A VP is also sometimes used without any containted VC simply to prove that we control a given DID, say for authentication, or often for the case where when an issuer is issuing a credential to a DID, the issuer wants to know that the recipient in fact does control that DID.
+A VP needn't be signed. It could simply be used as to 'package' together a set of VCs.
 
-Verifying a VP amounts to verifying the signature on the VP and that the VP hasn't expired, and also verifying all of the contained VCs, one by one.
+A VP is also sometimes used without any containted VC simply to prove that we control a given DID, say for authentication, or often for the case where when an issuer is issuing a credential to a DID, the issuer wants to know that the recipient in fact does control that DID. In these cases the VP is used as a `did-auth`. This verifier-core library does not, however, provide verification for `did-auth`, only to verify a presentation containing VCs.
+
+Verifying a VP amounts to verifying the signature on the VP (if the signature exists) and also verifying all of the contained VCs, one by one.
 
 #### arguments
 
 * presentation - The W3C Verifiable Presentation to be verified.
 * reloadIssuerRegistry - Whether or not to refresh the cached copy of the registry.
+* unsignedPresentation - wether the submitted vp has been signed or not
 
 #### result
 
-With a VP we have a result for the vp as well as for all the contained VCs.
+With a VP we have a result for the vp as well as for all the contained VCs. Each of the VC results follows exactly the format described above for the results of verifying an individual VCs. We may also have an error.
+
+A successful VP result might look like so:
+
+A VP that itself verfies (i.e, it's signature), but has one VC that doesn't might look like so:
+
+A VP with a bad signature might look like so:
+
+
 
 ## Install
 
@@ -543,9 +563,6 @@ npm install
 ## Contribute
 
 PRs accepted.
-
-If editing the Readme, please conform to the
-[standard-readme](https://github.com/RichardLitt/standard-readme) specification.
 
 ## License
 

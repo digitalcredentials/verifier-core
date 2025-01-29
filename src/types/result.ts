@@ -14,7 +14,7 @@ export interface VerificationError {
   }
   
   export interface VerificationResponse {
-    "credential": object,
+    "credential"?: object,
     "errors"?: VerificationError[],
     "log"?: VerificationStep[]
   }

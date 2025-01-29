@@ -64,14 +64,13 @@ export async function verifyPresentation({presentation, challenge = 'blah', unsi
 
     return {presentationResult, credentialResults: transformedCredentialResults};
   } catch (error) {
-      return {errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}]
-  }
+      return {errors: [{message: 'Could not verify presentation.', name: 'presentation_error', stackTrace: error}]}
 }
 }
 
 
 export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
-
+try {
   // null unless credential has a status
   const statusChecker = getCredentialStatusChecker(credential)
 
@@ -85,6 +84,9 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
 
   const adjustedResponse = transformResponse(verificationResponse, credential, knownDIDRegistries, reloadIssuerRegistry)
   return adjustedResponse;
+} catch (error) {
+  return {errors: [{message: 'Could not verify credential.', name: 'unknown_error', stackTrace: error}]}
+}
 }
 
 async function transformResponse(verificationResponse:any, credential:Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean  ) : Promise<VerificationResponse> {
