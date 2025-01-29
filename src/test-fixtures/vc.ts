@@ -9,12 +9,13 @@ import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus.js"
 import { v1Revoked } from "./verifiableCredentials/v1/v1Revoked.js"
 import { v1Expired } from "./verifiableCredentials/v1/v1Expired.js"
 import { v1ExpiredWithValidStatus } from "./verifiableCredentials/v1/v1ExpiredWithValidStatus.js"
-
+import { v2SimpleIssuerId } from "./verifiableCredentials/v2/v2SimpleIssuerId.js"
 import { v2EddsaWithValidStatus } from "./verifiableCredentials/eddsa/v2/v2EddsaWithValidStatus.js"
 import { v2DoubleSigWithBadStatusUrl } from "./verifiableCredentials/eddsaAndEd25519/v2/v2DoubleSigWithBadStatusUrl.js"
 
 import { v2didWebWithValidStatus } from "./verifiableCredentials/v2/didWeb/v2didWebWithValidStatus.js"
 import { v2WithBadDidWeb } from "./verifiableCredentials/v2/didWeb/v2WithBadDidWeb.js"
+import { v1SimpleIssuerId } from "./verifiableCredentials/v1/v1SimpleIssuerId.js"
 
 const getVCv1 = (): any => {
   return JSON.parse(JSON.stringify(v1NoStatus))
@@ -128,6 +129,13 @@ const getVCv2WithBadDidWebUrl = (): any => {
   return JSON.parse(JSON.stringify(v2WithBadDidWeb))
 }
 
+const getVCv1SimpleIssuerId = (): any => {
+  return JSON.parse(JSON.stringify(v1SimpleIssuerId))
+}
+
+const getVCv2SimpleIssuerId = (): any => {
+  return JSON.parse(JSON.stringify(v2SimpleIssuerId))
+}
 
 export {
 
@@ -138,6 +146,7 @@ export {
   getVCv2DoubleSigWithBadStatusUrl,
 
   getVCv2,
+  getVCv2SimpleIssuerId,
   getVCv2Expired,
   getVCv2Revoked,
   getVCv2Tampered,
@@ -150,6 +159,7 @@ export {
   getVCv2WithBadDidWebUrl,
 
   getVCv1,
+  getVCv1SimpleIssuerId,
   getVCv1Expired,
   getVCv1Revoked,
   getVCv1Tampered,

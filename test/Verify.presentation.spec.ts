@@ -2,6 +2,8 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { verifyPresentation } from '../src/Verify.js'
 import { 
+  getVCv1SimpleIssuerId,
+  getVCv2SimpleIssuerId,
   getVCv2Expired, 
   getVCv2Revoked, 
   getVCv2ValidStatus, 
@@ -68,14 +70,20 @@ import { VerifiablePresentation } from '../src/types/presentation.js';
     const v1NoStatus : any = getVCv1()
     const expectedV1Result = getExpectedVerifiedResult({credential:v1NoStatus, withStatus: false})
 
+    
     const v2Eddsa : any = getVCv2EddsaWithValidStatus()
     const expectedv2EddsaResult = getExpectedVerifiedResult({credential: v2Eddsa, withStatus: true})
 
+    const v1SimpleIssuerId : any = getVCv1SimpleIssuerId()
+    const expectedV1SimpleIssuerResult = getExpectedVerifiedResult({credential:v1SimpleIssuerId, withStatus: false})
+
+    const v2SimpleIssuerId : any = getVCv2SimpleIssuerId()
+    const expectedV2SimpleIssuerResult = getExpectedVerifiedResult({credential:v2SimpleIssuerId, withStatus: false})
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
 
-const DISABLE_CONSOLE_WHEN_NO_ERRORS = false
+const DISABLE_CONSOLE_WHEN_NO_ERRORS = true
 
 
 describe('Verify.verifyPresentation', () => {
@@ -106,6 +114,15 @@ describe('Verify.verifyPresentation', () => {
 
   describe('it returns as verified', () => {
     
+    it('with v1 and v2 vcs with simple issuer ids', async () => {
+      const verifiableCredential= [v1SimpleIssuerId, v2SimpleIssuerId]
+      const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
+      const credentialResults = [expectedV1SimpleIssuerResult,expectedV2SimpleIssuerResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
+      const result = await verifyPresentation({presentation, knownDIDRegistries})
+      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+    })
+
     it('when signed presentation has one vc in an array', async () => {
       const verifiableCredential= [v2WithStatus]
       const presentation = await getSignedVP({holder, verifiableCredential}) as VerifiablePresentation
