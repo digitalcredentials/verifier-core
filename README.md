@@ -25,7 +25,7 @@ And verifies signatures from both [eddsa-rdfc-2022 Data Integrity Proof](https:/
 
 The verification checks that the credential:
 
-* has a valid signature, and so:
+* has a valid signature, and so therefore:
   * the credential hasn't been tampered with
   * the signing key was retrieved from the did document
 * hasn't expired
@@ -493,7 +493,7 @@ The proof property is missing, likely because the credential hasn't been signed:
 
 <b>other problem</b>
   
-Some other error might also prevent verification, and a stack trace might be returned:
+Some other error might also prevent verification, and an error, possibly with a stack trace, might be returned:
 
 ```
 {
@@ -512,11 +512,11 @@ Some other error might also prevent verification, and a stack trace might be ret
 
 ```verifyPresentation({presentation, reloadIssuerRegistry = true, unsignedPresentation = false})```
 
-A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP can also be cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and often that DID is recorded inside the Verifiable Credentials as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to that DID we can prove we 'own' the credentials.
+A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP can be cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials contained in the VP, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and usually that DID was recorded inside the Verifiable Credentials - at the time of issuance - as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to that DID we can prove we 'own' the credentials, or in other words, that the credentials were issued to us (to our DID.)
 
 A VP needn't be signed. It could simply be used as to 'package' together a set of VCs.
 
-A VP is also sometimes used without any containted VC simply to prove that we control a given DID, say for authentication, or often for the case where when an issuer is issuing a credential to a DID, the issuer wants to know that the recipient in fact does control that DID. In these cases the VP is used as a `did-auth`. This verifier-core library does not, however, provide verification for `did-auth`, only to verify a presentation containing VCs.
+A signed VP is also sometimes used for authentication, without any contained VC. Say for the case where when an issuer is issuing a credential to a DID, and the issuer wants to know that the recipient in fact does control that DID. In these cases the VP is typically the response to a request for [DIDAuthentication (DidAuth)](https://w3c-ccg.github.io/vp-request-spec/#did-authentication). This verifier-core library does not, however, provide verification for DidAuthentication, only to verify a presentation containing VCs.
 
 Verifying a VP amounts to verifying the signature on the VP (if the signature exists) and also verifying all of the contained VCs, one by one.
 
@@ -530,13 +530,307 @@ Verifying a VP amounts to verifying the signature on the VP (if the signature ex
 
 With a VP we have a result for the vp as well as for all the contained VCs. Each of the VC results follows exactly the format described above for the results of verifying an individual VCs. We may also have an error.
 
-A successful VP result might look like so:
+A successful signed VP result with two packaged VCs might look like so:
 
-A VP that itself verfies (i.e, it's signature), but has one VC that doesn't might look like so:
+```
+{
+  "presentationResult": {
+    "signature": "valid"
+  },
+  "credentialResults": [
+    {
+      "log": [
+        {
+          "id": "valid_signature",
+          "valid": true
+        },
+        {
+          "id": "revocation_status",
+          "valid": true
+        },
+        {
+          "id": "expiration",
+          "valid": true
+        },
+        {
+          "id": "registered_issuer",
+          "valid": true,
+          "foundInRegistries": [
+            "DCC Sandbox Registry"
+          ],
+          "registriesNotLoaded": []
+        }
+      ],
+      "credential": {vc omitted for brevity/clarity}
+    },
+    {
+      "log": [
+        {
+          "id": "valid_signature",
+          "valid": true
+        },
+        {
+          "id": "revocation_status",
+          "valid": true
+        },
+        {
+          "id": "expiration",
+          "valid": true
+        },
+        {
+          "id": "registered_issuer",
+          "valid": true,
+          "foundInRegistries": [
+            "DCC Sandbox Registry"
+          ],
+          "registriesNotLoaded": []
+        }
+      ],
+      "credential": {vc omitted for brevity/clarity}
+    }
+  ]
+}
+```
 
-A VP with a bad signature might look like so:
+A VP that itself verfies (i.e, it's signature), but has one VC that doesn't, might look like so:
 
+```
+{
+  "presentationResult": {
+    "signature": "signed"
+  },
+  "credentialResults": [
+    {
+      "credential": {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
+          "https://w3id.org/security/suites/ed25519-2020/v1"
+        ],
+        "id": "0923lksjf",
+        "type": [
+          "VerifiableCredential",
+          "OpenBadgeCredential"
+        ],
+        "issuer": {
+          "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+          "type": [
+            "Profile"
+          ],
+          "name": "Example Corp"
+        },
+        "validFrom": "2010-01-01T00:00:00Z",
+        "name": "Teamwork Badge",
+        "credentialSubject": {
+          "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+          "type": [
+            "AchievementSubject"
+          ],
+          "achievement": {
+            "id": "https://example.com/achievements/21st-century-skills/teamwork",
+            "type": [
+              "Achievement"
+            ],
+            "criteria": {
+              "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
+            },
+            "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
+            "name": "Teamwork"
+          }
+        },
+        "proof": {
+          "type": "Ed25519Signature2020",
+          "created": "2025-01-09T17:58:33Z",
+          "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+          "proofPurpose": "assertionMethod",
+          "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
+        }
+      },
+      "errors": [
+        {
+          "name": "invalid_credential_id",
+          "message": "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement."
+        }
+      ]
+    }
+  ]
+}
+```
 
+It is important to note in the above example that the validity of the signature of the presentation is different from the validity of each of the contained VCs. A valid presentation signature simply means that nothing in the VP was tampered with.
+
+An unsigned VP containing a single verified credential:
+
+```
+{
+  "presentationResult": {
+    "signature": "unsigned"
+  },
+  "credentialResults": [
+    {
+      "log": [
+        {
+          "id": "valid_signature",
+          "valid": true
+        },
+        {
+          "id": "revocation_status",
+          "valid": true
+        },
+        {
+          "id": "expiration",
+          "valid": true
+        },
+        {
+          "id": "registered_issuer",
+          "valid": true,
+          "foundInRegistries": [
+            "DCC Sandbox Registry"
+          ],
+          "registriesNotLoaded": []
+        }
+      ],
+      "credential": {vc omitted for brevity/clarity}
+    }
+  ]
+}
+```
+
+A VP where we've tampered with one of the packaged credentials (by changing the credential name). Note here that both the VP and the VC don't verify because changing the VC affected the VC signature bit also the VP signature which contains the VC.
+
+```
+{
+  "presentationResult": {
+    "signature": "invalid",
+    "errors": [
+      {
+        "message": {
+          "name": "VerificationError",
+          "errors": [
+            {
+              "name": "Error",
+              "message": "Invalid signature.",
+              "stack": "Error: Invalid signature.\n    at Ed25519Signature2020.verifyProof (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/suites/LinkedDataSignature.js:189:15)\n    at async /Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:273:53\n    at async Promise.all (index 0)\n    at async _verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:261:3)\n    at async ProofSet.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:195:23)\n    at async Object.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/jsonld-signatures.js:160:18)\n    at async _verifyPresentation (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/vc/dist/index.js:578:30)\n    at async verifyPresentation (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/src/Verify.js:24:24)\n    at async Context.<anonymous> (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/test/Verify.presentation.spec.js:97:28)"
+            }
+          ]
+        },
+        "name": "presentation_error"
+      }
+    ]
+  },
+  "credentialResults": [
+    {
+      "credential": {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
+          "https://w3id.org/security/suites/ed25519-2020/v1"
+        ],
+        "id": "urn:uuid:2fe53dc9-b2ec-4939-9b2c-0d00f6663b6c",
+        "type": [
+          "VerifiableCredential",
+          "OpenBadgeCredential"
+        ],
+        "name": "Tampered Name",
+        "issuer": {
+          "type": [
+            "Profile"
+          ],
+          "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+          "name": "Digital Credentials Consortium Test Issuer",
+          "url": "https://dcconsortium.org",
+          "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
+        },
+        "issuanceDate": "2023-08-02T17:43:32.903Z",
+        "credentialSubject": {
+          "type": [
+            "AchievementSubject"
+          ],
+          "achievement": {
+            "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
+            "type": [
+              "Achievement"
+            ],
+            "achievementType": "Diploma",
+            "name": "Badge",
+            "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
+            "criteria": {
+              "type": "Criteria",
+              "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
+            },
+            "image": {
+              "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
+              "type": "Image"
+            }
+          },
+          "name": "Jane Doe"
+        },
+        "proof": {
+          "type": "Ed25519Signature2020",
+          "created": "2023-10-05T11:17:41Z",
+          "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+          "proofPurpose": "assertionMethod",
+          "proofValue": "z5fk6gq9upyZvcFvJdRdeL5KmvHr69jxEkyDEd2HyQdyhk9VnDEonNSmrfLAcLEDT9j4gGdCG24WHhojVHPbRsNER"
+        }
+      },
+      "errors": [
+        {
+          "name": "invalid_signature",
+          "message": "The signature is not valid."
+        }
+      ]
+    }
+  ]
+}
+```
+
+And here is a VP where just the VP has been tampered with, and not the embedded VC, and so the VC returns as valid, but not the presentation signature:
+
+```
+{
+  "presentationResult": {
+    "signature": "invalid",
+    "errors": [
+      {
+        "message": {
+          "name": "VerificationError",
+          "errors": [
+            {
+              "name": "Error",
+              "message": "Invalid signature.",
+              "stack": "Error: Invalid signature.\n    at Ed25519Signature2020.verifyProof (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/suites/LinkedDataSignature.js:189:15)\n    at async /Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:273:53\n    at async Promise.all (index 0)\n    at async _verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:261:3)\n    at async ProofSet.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:195:23)\n    at async Object.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/jsonld-signatures.js:160:18)\n    at async _verifyPresentation (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/vc/dist/index.js:578:30)\n    at async verifyPresentation (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/src/Verify.js:24:24)\n    at async Context.<anonymous> (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/test/Verify.presentation.spec.js:101:28)"
+            }
+          ]
+        },
+        "name": "presentation_error"
+      }
+    ]
+  },
+  "credentialResults": [
+    {
+      "log": [
+        {
+          "id": "valid_signature",
+          "valid": true
+        },
+        {
+          "id": "expiration",
+          "valid": true
+        },
+        {
+          "id": "registered_issuer",
+          "valid": true,
+          "foundInRegistries": [
+            "DCC Sandbox Registry"
+          ],
+          "registriesNotLoaded": []
+        }
+      ],
+      "credential": {vc ommitted for clarity/brevity}
+    }
+  ]
+}
+```
 
 ## Install
 

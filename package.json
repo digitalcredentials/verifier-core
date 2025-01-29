@@ -13,7 +13,7 @@
     "rebuild": "npm run clear && npm run build",
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.js",
-    "test-node-old": "cross-env NODE_ENV=test TS_NODE_PROJECT=tsconfig.spec.json TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register --project tsconfig.spec.json 'test/*.ts'",
+    "test-node-no-cov": "npm run build-test && mocha dist/test/*.spec.js && rm -rf dist/esm/test || true",
     "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha dist/test/*.spec.js && rm -rf dist/esm/test || true",
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },

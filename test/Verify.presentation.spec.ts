@@ -27,7 +27,8 @@ import {
   getExpectedVerifiedPresentationResult
  } from '../src/test-fixtures/expectedResults.js';
 
- import { 
+ import {
+  getVCv1,
   getVCv1Tampered, 
   getVCv1Expired,  
   getVCv1Revoked, 
@@ -64,6 +65,9 @@ import { VerifiablePresentation } from '../src/types/presentation.js';
     const v2WithStatus : any = getVCv2ValidStatus()
     const expectedV2WithStatusResult = getExpectedVerifiedResult({credential:v2WithStatus, withStatus: true})
       
+    const v1NoStatus : any = getVCv1()
+    const expectedV1Result = getExpectedVerifiedResult({credential:v1NoStatus, withStatus: false})
+
     const v2Eddsa : any = getVCv2EddsaWithValidStatus()
     const expectedv2EddsaResult = getExpectedVerifiedResult({credential: v2Eddsa, withStatus: true})
 
@@ -143,6 +147,28 @@ describe('Verify.verifyPresentation', () => {
 
   describe('it returns as unverified', () => {
     
+    
+
+    it('when vc in signed presentation has been tampered with', async () => {
+      const v1 : any = getVCv1()
+      const verifiableCredential= [v1]
+      const presentation = await getSignedVP({holder, verifiableCredential}) as any
+      presentation.verifiableCredential[0].name = 'Tampered Name'
+      const result = await verifyPresentation({presentation, knownDIDRegistries}) as any
+      expect(result.presentationResult.signature).to.equal('invalid')
+      expect(result.credentialResults[0].errors[0].name).to.equal('invalid_signature')
+    })
+
+    it('when signed presentation has been tampered with', async () => {
+      const verifiableCredential= [v1NoStatus]
+      const presentation = await getSignedVP({holder, verifiableCredential}) as any
+      presentation.holder = 'did:ex:tampered'
+      const result = await verifyPresentation({presentation, knownDIDRegistries}) as any
+      const expectedCredentialResults = [expectedV1Result]
+      expect(result.credentialResults).to.deep.equalInAnyOrder(expectedCredentialResults)
+      expect(result.presentationResult.signature).to.equal('invalid')
+    })
+
     it('when unsigned presentation has bad vc', async () => {
       /// NOTE that this is an unsigned vp because the vc libs signing
       // method doesn't allow signing a VP with a 'bad' VC, so
@@ -153,6 +179,7 @@ describe('Verify.verifyPresentation', () => {
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults, unsigned: true})
       const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation: true})
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+
     })
 
     it('when signed presentation has no proof vc', async () => {
