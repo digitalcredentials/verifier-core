@@ -1,5 +1,6 @@
 import {RegistryClient, LoadResult} from '@digitalcredentials/issuer-registry-client';
 import { VerificationResponse, RegistryListResult } from './types/result.js';
+import { REGISTERED_ISSUER_STEP_ID } from './constants/verificationSteps.js';
 const registries = new RegistryClient()
 const registryNotYetLoaded = true;
 
@@ -44,7 +45,7 @@ export async function addTrustedIssuersToVerificationResponse( {issuer, knownDID
     const {foundInRegistries,registriesNotLoaded}  = await getTrustedRegistryListForIssuer( {issuer, knownDIDRegistries, reloadIssuerRegistry});
 
     const registryStep = {
-      "id": "registered_issuer",
+      "id": REGISTERED_ISSUER_STEP_ID,
       "valid": !!foundInRegistries.length,
       foundInRegistries,
       registriesNotLoaded

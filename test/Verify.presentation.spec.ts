@@ -43,13 +43,15 @@ import {
 
 import { getSignedVP, getUnSignedVP } from './vpUtils.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
+import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, PRESENTATION_ERROR } from '../src/constants/errors.js';
+import { SIGNATURE_INVALID, SIGNATURE_UNSIGNED } from '../src/constants/verificationSteps.js';
 
 
     const noProofVC : any = getVCv1NoProof()
     const expectedNoProofResult = getExpectedFatalResult({
                 credential: noProofVC, 
                 errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
-                errorName: 'no_proof'
+                errorName: NO_PROOF
               })
       
 
@@ -57,7 +59,7 @@ import { VerifiablePresentation } from '../src/types/presentation.js';
     const expectedBadIdResult = getExpectedFatalResult({
       credential: badIdVC, 
       errorMessage: "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement.",
-      errorName: 'invalid_credential_id'
+      errorName: INVALID_CREDENTIAL_ID
     })
 
 
@@ -172,8 +174,8 @@ describe('Verify.verifyPresentation', () => {
       const presentation = await getSignedVP({holder, verifiableCredential}) as any
       presentation.verifiableCredential[0].name = 'Tampered Name'
       const result = await verifyPresentation({presentation, knownDIDRegistries}) as any
-      expect(result.presentationResult.signature).to.equal('invalid')
-      expect(result.credentialResults[0].errors[0].name).to.equal('invalid_signature')
+      expect(result.presentationResult.signature).to.equal(SIGNATURE_INVALID)
+      expect(result.credentialResults[0].errors[0].name).to.equal(INVALID_SIGNATURE)
     })
 
     it('when signed presentation has been tampered with', async () => {
@@ -183,7 +185,7 @@ describe('Verify.verifyPresentation', () => {
       const result = await verifyPresentation({presentation, knownDIDRegistries}) as any
       const expectedCredentialResults = [expectedV1Result]
       expect(result.credentialResults).to.deep.equalInAnyOrder(expectedCredentialResults)
-      expect(result.presentationResult.signature).to.equal('invalid')
+      expect(result.presentationResult.signature).to.equal(SIGNATURE_INVALID)
     })
 
     it('when unsigned presentation has bad vc', async () => {
@@ -214,7 +216,7 @@ describe('Verify.verifyPresentation', () => {
       const credentialResults = [expectedNoProofResult]
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({credentialResults})
       if (expectedPresentationResult?.presentationResult) {
-        expectedPresentationResult.presentationResult.signature = 'unsigned'
+        expectedPresentationResult.presentationResult.signature = SIGNATURE_UNSIGNED
       }
       const result = await verifyPresentation({presentation, knownDIDRegistries, unsignedPresentation:true})
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
@@ -224,7 +226,7 @@ describe('Verify.verifyPresentation', () => {
       const verifiableCredential= [noProofVC]
       const presentation = await getUnSignedVP({verifiableCredential}) as VerifiablePresentation
       const result = await verifyPresentation({presentation, knownDIDRegistries})
-      expect(result?.presentationResult?.signature).to.equal('invalid')
+      expect(result?.presentationResult?.signature).to.equal(SIGNATURE_INVALID)
     })
 
     it('when bad presentation', async () => {
@@ -233,7 +235,7 @@ describe('Verify.verifyPresentation', () => {
       delete presentation['@context']
       const result = await verifyPresentation({presentation, knownDIDRegistries})
       if (result?.errors) {
-        expect(result.errors[0].name).to.equal('presentation_error')
+        expect(result.errors[0].name).to.equal(PRESENTATION_ERROR)
       } else {
         expect(false).to.equal(true)
       }

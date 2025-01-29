@@ -9,6 +9,7 @@ import { knownDIDRegistries } from '../.knownDidRegistries.js';
 import {
   getExpectedFatalResult
  } from '../src/test-fixtures/expectedResults.js';
+import { INVALID_JSONLD, NO_VC_CONTEXT } from '../src/constants/errors.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -49,7 +50,7 @@ describe('Verify', () => {
         const expectedResult = getExpectedFatalResult({
           credential, 
           errorMessage: 'The credential does not appear to be a valid jsonld document - there is no context.',
-          errorName: 'invalid_jsonld'
+          errorName: INVALID_JSONLD
         })
         expect(result).to.deep.equalInAnyOrder(expectedResult) 
       })
@@ -61,7 +62,7 @@ describe('Verify', () => {
         const expectedResult = getExpectedFatalResult({
           credential, 
           errorMessage: "The credential doesn't have a verifiable credential context.",
-          errorName: 'no_vc_context'
+          errorName: NO_VC_CONTEXT
         })
         expect(result).to.deep.equalInAnyOrder(expectedResult) 
       }) 

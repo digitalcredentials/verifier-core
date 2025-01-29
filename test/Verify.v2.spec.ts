@@ -25,6 +25,8 @@ import {
   getExpectedUnverifiedResult, 
   getExpectedFatalResult
  } from '../src/test-fixtures/expectedResults.js';
+import { EXPIRATION_STEP_ID, REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
+import { DID_WEB_UNRESOLVED, INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, STATUS_LIST_NOT_FOUND } from '../src/constants/errors.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -66,9 +68,9 @@ describe('Verify', () => {
             const expectedResult = getExpectedVerifiedResult({credential, withStatus: false})
             expectedResult.log?.push(
             {
-              "id": "revocation_status",
+              "id": REVOCATION_STATUS_STEP_ID,
               "error": {
-                "name": "status_list_not_found",
+                "name": STATUS_LIST_NOT_FOUND,
                 "message": "NotFoundError loading \"https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj\": Request failed with status code 404 Not Found: GET https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj"
               }
             })
@@ -98,7 +100,7 @@ describe('Verify', () => {
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'The signature is not valid.',
-            errorName: 'invalid_signature'
+            errorName: INVALID_SIGNATURE
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
@@ -109,7 +111,7 @@ describe('Verify', () => {
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'The signature is not valid.',
-            errorName: 'invalid_signature'
+            errorName: INVALID_SIGNATURE
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
@@ -121,7 +123,7 @@ describe('Verify', () => {
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
-            errorName: 'no_proof'
+            errorName: NO_PROOF
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
@@ -132,14 +134,14 @@ describe('Verify', () => {
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement.",
-            errorName: 'invalid_credential_id'
+            errorName: INVALID_CREDENTIAL_ID
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
         
         it('when did:web url is unreachable', async () => {
           const credential : any = getVCv2WithBadDidWebUrl()
-          const errorName = "did_web_unresolved"
+          const errorName = DID_WEB_UNRESOLVED
           const errorMessage = "The signature could not be checked because the public signing key could not be retrieved from https://digitalcredentials.github.io/dcc-did-web-bad/did.json"
           const expectedResult = getExpectedFatalResult({credential, errorName, errorMessage}) 
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
@@ -178,7 +180,7 @@ describe('Verify', () => {
       describe('returns as unverified', () => {
         it('when expired', async () => {
           const credential : any = getVCv2Expired() 
-          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:false})
+          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:false})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult)
         })
@@ -190,7 +192,7 @@ describe('Verify', () => {
         it('when expired with valid status', async () => {
           // NOTE: TODO - this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
           const credential : any = getVCv2ExpiredWithValidStatus() 
-          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: 'expiration', withStatus:true})
+          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:true})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
