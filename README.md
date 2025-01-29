@@ -80,6 +80,41 @@ The typescript definitions for the result can be found [here](./src/types/result
 
 Note that the verification result doesn't make any conclusion about the overall validity of a credential. It only checks the validity of each of the four steps, leaving it up to the consumer of the result to decide on the overall validity. The consumer might not, for example, consider a credential that had expired or had been revoked to be 'invalid'. The credential might still in fact be useful as a record of history, i.e, I had a driver's licence that expired two years ago, but it was valid during the period 2018 to 2023, and that information might be useful.
 
+Four steps are checked, returning a result per step in a log like so:
+
+
+```
+{
+  "credential": {the VC that was submitted is returned here},
+  "log": [
+    {
+      "id": "valid_signature",
+      "valid": true (if it is false then an error is returned instead of the log)
+    },
+    {
+      "id": "expiration",
+      "valid": true/false
+    },
+    {
+      "id": "revocation_status",
+      "valid": true/false
+    },
+    {
+      "id": "registered_issuer",
+      "valid": true/false,
+      "foundInRegistries": [
+        "DCC Sandbox Registry"
+      ],
+      "registriesNotLoaded":[
+        "DCC Issuer Registry"
+      ]
+    }
+  ]
+}
+```
+
+Variations and errors are covered next...
+
 There are three general flavours of result that might be returned:
 
 1. <b>all checks were conclusive</b>
@@ -183,7 +218,7 @@ A partially successful verification might look like this example, where we could
     {
       "id": "revocation_status",
       "error": {
-            "name": "network-error",
+            "name": "'status_list_not_found'",
             "message": "Could not retrieve the revocation status list."
       }   
     },
@@ -241,11 +276,29 @@ has been taken down, or there is a network error.
 }
 ```
 
+<b>unknown http error</b>
+
+A catchall error for unknown http errors when verifying the signature.
+
+```
+{
+  "credential": {vc removed for brevity/clarity},
+  "errors": [
+    {
+      "name": "http_error_with_signature_check",
+      "message": "An http error prevented the signature check."
+    }
+  ]
+}
+```
+
+
+
 <b>malformed credential</b>
   
 The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
 
-Some specific examples:
+Specific cases:
 
 <b><i>invalid_jsonld</i></b>
 
@@ -696,7 +749,7 @@ An unsigned VP containing a single verified credential:
 }
 ```
 
-A VP where we've tampered with one of the packaged credentials (by changing the credential name). Note here that both the VP and the VC don't verify because changing the VC affected the VC signature bit also the VP signature which contains the VC.
+A VP where we've tampered with one of the packaged credentials (by changing the credential name). Note here that both the VP and the VC don't verify because changing the VC affected the VC's signature and also the VP signature which contains the VC.
 
 ```
 {
@@ -792,6 +845,7 @@ And here is a VP where just the VP has been tampered with, and not the embedded 
     "signature": "invalid",
     "errors": [
       {
+        "name": "presentation_error",
         "message": {
           "name": "VerificationError",
           "errors": [
@@ -801,8 +855,7 @@ And here is a VP where just the VP has been tampered with, and not the embedded 
               "stack": "Error: Invalid signature.\n    at Ed25519Signature2020.verifyProof (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/suites/LinkedDataSignature.js:189:15)\n    at async /Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:273:53\n    at async Promise.all (index 0)\n    at async _verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:261:3)\n    at async ProofSet.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:195:23)\n    at async Object.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/jsonld-signatures.js:160:18)\n    at async _verifyPresentation (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/vc/dist/index.js:578:30)\n    at async verifyPresentation (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/src/Verify.js:24:24)\n    at async Context.<anonymous> (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/test/Verify.presentation.spec.js:101:28)"
             }
           ]
-        },
-        "name": "presentation_error"
+        }
       }
     ]
   },
@@ -834,7 +887,7 @@ And here is a VP where just the VP has been tampered with, and not the embedded 
 
 ## Install
 
-- Node.js 18+ is recommended.
+- Node.js 20+ is recommended.
 
 ### NPM
 
