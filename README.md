@@ -25,8 +25,8 @@ And verifies signatures from both [eddsa-rdfc-2022 Data Integrity Proof](https:/
 
 The verification checks that the credential:
 
-* has a valid signature, so:
-  * credential hasn't been tampered with
+* has a valid signature, and so:
+  * the credential hasn't been tampered with
   * the signing key was retrieved from the did document
 * hasn't expired
 * hasn't been revoked
@@ -66,7 +66,7 @@ This package exports two methods:
 
 ### verifyCredential
 
-```verifyCredential({credential, reloadIssuerRegistry = true})```
+```verifyCredential({credential, knownDidRegistries, reloadIssuerRegistry = true})```
 
 #### arguments
 
