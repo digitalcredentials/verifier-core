@@ -1,7 +1,7 @@
 {
   "name": "@digitalcredentials/verifier-core",
   "description": "For verifying Verifiable Credentials in the browser, Node.js, and React Native.",
-  "version": "0.0.1",
+  "version": "0.0.1-beta.2",
   "scripts": {
     "build": "npm run clear && tsc -d && tsc -p tsconfig.esm.json",
     "build-test": "npm run clear && tsc -p tsconfig.spec.json",
@@ -17,14 +17,14 @@
     "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha dist/test/*.spec.js && rm -rf dist/esm/test || true",
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },
+  "type": "module",
+  "exports": {
+    ".": {"import": "./dist/index.js"},
+    "./package.json": "./package.json"
+  },
   "files": [
-    "dist",
-    "README.md",
-    "LICENSE.md"
+    "dist/**/*.js"
   ],
-  "main": "dist/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/index.d.ts",
   "dependencies": {
     "@digitalbazaar/data-integrity": "^2.5.0",
     "@digitalbazaar/eddsa-rdfc-2022-cryptosuite": "^1.2.0",
@@ -83,9 +83,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/digitalcredentials/isomorphic-lib-template"
+    "url": "https://github.com/digitalcredentials/verifier-core"
   },
-  "homepage": "https://github.com/digitalcredentials/isomorphic-lib-template",
-  "bugs": "https://github.com/digitalcredentials/isomorphic-lib-template/issues",
-  "type": "module"
+  "homepage": "https://github.com/digitalcredentials/verifier-core",
+  "bugs": "https://github.com/digitalcredentials/verifier-core"
 }
