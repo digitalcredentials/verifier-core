@@ -1,7 +1,7 @@
 {
   "name": "@digitalcredentials/verifier-core",
   "description": "For verifying Verifiable Credentials in the browser, Node.js, and React Native.",
-  "version": "0.0.1-beta.3",
+  "version": "0.0.1-beta.4",
   "scripts": {
     "build": "npm run clear && tsc -d && tsc -p tsconfig.esm.json",
     "build-test": "npm run clear && tsc -p tsconfig.spec.json",
@@ -30,7 +30,7 @@
   "dependencies": {
     "@digitalcredentials/data-integrity": "^2.5.1-beta.1",
     "@digitalcredentials/ed25519-signature-2020": "^6.0.0",
-    "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.2.1-beta.1",
+    "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.2.1-beta.2",
     "@digitalcredentials/issuer-registry-client": "^3.0.1-beta.1",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
     "@digitalcredentials/security-document-loader": "^6.0.1",

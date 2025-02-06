@@ -82,7 +82,7 @@ describe('Verify', () => {
   })
       describe('with eddsa signature', () => { 
         describe('it returns as verified', () => {
-        it.skip('when status is valid', async () => {
+        it('when status is valid', async () => {
           const credential : any = getVCv2EddsaWithValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})

@@ -144,7 +144,7 @@ describe('Verify.verifyPresentation', () => {
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
     })
 
-    it.skip('when signed presentation has mix of VCs', async () => {
+    it('when signed presentation has mix of VCs', async () => {
       const verifiableCredential = [v2WithStatus, v2Eddsa, didWebVC]
       const presentation = await getSignedVP({verifiableCredential, holder: 'did:ex:12345'}) as VerifiablePresentation
       const credentialResults = [expectedV2WithStatusResult, expectedv2EddsaResult, expectedDidWebResult]
