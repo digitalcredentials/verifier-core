@@ -90,7 +90,7 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
       verifyMatchingIssuers: false
     });
 
-    const adjustedResponse = transformResponse(verificationResponse, credential, knownDIDRegistries, reloadIssuerRegistry)
+    const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries, reloadIssuerRegistry)
     return adjustedResponse;
   } catch (error) {
     return { errors: [{ message: 'Could not verify credential.', name: UNKNOWN_ERROR, stackTrace: error }] }
