@@ -27,7 +27,7 @@ The verification checks that the credential:
 
 * has a valid signature, and so therefore:
   * the credential hasn't been tampered with
-  * the signing key was retrieved from the did document
+  * the public key was successfully retrieved from the did document
 * hasn't expired
 * hasn't been revoked
 * was signed by a trusted issuer

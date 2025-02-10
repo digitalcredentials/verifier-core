@@ -5,7 +5,7 @@ import {
   getCredentialWithoutContext, 
   getCredentialWithoutVCContext, 
 } from '../src/test-fixtures/vc.js'
-import { knownDIDRegistries } from '../.knownDidRegistries.js';
+import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import {
   getExpectedFatalResult
  } from '../src/test-fixtures/expectedResults.js';

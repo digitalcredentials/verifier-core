@@ -4,22 +4,24 @@ import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
 import * as vc from '@digitalcredentials/vc';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
+import pkg from '@digitalcredentials/jsonld-signatures';
+
 import { getCredentialStatusChecker } from './credentialStatus.js';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
+import { extractCredentialsFrom } from './extractCredentialsFrom.js';
+
 import { 
   PRESENTATION_ERROR, UNKNOWN_ERROR, INVALID_JSONLD, NO_VC_CONTEXT, 
   INVALID_CREDENTIAL_ID, NO_PROOF, STATUS_LIST_NOT_FOUND, 
   HTTP_ERROR_WITH_SIGNATURE_CHECK, DID_WEB_UNRESOLVED, 
   INVALID_SIGNATURE } from './constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_VALID, SIGNATURE_UNSIGNED, REVOCATION_STATUS_STEP_ID } from './constants/verificationSteps.js';
+import { ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, VERIFICATION_ERROR } from './constants/external.js';
+
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
 import { VerifiablePresentation } from './types/presentation.js';
 
-import { extractCredentialsFrom } from './extractCredentialsFrom.js';
-
-import pkg from '@digitalcredentials/jsonld-signatures';
-import { ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, VERIFICATION_ERROR } from './constants/external.js';
 const { purposes } = pkg;
 const presentationPurpose = new purposes.AssertionProofPurpose();
 

@@ -13,7 +13,7 @@ import {
   getVCv1ExpiredWithValidStatus
 
 } from '../src/test-fixtures/vc.js'
-import { knownDIDRegistries } from '../.knownDidRegistries.js';
+import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import { 
   getExpectedVerifiedResult, 
   getExpectedUnverifiedResult, 

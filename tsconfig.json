@@ -20,7 +20,7 @@
   "include": [
     "src/**/*",
     ".eslintrc.cjs",
-    "karma.conf.js"
-  ],
+    "karma.conf.cjs"
+, "src/test-fixtures/knownDidRegistries.ts"  ],
   "exclude": ["node_modules", "dist", "test"]
 }
