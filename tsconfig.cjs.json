@@ -3,9 +3,9 @@
     "strict": true,
     "target": "es2022",
     "lib": ["es2022", "dom"],
-    "module": "es6",
+    "module": "CommonJS",
     "moduleResolution": "nodenext",
-    "outDir": "dist/esm",
+    "outDir": "dist/cjs",
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
@@ -19,8 +19,8 @@
   },
   "include": [
     "src/**/*",
-    ".eslintrc.js",
-    "karma.conf.js"
-  ],
-  "exclude": ["node_modules", "dist"]
+    ".eslintrc.cjs",
+    "karma.conf.cjs"
+, "src/test-fixtures/knownDidRegistries.ts"  ],
+  "exclude": ["node_modules", "dist", "test"]
 }

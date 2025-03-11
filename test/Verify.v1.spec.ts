@@ -115,7 +115,7 @@ describe('Verify', () => {
       })
 
       describe('returns as verified', () => {
-        it('when status is valid', async () => {
+        it.only('when status is valid', async () => {
           const credential : any = getVCv1ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})

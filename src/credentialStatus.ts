@@ -1,5 +1,5 @@
 import { checkStatus } from '@digitalcredentials/vc-bitstring-status-list';
-import { Credential } from './types/credential';
+import { Credential } from './types/credential.js';
 
 export enum StatusPurpose {
   Revocation = 'revocation',

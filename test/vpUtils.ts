@@ -7,7 +7,7 @@ import {Ed25519VerificationKey2020} from '@digitalcredentials/ed25519-verificati
 const documentLoader = securityLoader().build()
 
 import pkg from '@digitalcredentials/jsonld-signatures';
-import { VerifiablePresentation } from '../src/types/presentation';
+import { VerifiablePresentation } from '../src/types/presentation.js';
 const { purposes } = pkg;
 const presentationPurpose = new purposes.AssertionProofPurpose();
 

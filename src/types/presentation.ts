@@ -1,4 +1,4 @@
-import type { Credential, Proof, Issuer } from './credential';
+import type { Credential, Proof, Issuer } from './credential.js';
 
 export interface VerifiablePresentation {
   readonly '@context': string[];

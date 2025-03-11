@@ -1,4 +1,4 @@
-import { VerificationResponse, VerificationStep, PresentationVerificationResponse } from "src/types/result";
+import { VerificationResponse, VerificationStep, PresentationVerificationResponse } from "../types/result.js";
 
 const expectedPresentationResult = {
   "presentationResult": {
