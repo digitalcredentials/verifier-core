@@ -15,10 +15,19 @@ export function getCredentialStatusChecker(credential: Credential) : (() => bool
     credential.credentialStatus :
     [credential.credentialStatus];
   const [credentialStatus] = credentialStatuses;
-  if (credentialStatus.type === 'BitstringStatusListEntry') {
-    statusChecker = checkStatus;
+
+ switch (credentialStatus.type) {
+  case 'BitstringStatusListEntry':
+    return checkStatus;
+  case 'StatusList2021Entry':
+    // old spec - ignore
+    return ()=>{return true};
+  case '1EdTechRevocationList':
+    // old spec - ignore
+    return ()=>{return true}
+  default:
+    return null;
   }
-  return statusChecker;
   
 }
 
