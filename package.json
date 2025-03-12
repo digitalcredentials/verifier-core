@@ -17,6 +17,7 @@
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.cjs",
     "test-node-no-cov": "npm run build-test && mocha dist/esm/test/*.spec.js && rimraf dist/esm/test",
+    "debug-test": "mocha dist/esm/test/Verify.v1.spec.js",
     "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha dist/test/*.spec.js && rm -rf dist/esm/test || true",
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },
@@ -43,7 +44,7 @@
     "@digitalcredentials/issuer-registry-client": "^3.0.1-beta.1",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
     "@digitalcredentials/security-document-loader": "file:../security-document-loader",
-    "@digitalcredentials/vc": "^9.0.1-beta.2",
+    "@digitalcredentials/vc": "^9.0.2-beta.3",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0"
   },
   "devDependencies": {

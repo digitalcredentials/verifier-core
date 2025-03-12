@@ -16,7 +16,8 @@ import {
   getVCv2EddsaWithValidStatus,
   getVCv2DoubleSigWithBadStatusUrl,
   getVCv2DidWebWithValidStatus,
-  getVCv2WithBadDidWebUrl
+  getVCv2WithBadDidWebUrl,
+  getVCv2DidWebMultikeyWithValidStatus
 
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
@@ -173,6 +174,13 @@ describe('Verify', () => {
             const credential : any = getVCv2DidWebWithValidStatus()
             const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
             const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          })
+
+          it('when status is valid for multikey verification method', async () => {
+            const credential : any = getVCv2DidWebMultikeyWithValidStatus()
+            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
+            const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries})
             expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
           })
 
