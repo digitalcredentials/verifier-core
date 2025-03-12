@@ -151,7 +151,6 @@ describe('Verify', () => {
           const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
-
       })
 
       describe('returns as verified', () => {

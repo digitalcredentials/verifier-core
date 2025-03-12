@@ -7,7 +7,7 @@ export enum StatusPurpose {
 }
 
 export function getCredentialStatusChecker(credential: Credential) : (() => boolean) | null  {
-  let statusChecker = null;
+
   if (!credential.credentialStatus) {
     return null;
   }
