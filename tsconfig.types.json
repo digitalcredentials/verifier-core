@@ -5,7 +5,7 @@
     "lib": ["es2022", "dom"],
     "module": "es2022",
     "moduleResolution": "nodenext",
-    "outDir": "dist/types",
+    "outDir": "dist",
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
@@ -15,7 +15,7 @@
     "resolveJsonModule": true,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationDir": "dist/types"
+    "declarationDir": "dist"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

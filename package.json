@@ -3,11 +3,10 @@
   "description": "For verifying Verifiable Credentials in the browser, Node.js, and React Native.",
   "version": "1.0.0",
   "scripts": {
-    "build-cjs": "tsc -p tsconfig.cjs.json",
     "build-esm": "tsc -p tsconfig.esm.json",
     "build-types": "tsc -p tsconfig.types.json",
     "build-test": "tsc -p tsconfig.test.json",
-    "build": "npm run clear && npm run build-types && npm run build-cjs && npm run build-esm",
+    "build": "npm run clear && npm run build-types && npm run build-esm",
     "clear": "rimraf dist/*",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
@@ -16,24 +15,13 @@
     "rebuild": "npm run clear && npm run build",
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.cjs",
-    "test-node-no-cov": "npm run build-test && mocha dist/esm/test/*.spec.js && rimraf dist/esm/test",
-    "debug-test": "mocha dist/esm/test/Verify.v1.spec.js",
-    "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha dist/test/*.spec.js && rm -rf dist/esm/test || true",
+    "test-node-no-cov": "npm run build-test && mocha dist/test/*.spec.js && rimraf dist/test",
+    "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha dist/test/*.spec.js && rm -rf dist/test || true",
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
   "type": "module",
-  "browser": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "require": "./dist/cjs/index.js",
-      "import": "./dist/esm/index.js",
-      "types": "./dist/types/index.d.ts"
-    },
-    "./package.json": "./package.json"
-  },
+  "types": "dist/index.d.ts",
+  "exports": "./dist/index.js",
   "files": [
     "dist/**/*.js"
   ],
@@ -55,6 +43,7 @@
     "@types/node": "^18.11.17",
     "@typescript-eslint/eslint-plugin": "^5.46.1",
     "@typescript-eslint/parser": "^5.46.1",
+    "c8": "^10.1.3",
     "chai": "^4.3.7",
     "coveralls": "^3.1.1",
     "cross-env": "^7.0.3",
