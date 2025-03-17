@@ -20,10 +20,10 @@
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },
   "type": "module",
-  "types": "dist/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": "./dist/index.js",
   "files": [
-    "dist/**/*.js"
+    "./dist/**/*.js"
   ],
   "dependencies": {
     "@digitalcredentials/data-integrity": "^2.6.0-beta.1",
