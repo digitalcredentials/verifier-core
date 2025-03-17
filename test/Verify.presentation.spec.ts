@@ -1,6 +1,6 @@
 import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
-import { verifyPresentation } from '../src/Verify.js'
+import { verifyPresentation } from '../src/index.js'
 import { 
   getVCv1SimpleIssuerId,
   getVCv2SimpleIssuerId,
