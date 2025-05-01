@@ -4,7 +4,7 @@ module.exports = {
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint', 'prettier'],
   parserOptions: {
-    project: './tsconfig.json'
+    project: './tsconfig.esm.json'
   },
   ignorePatterns: ['dist/', 'test'],
   rules: {
@@ -14,6 +14,7 @@ module.exports = {
     '@typescript-eslint/prefer-ts-expect-error': 'off',
     '@typescript-eslint/return-await': 'off',
     '@typescript-eslint/strict-boolean-expressions': 'off',
+    '@typescript-eslint/prefer-nullish-coalescing': 'off',
     'no-empty-pattern': 'off'
   }
 }

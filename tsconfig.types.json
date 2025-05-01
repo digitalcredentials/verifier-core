@@ -3,24 +3,20 @@
     "strict": true,
     "target": "es2022",
     "lib": ["es2022", "dom"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "outDir": "dist/esm",
+    "module": "es2022",
+    "moduleResolution": "nodenext",
+    "outDir": "dist",
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
     "baseUrl": ".",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "dist"
   },
-  "ts-node": {
-    "files": true
-  },
-  "include": [
-    "src/**/*",
-    ".eslintrc.js",
-    "karma.conf.js"
-  ],
-  "exclude": ["node_modules", "dist", "test"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
