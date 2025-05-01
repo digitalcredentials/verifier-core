@@ -46,7 +46,7 @@ describe('Verify', () => {
 
       it('when not jsonld', async () => {
         const credential : any = getCredentialWithoutContext() 
-        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        const result = await verifyCredential({credential, knownDIDRegistries})
         const expectedResult = getExpectedFatalResult({
           credential, 
           errorMessage: 'The credential does not appear to be a valid jsonld document - there is no context.',
@@ -57,7 +57,7 @@ describe('Verify', () => {
 
       it('when no vc context', async () => {
         const credential : any = getCredentialWithoutVCContext() 
-        const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+        const result = await verifyCredential({credential, knownDIDRegistries})
 
         const expectedResult = getExpectedFatalResult({
           credential, 

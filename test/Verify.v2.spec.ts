@@ -32,6 +32,7 @@ import { DID_WEB_UNRESOLVED, INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF,
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
 
+const REGISTERED_ISSUER_STEP_ID = 'registered_issuer'
 const DISABLE_CONSOLE_WHEN_NO_ERRORS = true
 
 describe('Verify', () => {
@@ -75,7 +76,7 @@ describe('Verify', () => {
                 "message": "NotFoundError loading \"https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj\": Request failed with status code 404 Not Found: GET https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5VK8CbZ1GjycuPombrj"
               }
             })
-            const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            const result = await verifyCredential({credential, knownDIDRegistries})
             expect(result).to.deep.equalInAnyOrder(expectedResult) 
           })
 
@@ -86,7 +87,7 @@ describe('Verify', () => {
         it('when status is valid', async () => {
           const credential : any = getVCv2EddsaWithValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           
          // console.log(JSON.stringify(result,null,2))
           
@@ -100,7 +101,7 @@ describe('Verify', () => {
 
         it('when tampered with', async () => {
           const credential : any = getVCv2Tampered() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'The signature is not valid.',
@@ -111,7 +112,7 @@ describe('Verify', () => {
 
         it('when expired and tampered with', async () => {
           const credential : any = getVCv2ExpiredAndTampered() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           const expectedResult = getExpectedFatalResult({
             credential, 
             errorMessage: 'The signature is not valid.',
@@ -122,7 +123,7 @@ describe('Verify', () => {
 
          it('when no proof', async () => {
           const credential : any = getVCv2NoProof() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
 
           const expectedResult = getExpectedFatalResult({
             credential, 
@@ -133,7 +134,7 @@ describe('Verify', () => {
         })
         it('when credential id is not a uri', async () => {
           const credential : any = getVCv2NonURIId() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
   
           const expectedResult = getExpectedFatalResult({
             credential, 
@@ -148,7 +149,7 @@ describe('Verify', () => {
           const errorName = DID_WEB_UNRESOLVED
           const errorMessage = "The signature could not be checked because the public signing key could not be retrieved from https://digitalcredentials.github.io/dcc-did-web-bad/did.json"
           const expectedResult = getExpectedFatalResult({credential, errorName, errorMessage}) 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) 
         })
       })
@@ -157,29 +158,77 @@ describe('Verify', () => {
         it('when status is valid', async () => {
           const credential : any = getVCv2ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
         describe('with did:web issuer', () => {
 
           it('when status is valid', async () => {
             const credential : any = getVCv2DidWebWithValidStatus()
-            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-            const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+            expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID).matchingIssuers = [
+              {
+                "issuer": {
+                  "federation_entity": {
+                    "organization_name": "DCC did:web test",
+                    "homepage_uri": "https://digitalcredentials.mit.edu",
+                    "location": "Cambridge, MA, USA"
+                  }
+                },
+                "registry": {
+                  "name": "DCC Sandbox Registry",
+                  "type": "dcc-legacy",
+                  "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+                }
+              }
+                      ]
+            const result = await verifyCredential({credential, knownDIDRegistries})
             expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
           })
         
           it('with different issuer for vc and statusList ', async () => {
             const credential : any = getVCv2DidWebWithValidStatus()
-            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-            const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+            const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+            expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID).matchingIssuers = [
+              {
+                "issuer": {
+                  "federation_entity": {
+                    "organization_name": "DCC did:web test",
+                    "homepage_uri": "https://digitalcredentials.mit.edu",
+                    "location": "Cambridge, MA, USA"
+                  }
+                },
+                "registry": {
+                  "name": "DCC Sandbox Registry",
+                  "type": "dcc-legacy",
+                  "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+                }
+              }
+                      ]
+            const result = await verifyCredential({credential, knownDIDRegistries})
             expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
           })
 
           it('when status is valid for multikey verification method', async () => {
             const credential : any = getVCv2DidWebMultikeyWithValidStatus()
-            const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-            const result = await verifyCredential({credential, reloadIssuerRegistry: true, knownDIDRegistries})
+            const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
+            expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID).matchingIssuers = [
+              {
+                "issuer": {
+                  "federation_entity": {
+                    "organization_name": "DCC did:web multikey test",
+                    "homepage_uri": "https://digitalcredentials.mit.edu",
+                    "location": "Cambridge, MA, USA"
+                  }
+                },
+                "registry": {
+                  "name": "DCC Sandbox Registry",
+                  "type": "dcc-legacy",
+                  "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+                }
+              }
+            ]
+            const result = await verifyCredential({credential, knownDIDRegistries})
             expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
           })
 
@@ -191,19 +240,19 @@ describe('Verify', () => {
         it('when expired', async () => {
           const credential : any = getVCv2Expired() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:false})
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           expect(result).to.deep.equalInAnyOrder(expectedResult)
         })
         it('when revoked', async () => {
           const credential : any = getVCv2Revoked() 
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
           assert.ok(result.log);
         })
         it('when expired with valid status', async () => {
           // NOTE: TODO - this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
           const credential : any = getVCv2ExpiredWithValidStatus() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:true})
-          const result = await verifyCredential({credential, reloadIssuerRegistry: false, knownDIDRegistries})
+          const result = await verifyCredential({credential, knownDIDRegistries})
            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
