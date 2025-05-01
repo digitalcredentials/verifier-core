@@ -26,13 +26,13 @@
     "./dist/**/*.js"
   ],
   "dependencies": {
-    "@digitalcredentials/data-integrity": "^2.6.0-beta.1",
-    "@digitalcredentials/ed25519-signature-2020": "^7.0.0-beta.1",
-    "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.3.0-beta.1",
-    "@digitalcredentials/issuer-registry-client": "^3.2.0-beta.1",
+    "@digitalcredentials/data-integrity": "^2.6.0",
+    "@digitalcredentials/ed25519-signature-2020": "^7.0.0",
+    "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.3.0",
+    "@digitalcredentials/issuer-registry-client": "file:../issuer-registry-client",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
-    "@digitalcredentials/security-document-loader": "^7.0.0-beta.1",
-    "@digitalcredentials/vc": "^10.0.0-beta.1",
+    "@digitalcredentials/security-document-loader": "^7.0.0",
+    "@digitalcredentials/vc": "^10.0.0",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0"
   },
   "devDependencies": {
