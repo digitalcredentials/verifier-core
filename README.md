@@ -27,14 +27,14 @@ The verification checks that the credential:
 
 * has a valid signature, and so therefore:
   * the credential hasn't been tampered with
-  * the public key was successfully retrieved from the did document
+  * the public signing key was successfully retrieved from the did document
 * hasn't expired
 * hasn't been revoked
 * was signed by a trusted issuer
 
-The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded, which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
+The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded (say because of a network error), which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
 
-As of January 2025 issuers are trusted if they are listed in one of the Digital Credentials Issuer Registries:
+As of March 2025 issuers are trusted if they are listed in one of the Digital Credentials Issuer Registries:
 
 ```
 {
