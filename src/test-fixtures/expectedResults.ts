@@ -29,9 +29,13 @@ const expectedResult = {
               }
             },
             "registry": {
-              "name": "DCC Sandbox Registry",
               "type": "dcc-legacy",
-              "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+              "federation_entity": {
+                "organization_name": "DCC Sandbox Registry"
+              },
+              "institution_additional_information": {
+                "legacy_list": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+              }
             }
           }
         ],

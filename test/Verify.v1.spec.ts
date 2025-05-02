@@ -119,8 +119,6 @@ describe('Verify', () => {
           const credential : any = getVCv1ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
           const result = await verifyCredential({credential, knownDIDRegistries})
-         // console.log("THE RESULT COMING BACK")
-         // console.log(JSON.stringify(result,null,2))
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
       })
