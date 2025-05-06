@@ -15,7 +15,7 @@
     "rebuild": "npm run clear && npm run build",
     "test": "npm run lint && npm run test-node",
     "test-karma": "karma start karma.conf.cjs",
-    "test-node-no-cov": "npm run build-test && mocha dist/test/*.spec.js && rimraf dist/test",
+    "test-node-no-cov": "npm run build-test && mocha --timeout 20000 dist/test/*.spec.js && rimraf dist/test",
     "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha --timeout 20000 dist/test/*.spec.js && rm -rf dist/test || true",
     "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
   },
