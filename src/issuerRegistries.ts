@@ -1,5 +1,5 @@
 import {RegistryClient, LookupResult} from '@digitalcredentials/issuer-registry-client';
-import { VerificationResponse, RegistryListResult } from './types/result.js';
+import { VerificationResponse } from './types/result.js';
 import { REGISTERED_ISSUER_STEP_ID } from './constants/verificationSteps.js';
 const registryClient = new RegistryClient()
 
