@@ -19,10 +19,27 @@ const expectedResult = {
       {
         "id": "registered_issuer",
         "valid": true,
-        "foundInRegistries": [
-          "DCC Sandbox Registry"
+        "matchingIssuers": [
+          {
+            "issuer": {
+              "federation_entity": {
+                "organization_name": "Public Test Issuer",
+                "homepage_uri": "https://dcconsortium.org",
+                "location": "Everywhere"
+              }
+            },
+            "registry": {
+              "type": "dcc-legacy",
+              "federation_entity": {
+                "organization_name": "DCC Sandbox Registry"
+              },
+              "institution_additional_information": {
+                "legacy_list": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+              }
+            }
+          }
         ],
-        "registriesNotLoaded": []
+        "uncheckedRegistries": []
       }
     ]
   }

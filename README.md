@@ -34,28 +34,20 @@ The verification checks that the credential:
 
 The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded (say because of a network error), which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
 
-As of March 2025 issuers are trusted if they are listed in one of the Digital Credentials Issuer Registries:
+As of May 2025 we've published a list of known DCC registries:
 
 ```
-{
-    name: 'DCC Pilot Registry',
-    url: 'https://digitalcredentials.github.io/issuer-registry/registry.json'
-  },
-  {
-    name: 'DCC Sandbox Registry',
-    url: 'https://digitalcredentials.github.io/sandbox-registry/registry.json'
-  },
-  {
-    name: 'DCC Community Registry',
-    url: 'https://digitalcredentials.github.io/community-registry/registry.json'
-  },
-  {
-    name: 'DCC Registry',
-    url: 'https://digitalcredentials.github.io/dcc-registry/registry.json'
-  }
+https://digitalcredentials.github.io/dcc-known-registries/known-did-registries.json
   ```
 
-  The DCC is working on a new trust registry model that will extend the registry scope.
+ that you would retrieve something like so:
+
+```
+const response = await fetch("https://digitalcredentials.github.io/dcc-known-registries/known-did-registries.json");
+const knownRegistries = await response.json();
+  ```
+
+and then pass that knownRegistries variable into the call to verifyCredential, as explained below.
 
 ## API
 
@@ -72,7 +64,7 @@ This package exports two methods:
 
 * credential - The W3C Verifiable Credential to be verified.
 * knownDidRegistries - a list of trusted registries.
-* reloadIssuerRegistry - A boolean (true/false) indication whether or not to refresh the cached copy of the registries.
+
 
 #### result
 
@@ -102,11 +94,58 @@ Four steps are checked, returning a result per step in a log like so:
     {
       "id": "registered_issuer",
       "valid": true/false,
-      "foundInRegistries": [
-        "DCC Sandbox Registry"
+      "matchingIssuers": [
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC test issuer",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
+        },
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "OneUni University",
+              "homepage_uri": "https://oneuni.edu",
+              "logo_uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAB4SURBVEhLY1Da6ENTNGoBQTRqAUE0Yixwkq3X5tNgAANBkRlosvgQERbM0OaAmAwFNLFAkMNdW2KGkwjIE1S3AIFGLSCIRi0giEYtwIHq5Tk0BCEIaDwIwLh89RiKMRBRFkDNxQBUsoAyNGoBQTRqAUE01C3Y6AMAsDxJowXOs6oAAAAASUVORK5CYII="
+            },
+            "institution_additional_information": {
+              "legal_name": "Board and Trustees of OneUni University"
+            },
+            "credential_registry_entity": {
+              "ctid": "ce-e8a41a52-6ff6-48f0-9872-889c87b093b7",
+              "ce_url": "https://credentialengineregistry.org/resources/ce-e8a41a52-6ff6-48f0-9872-889c87b093b7"
+            },
+            "ror_entity": {
+              "rorid": "042nb2s44",
+              "ror_url": "https://ror.org/042nb2s44"
+            }
+          },
+          "registry": {
+            "type": "oidf",
+            "fetchEndpoint": "https://test.registry.dcconsortium.org/fetch?sub=",
+            "name": "DCC Member Registry"
+          }
+        }
       ],
-      "registriesNotLoaded":[
-        "DCC Issuer Registry"
+      "uncheckedRegistries": [
+            {
+             "name": "DCC Community Registry",
+             "type": "dcc-legacy",
+             "url": "https://onldynoyrrrt.com/registry.json"
+           },
+           {
+              "name": "DCC Pilot Registry",
+              "type": "dcc-legacy",
+              "url": "https://onldynoyrt.com/registry.json"
+            }
       ]
     }
   ]
@@ -142,10 +181,23 @@ A conclusive verification might look like this example where all steps returned 
     {
       "id": "registered_issuer",
       "valid": true,
-      "foundInRegistries": [
-        "DCC Sandbox Registry"
+      "matchingIssuers": [
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC did:web test",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
+        }
       ],
-      "registriesNotLoaded":[]
+      "uncheckedRegistries": []
     }
   ]
 }
@@ -173,10 +225,23 @@ And here is a slightly different verification result where we have still made co
     {
       "id": "registered_issuer",
       "valid": true,
-      "foundInRegistries": [
-        "DCC Sandbox Registry"
+      "matchingIssuers": [
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC did:web test",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
+        }
       ],
-      "registriesNotLoaded":[]
+      "uncheckedRegistries": []
     }
   ]
 }
@@ -225,12 +290,33 @@ A partially successful verification might look like this example, where we could
     {
       "id": "registered_issuer",
       "valid": false,
-      "foundInRegistries": [],
-      "registriesNotLoaded": [
+      "matchingIssuers": [
         {
-          "name": "DCC Sandbox Registry",
-          "url": "https://onlynoyrt.com/registry.json"
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC did:web test",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
         }
+      ],
+      "uncheckedRegistries": [
+            {
+             "name": "DCC Community Registry",
+             "type": "dcc-legacy",
+             "url": "https://onldynoyrrrt.com/registry.json"
+           },
+           {
+              "name": "DCC Pilot Registry",
+              "type": "dcc-legacy",
+              "url": "https://onldynoyrt.com/registry.json"
+            }
       ]
     }
   ]
@@ -633,10 +719,23 @@ A successful signed VP result with two packaged VCs might look like so:
         {
           "id": "registered_issuer",
           "valid": true,
-          "foundInRegistries": [
-            "DCC Sandbox Registry"
-          ],
-          "registriesNotLoaded": []
+          "matchingIssuers": [
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC did:web test",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
+        }
+      ],
+          "uncheckedRegistries": []
         }
       ],
       "credential": {vc omitted for brevity/clarity}

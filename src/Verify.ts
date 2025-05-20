@@ -34,7 +34,7 @@ const ed25519Suite = new Ed25519Signature2020();
 // add both suites - the vc lib will use whichever is appropriate
 const suite = [ed25519Suite, eddsaSuite]
 
-export async function verifyPresentation({ presentation, challenge = 'meaningless', unsignedPresentation = false, knownDIDRegistries, reloadIssuerRegistry = true }:
+export async function verifyPresentation({ presentation, challenge = 'meaningless', unsignedPresentation = false, knownDIDRegistries }:
   {
     presentation: VerifiablePresentation,
     challenge?: string | null,
@@ -59,7 +59,7 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
     });
 
     const transformedCredentialResults = await Promise.all(result.credentialResults.map(async (credentialResult: any) => {
-      return transformResponse(credentialResult, credentialResult.credential, knownDIDRegistries, reloadIssuerRegistry)
+      return transformResponse(credentialResult, credentialResult.credential, knownDIDRegistries)
     }));
 
     // take what we need from the presentation part of the result
@@ -79,7 +79,7 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
 }
 
 
-export async function verifyCredential({ credential, knownDIDRegistries, reloadIssuerRegistry = true }: { credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean }): Promise<VerificationResponse> {
+export async function verifyCredential({ credential, knownDIDRegistries}: { credential: Credential, knownDIDRegistries: object}): Promise<VerificationResponse> {
   try {
     // null unless credential has a status
     const statusChecker = getCredentialStatusChecker(credential)
@@ -92,14 +92,14 @@ export async function verifyCredential({ credential, knownDIDRegistries, reloadI
       verifyMatchingIssuers: false
     });
 
-    const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries, reloadIssuerRegistry)
+    const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries)
     return adjustedResponse;
   } catch (error) {
     return { errors: [{ message: 'Could not verify credential.', name: UNKNOWN_ERROR, stackTrace: error }] }
   }
 }
 
-async function transformResponse(verificationResponse: any, credential: Credential, knownDIDRegistries: object, reloadIssuerRegistry: boolean): Promise<VerificationResponse> {
+async function transformResponse(verificationResponse: any, credential: Credential, knownDIDRegistries: object): Promise<VerificationResponse> {
 
   const fatalCredentialError = handleAnyFatalCredentialErrors(credential)
 
@@ -115,7 +115,7 @@ async function transformResponse(verificationResponse: any, credential: Credenti
   }
 
   const { issuer } = credential
-  await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, reloadIssuerRegistry, issuer })
+  await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, issuer })
 
   // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
