@@ -1,6 +1,6 @@
 # isomorphic-lib-template Changelog
 
-## 0.0.1 - TBD
+## 1.0.0 - TBD
 
 ### Added
 
