@@ -31,7 +31,7 @@
     "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.3.0",
     "@digitalcredentials/issuer-registry-client": "^3.2.0-beta.5",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
-    "@digitalcredentials/security-document-loader": "^7.0.0",
+    "@digitalcredentials/security-document-loader": "^8.0.0",
     "@digitalcredentials/vc": "^10.0.0",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0"
   },
