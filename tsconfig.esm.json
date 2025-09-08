@@ -4,14 +4,18 @@
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "module": "es2022",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "outDir": "dist",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
     "baseUrl": ".",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
     "resolveJsonModule": true
   },
   "ts-node": {
@@ -22,5 +26,5 @@
     ".eslintrc.js",
     "karma.conf.js"
   ],
-  "exclude": ["node_modules", "dist", "test"]
+  "exclude": ["node_modules", "dist", "test", "src/test-fixtures"]
 }
