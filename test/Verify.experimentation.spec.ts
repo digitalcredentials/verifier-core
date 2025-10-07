@@ -1,6 +1,8 @@
 import chai from 'chai'
 import { verifyCredential } from '../src/Verify.js'
+import { Credential } from '../src/types/credential.js';
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
+import { checkSchemas } from '../src/schemaCheck.js';
 const { expect } = chai;
 
 /* This file is just here for convenience, as an easy way to try things 
@@ -171,12 +173,22 @@ const didKeyCredential = {
 
 
 describe('tests to experiment during development work', () => {
-  it('tests', async () => {
+  it.only('tests', async () => {
     // change this however you like to test things, or more likely,
     // change the VC that is passed in.
-    const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-   // console.log(JSON.stringify(result, null, 2))
-    expect(result.errors).to.not.exist
+    const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+    const result = checkSchemas(vc)
+    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
+    console.log(JSON.stringify(result, null, 2))
+    expect(result).to.exist
   })
 })
 
+
+async function fetchVC(url:string) : Promise<Credential> {
+
+    const response = await fetch(url);
+    const data = await response.json();
+    return data as Credential
+  
+}
