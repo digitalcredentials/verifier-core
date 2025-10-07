@@ -92,6 +92,11 @@ export interface Proof {
   jws?: string;
 }
 
+export interface CredentialSchema {
+  type: string;
+  id: string;
+}
+
 export interface RenderMethod {
   id?: string;
   type: string;
@@ -112,6 +117,7 @@ export interface CredentialV1 {
   readonly proof?: Proof;                // https://www.w3.org/TR/vc-data-model/#proofs-signatures
   readonly name?: string;
   readonly renderMethod?: RenderMethod[];
+  readonly credentialSchema?: CredentialSchema | CredentialSchema[]; //https://www.w3.org/TR/vc-data-model-1.1/#data-schemas
 }
 
 // https://www.w3.org/TR/vc-data-model-2.0/
@@ -128,6 +134,7 @@ export interface CredentialV2 {
   readonly proof?: Proof;                // https://w3c.github.io/vc-data-model/#proofs-signatures
   readonly name?: string;
   readonly renderMethod?: RenderMethod[]; // https://www.w3.org/TR/vc-data-model-2.0/#reserved-extension-points
+  readonly credentialSchema?: CredentialSchema | CredentialSchema[]; //https://www.w3.org/TR/vc-data-model-2.0/#data-schemas
 }
 
 export type Credential = CredentialV1 | CredentialV2;
