@@ -1,10 +1,9 @@
 import { Ajv } from "ajv"
 import { Credential } from "./types/credential.js"
 
-export const checkSchemas = async (vc: Credential) => {
+export const checkSchemas = async (vc: Credential) : Promise<any> => {
   try {
     const ajv = new Ajv({ allErrors: true }) // options can be passed, e.g. {allErrors: true}
-    let schemaURL;
     if (vc.credentialSchema) {
       // wrap in array if not already
       const credentialSchemas = [].concat(vc.credentialSchema as any);
@@ -28,12 +27,13 @@ export const checkSchemas = async (vc: Credential) => {
   }
 }
 
-async function fetchSchema(url: string) {
+async function fetchSchema(url: string) : Promise<object> {
   try {
     const response = await fetch(url);
     const data = await response.json();
     return data
   } catch (error) {
-    console.error('Error fetching data:', error);
+    console.error('Error fetching schema:', error);
+    throw Error(`Error fetching schema`)
   }
 }
