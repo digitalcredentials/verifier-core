@@ -173,7 +173,7 @@ const didKeyCredential = {
 
 
 describe('schema check to fail for object proof', () => {
-  it('tests', async () => {
+  it.only('tests', async () => {
     // change this however you like to test things
     const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
     const result = await checkSchemas(vc)
