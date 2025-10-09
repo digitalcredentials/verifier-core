@@ -172,20 +172,8 @@ const didKeyCredential = {
 } as any
 
 
-describe('schema check to fail for object proof', () => {
-  it.only('tests', async () => {
-    // change this however you like to test things
-    const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
-    const result = await checkSchemas(vc)
-    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-    console.log(JSON.stringify(result, null, 2))
-    expect(result[0].errors).to.exist
-    expect(result[0].valid).to.be.false
-  })
-})
-
 describe('schema check to pass for array proof', () => {
-  it.only('tests', async () => {
+  it.skip('tests', async () => {
     // change this however you like to test things
     const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
     const vc = JSON.parse(JSON.stringify(originalVC))
