@@ -1,8 +1,8 @@
 import { Ajv2019 } from "ajv/dist/2019.js"
 import addFormats from "ajv-formats";
-import { Credential, CredentialSchema } from "./types/credential.js"
+import { Credential } from "./types/credential.js"
 
-const OBv3_0_3_CONTEXT = 'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json';
+const OBV3_0_3_CONTEXT = 'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json';
 const OBV3_0_3_SCHEMA = 'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json'
 const ajv = new Ajv2019({ allErrors: true, loadSchema })
 addFormats.default(ajv);
@@ -19,7 +19,7 @@ export const checkSchemas = async (vc: Credential): Promise<any> => {
     } else {
       // no credentialSchema was specified so try to guess based on context
       // TODO make sure to indicate in results that this is a guess based on context                        
-      if (vc["@context"].includes(OBv3_0_3_CONTEXT)) {
+      if (vc["@context"].includes(OBV3_0_3_CONTEXT)) {
         return [await validate(OBV3_0_3_SCHEMA, vc)];
       } else {
         return {result: 'NO_SCHEMA'}
