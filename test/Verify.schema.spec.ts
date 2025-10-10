@@ -9,55 +9,68 @@ const { expect } = chai;
 Tests credential *schema* validation.
 */
 
-describe('obv3 schema check when no credentialSchema property', () => {
-  it.skip('tests', async () => {
-    const vc = await fetchVC('NEED A PLAIN VC HERE, I.E, NO OBV3')
-    const result = await checkSchemas(vc)
-    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-    console.log(JSON.stringify(result, null, 2))
-    expect(result).to.equal({result: 'NO_SCHEMA'})
-  })
+describe('checkSchemas', () => {
+    it.only('passes for array proof', async () => {
+        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+        const vc = JSON.parse(JSON.stringify(originalVC))
+        vc.proof = [vc.proof]
+        const result = await checkSchemas(vc)
+        // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
+        console.log(JSON.stringify(result, null, 2))
+        expect(result[0].errors).to.not.exist
+        expect(result[0].valid).to.be.true
+    })
+
+    it.only('fails for object proof', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+        const result = await checkSchemas(vc)
+        expect(result[0].errors).to.exist
+        expect(result[0].valid).to.be.false
+    })
+
+    it.only('returns NO_SCHEMA when no credentialSchema property or context', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-noExpiry-minimal.json')
+        const result = await checkSchemas(vc)
+        // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
+        console.log(JSON.stringify(result, null, 2))
+        expect(result).to.deep.equalInAnyOrder({ result: 'NO_SCHEMA' })
+    })
+
+    it.only('fails for obv3 based on context with object proof', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+        const result = await checkSchemas(vc)
+        // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
+        console.log(JSON.stringify(result, null, 2))
+        expect(result[0].errors).to.exist
+        expect(result[0].valid).to.be.false
+    })
+
+    it.only('passes for obv3 based on context with array proof', async () => {
+        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+        const vc = JSON.parse(JSON.stringify(originalVC))
+        vc.proof = [vc.proof]
+        const result = await checkSchemas(vc)
+        // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
+        expect(result[0].errors).to.not.exist
+        expect(result[0].valid).to.be.true
+    })
 })
 
-describe('failing schema check for obv3 when no credentialSchema', () => {
-  it.only('tests', async () => {
-    const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
-    const result = await checkSchemas(vc)
-    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-    console.log(JSON.stringify(result, null, 2))
-    expect(result[0].errors).to.exist
-    expect(result[0].valid).to.be.false
-  })
-})
-
-describe('schema check to fail for object proof', () => {
-  it.only('tests', async () => {
-    // change this however you like to test things
-    const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
-    const result = await checkSchemas(vc)
-    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-    console.log(JSON.stringify(result, null, 2))
-    expect(result[0].errors).to.exist
-    expect(result[0].valid).to.be.false
-  })
-})
-
-describe('schema check to pass for array proof', () => {
-  it.only('tests', async () => {
-    // change this however you like to test things
-    const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
-    const vc = JSON.parse(JSON.stringify(originalVC))
-    vc.proof = [vc.proof]
-    const result = await checkSchemas(vc)
-    // const result = await verifyCredential({ credential: didKeyCredential, knownDIDRegistries })
-    console.log(JSON.stringify(result, null, 2))
-    expect(result[0].errors).to.not.exist
-    expect(result[0].valid).to.be.true
-  })
+describe('schema results for verification call', () => {
+    it.skip('returns positive result', async () => {
+        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+        const credential = JSON.parse(JSON.stringify(originalVC))
+        credential.proof = [credential.proof]
+        const result = await verifyCredential({ credential, knownDIDRegistries })
+        expect(result).to.exist
+        // need to change these to get pull the schema result from the VC result:
+        // expect(result[0].errors).to.not.exist
+        //  expect(result[0].valid).to.be.true
+    })
 })
 
 
-async function fetchVC(url:string) : Promise<Credential> {
+async function fetchVC(url: string): Promise<Credential> {
     const response = await fetch(url);
     const data = await response.json();
     return data as Credential
