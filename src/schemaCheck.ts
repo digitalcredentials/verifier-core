@@ -1,6 +1,8 @@
 import { Ajv2019 } from "ajv/dist/2019.js"
 import addFormats from "ajv-formats";
 import { Credential } from "./types/credential.js"
+import { VerificationResponse, VerificationStep } from './types/result.js';
+import { SCHEMA_STEP_ID } from './constants/verificationSteps.js';
 
 const OBV3_0_3_CONTEXT = 'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json';
 const OBV3_0_3_SCHEMA = 'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json'
@@ -47,4 +49,16 @@ async function loadSchema(url: string): Promise<object> {
     console.error('Error fetching schema:', error);
     throw Error(`Error fetching schema`)
   }
+}
+
+export const addSchemaCheckToVerificationResponse = async ({verificationResponse, credential } : {verificationResponse: VerificationResponse, credential: Credential}): Promise<void> => {
+  const schemaResult = await checkSchemas(credential);
+
+  const schemaStep = {
+        "id": SCHEMA_STEP_ID,
+        "details": schemaResult
+  };
+  
+  (verificationResponse.additionalInformation ??= []).push(schemaStep)
+
 }

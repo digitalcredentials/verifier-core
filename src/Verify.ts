@@ -8,6 +8,7 @@ import pkg from '@digitalcredentials/jsonld-signatures';
 
 import { getCredentialStatusChecker } from './credentialStatus.js';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
+import { addSchemaCheckToVerificationResponse } from './schemaCheck.js'
 import { extractCredentialsFrom } from './extractCredentialsFrom.js';
 
 import { 
@@ -116,6 +117,8 @@ async function transformResponse(verificationResponse: any, credential: Credenti
 
   const { issuer } = credential
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, issuer })
+
+  await addSchemaCheckToVerificationResponse({verificationResponse, credential})
 
   // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
