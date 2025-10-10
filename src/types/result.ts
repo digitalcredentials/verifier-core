@@ -12,8 +12,14 @@ export interface VerificationError {
     "registriesNotLoaded"?: RegistriesNotLoaded[],
     "error"?: VerificationError
   }
+
+  export interface AdditionalInformationEntry {
+    "id": string,
+    "details": object
+  }
   
   export interface VerificationResponse {
+    "additionalInformation"?: AdditionalInformationEntry[];
     "credential"?: object,
     "errors"?: VerificationError[],
     "log"?: VerificationStep[]
