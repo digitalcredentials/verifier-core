@@ -49,6 +49,7 @@ export type EducationalOperationalCredential = EducationalOperationalCredentialE
   readonly competencyRequired?: string;
   readonly credentialCategory?: string;
   readonly achievementType?: string;
+  readonly type?: string;
 }
 
 export interface DegreeCompletion {
