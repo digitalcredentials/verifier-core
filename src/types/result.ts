@@ -13,9 +13,15 @@ export interface VerificationError {
     "error"?: VerificationError
   }
 
+  export interface SchemaCheck {
+    "schema": string,
+    "result": {"valid": boolean, errors?: object[]},
+    "source": string
+  }
+
   export interface AdditionalInformationEntry {
     "id": string,
-    "details": object
+    "results": SchemaCheck[]
   }
   
   export interface VerificationResponse {
