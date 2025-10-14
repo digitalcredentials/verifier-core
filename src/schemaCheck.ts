@@ -29,10 +29,12 @@ export const checkSchemas = async (vc: Credential): Promise<any> => {
       return { results };
     } else {
       // no credentialSchema was specified so try to guess based on context
-      // and the Verifiable Credentials version.                      
-      if (vc["@context"].some(context => context.startsWith(OBV3_0_3_CONTEXT_MATCHER))) {
-        const isVC2 = (vc["@context"].some(context => context.startsWith(VC_V2_CONTEXT)));
-        const isVC1 = (vc["@context"].some(context => context.startsWith(VC_V1_CONTEXT)));
+      // and the Verifiable Credentials version.    
+      const contextsToCheck = vc["@context"].filter(entry=>typeof entry === 'string')
+      const hasOBv3Context = contextsToCheck.some(context => context.startsWith(OBV3_0_3_CONTEXT_MATCHER))                  
+      if (hasOBv3Context) {
+        const isVC2 = (contextsToCheck.some(context => context.startsWith(VC_V2_CONTEXT)));
+        const isVC1 = (contextsToCheck.some(context => context.startsWith(VC_V1_CONTEXT)));
         let obType = '';
         let schema;
 
