@@ -689,7 +689,7 @@ If one or more schemas are listed in the credentialSchema property of the creden
   ```
 
 >[!NOTE]
->The schema result is not included with the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or debugging problems.
+>The schema result is not included with the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or diagnosing problems.
 
 ### verifyPresentation
 
