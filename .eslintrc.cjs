@@ -6,7 +6,7 @@ module.exports = {
   parserOptions: {
     project: './tsconfig.esm.json'
   },
-  ignorePatterns: ['dist/', 'test'],
+  ignorePatterns: ['dist/', 'test', 'src/test-fixtures'],
   rules: {
     'prettier/prettier': 'off',
     'arrow-body-style': 'off',
