@@ -1,10 +1,12 @@
 import chai from 'chai'
+import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { verifyCredential } from '../src/Verify.js'
 import { Credential } from '../src/types/credential.js';
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import { checkSchemas } from '../src/schemaCheck.js';
 import { SCHEMA_ENTRY_ID } from '../src/constants/verificationSteps.js';
-const { expect } = chai;
+chai.use(deepEqualInAnyOrder);
+const {expect} = chai;
 
 /* 
 Tests credential *schema* validation.
@@ -63,10 +65,9 @@ describe('schema results for verification call', () => {
         expect(result.additionalInformation![0].results![0].source).to.equal("Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'")
     })
 
-    it.only('returns error for extra term', async () => {
+    it('returns error for extra term', async () => {
         const credential = await fetchVC("https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/twoOIDF-revoked-notExpired-badSchema.json");
         const result = await verifyCredential({ credential, knownDIDRegistries })
-        console.log("result: ", JSON.stringify(result,null,2))
         expect(result.additionalInformation![0].id).to.equal(SCHEMA_ENTRY_ID)
         expect(result.additionalInformation![0].results![0].result.valid).to.be.false
         expect(result.additionalInformation![0].results![0].source).to.equal("Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'")
