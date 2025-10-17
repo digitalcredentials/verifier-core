@@ -6,7 +6,7 @@ import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import { checkSchemas } from '../src/schemaCheck.js';
 import { SCHEMA_ENTRY_ID } from '../src/constants/verificationSteps.js';
 chai.use(deepEqualInAnyOrder);
-const {expect} = chai;
+const { expect } = chai;
 
 /* 
 Tests credential *schema* validation.
@@ -68,14 +68,14 @@ describe('schema results for verification call', () => {
         expect(result.additionalInformation![0].results![0].result.valid).to.be.false
         expect(result.additionalInformation![0].results![0].source).to.equal("Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'")
         expect(result.additionalInformation![0].results![0].result.errors![0]).to.deep.equalInAnyOrder({
-                "instancePath": "",
-                "schemaPath": "#/required",
-                "keyword": "required",
-                "params": {
-                  "missingProperty": "validFrom"
-                },
-                "message": "must have required property 'validFrom'"
-              })
+            "instancePath": "",
+            "schemaPath": "#/required",
+            "keyword": "required",
+            "params": {
+                "missingProperty": "validFrom"
+            },
+            "message": "must have required property 'validFrom'"
+        })
     })
 })
 

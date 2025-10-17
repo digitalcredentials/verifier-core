@@ -78,7 +78,7 @@ describe('Verify', () => {
               })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
 
         })
@@ -90,7 +90,7 @@ describe('Verify', () => {
             const expectedResult = getExpectedVerifiedResult({ credential, withStatus: true })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
 
         })
@@ -159,7 +159,7 @@ describe('Verify', () => {
             const expectedResult = getExpectedVerifiedResult({ credential, withStatus: true })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
           describe('with did:web issuer', () => {
 
@@ -188,7 +188,7 @@ describe('Verify', () => {
               ]
               const result = await verifyCredential({ credential, knownDIDRegistries })
               expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+              expect(result).to.have.property("credential").that.equals(credential)
             })
 
             it('with different issuer for vc and statusList ', async () => {
@@ -215,8 +215,8 @@ describe('Verify', () => {
                 }
               ]
               const result = await verifyCredential({ credential, knownDIDRegistries })
-             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+              expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+              expect(result).to.have.property("credential").that.equals(credential)
             })
 
             it('when status is valid for multikey verification method', async () => {
@@ -243,8 +243,8 @@ describe('Verify', () => {
                 }
               ]
               const result = await verifyCredential({ credential, knownDIDRegistries })
-             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+              expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+              expect(result).to.have.property("credential").that.equals(credential)
             })
 
           })
@@ -257,14 +257,14 @@ describe('Verify', () => {
             const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus: false })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
           it('when revoked', async () => {
             const credential: any = getVCv2Revoked()
-            const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: REVOCATION_STATUS_STEP_ID, withStatus:true})
+            const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: REVOCATION_STATUS_STEP_ID, withStatus: true })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
           it('when expired with valid status', async () => {
             // NOTE: TODO - this will continue to fail until we fix https://github.com/digitalcredentials/vc/issues/28
@@ -272,7 +272,7 @@ describe('Verify', () => {
             const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus: true })
             const result = await verifyCredential({ credential, knownDIDRegistries })
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
-          expect(result).to.have.property("credential").that.equals(credential)
+            expect(result).to.have.property("credential").that.equals(credential)
           })
 
         })
