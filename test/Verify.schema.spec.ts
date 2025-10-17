@@ -13,17 +13,17 @@ Tests credential *schema* validation.
 */
 
 describe('schemaCheck.checkSchemas', () => {
-    it('passes for array proof', async () => {
-        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
-        const vc = JSON.parse(JSON.stringify(originalVC))
-        vc.proof = [vc.proof]
+    it('validates as expected', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
         const result = await checkSchemas(vc)
         expect(result.results[0].result.errors).to.not.exist
         expect(result.results[0].result.valid).to.be.true
     })
 
-    it('fails for object proof', async () => {
-        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+    it('fails for missing achievement id', async () => {
+        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+        const vc = JSON.parse(JSON.stringify(originalVC));
+        delete vc.credentialSubject.achievement.id
         const result = await checkSchemas(vc)
         expect(result.results[0].result.errors).to.exist
         expect(result.results[0].result.valid).to.be.false
@@ -35,18 +35,17 @@ describe('schemaCheck.checkSchemas', () => {
         expect(result).to.deep.equalInAnyOrder({ results: 'NO_SCHEMA' })
     })
 
-    it('fails for obv3 based on context with object proof', async () => {
-        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+    it('fails for obv3 based on context with missing achievement id', async () => {
+        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+        const vc = JSON.parse(JSON.stringify(originalVC));
+        delete vc.credentialSubject.achievement.id
         const result = await checkSchemas(vc)
-        console.log(JSON.stringify(result, null, 2))
         expect(result.results[0].result.errors).to.exist
         expect(result.results[0].result.valid).to.be.false
     })
 
-    it('passes for obv3 based on context with array proof', async () => {
-        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
-        const vc = JSON.parse(JSON.stringify(originalVC))
-        vc.proof = [vc.proof]
+    it('passes for obv3 guessed by context', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
         const result = await checkSchemas(vc)
         expect(result.results[0].result.errors).to.not.exist
         expect(result.results[0].result.valid).to.be.true
@@ -55,11 +54,8 @@ describe('schemaCheck.checkSchemas', () => {
 
 describe('schema results for verification call', () => {
     it('returns positive result', async () => {
-        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
-        const credential = JSON.parse(JSON.stringify(originalVC))
-        credential.proof = [credential.proof]
+        const credential = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
         const result = await verifyCredential({ credential, knownDIDRegistries })
-        console.log("result: ", JSON.stringify(result,null,2))
         expect(result.additionalInformation![0].id).to.equal(SCHEMA_ENTRY_ID);
         expect(result.additionalInformation![0].results![0].result.valid).to.be.true
         expect(result.additionalInformation![0].results![0].source).to.equal("Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'")
