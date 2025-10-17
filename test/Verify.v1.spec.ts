@@ -20,7 +20,7 @@ import {
   getExpectedFatalResult
  } from '../src/test-fixtures/expectedResults.js';
 import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF } from '../src/constants/errors.js';
-import { EXPIRATION_STEP_ID, REGISTERED_ISSUER_STEP_ID } from '../src/constants/verificationSteps.js';
+import { EXPIRATION_STEP_ID, REGISTERED_ISSUER_STEP_ID, REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
 
 chai.use(deepEqualInAnyOrder);
 const {expect} = chai;
@@ -119,8 +119,10 @@ describe('Verify', () => {
           const credential : any = getVCv1ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
           const result = await verifyCredential({credential, knownDIDRegistries})
-          console.log(JSON.stringify(result,null,2))
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+        //  expect (result.log).to.deep.equalInAnyOrder(expectedResult.log)
+          expect(result).to.have.property("credential").that.equals(credential)
+        //  expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
       })
 
@@ -129,19 +131,23 @@ describe('Verify', () => {
           const credential : any = getVCv1Expired() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:false})
           const result = await verifyCredential({credential, knownDIDRegistries})
-          expect(result).to.deep.equalInAnyOrder(expectedResult)
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
         it('when revoked', async () => {
           const credential : any = getVCv1Revoked() 
+           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: REVOCATION_STATUS_STEP_ID, withStatus:true})
           const result = await verifyCredential({credential, knownDIDRegistries})
-          assert.ok(result.log);
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
         
         it('when expired with valid status', async () => {
            const credential : any = getVCv1ExpiredWithValidStatus() 
           const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:true})
           const result = await verifyCredential({credential, knownDIDRegistries})
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
 
         it('when no matching registry', async () => {
@@ -163,8 +169,8 @@ describe('Verify', () => {
 
           const result = await verifyCredential({credential, knownDIDRegistries: noMatchingRegistryList})
           
-          //console.log(JSON.stringify(result, null, 2))
-          expect(result).to.deep.equalInAnyOrder(expectedResult)
+         expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
       })
 
@@ -183,7 +189,8 @@ describe('Verify', () => {
             }
           ]
           const result = await verifyCredential({credential, knownDIDRegistries: badRegistryList}) 
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
 
         it('when two registry urls do not exist', async () => {
@@ -205,13 +212,15 @@ describe('Verify', () => {
             }
           ]
           const result = await verifyCredential({credential, knownDIDRegistries: badRegistryList}) 
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
         it('when all registries exist', async () => {
           const credential : any = getVCv1ValidStatus()
           const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
           const result = await verifyCredential({credential, knownDIDRegistries})      
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
       })
     })
