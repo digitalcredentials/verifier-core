@@ -35,23 +35,30 @@ describe('schemaCheck.checkSchemas', () => {
         expect(result).to.deep.equalInAnyOrder({ results: 'NO_SCHEMA' })
     })
 
-    it('fails for obv3 based on context with missing achievement id', async () => {
-        const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
-        const vc = JSON.parse(JSON.stringify(originalVC));
-        delete vc.credentialSubject.achievement.id
+    it('fails for obv3 guessed by context with missing achievement id', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
+        // @ts-ignore: Property does not exist
+        delete vc.credentialSubject.achievement!.id
         const result = await checkSchemas(vc)
         expect(result.results[0].result.errors).to.exist
         expect(result.results[0].result.valid).to.be.false
     })
 
-    it('passes for obv3 guessed by context', async () => {
+    it('returns valid for obv3 v2 guessed by context', async () => {
         const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
         const result = await checkSchemas(vc)
         expect(result.results[0].result.errors).to.not.exist
         expect(result.results[0].result.valid).to.be.true
     })
 
-    it.only('returns error if bad schema url', async () => {
+        it('returns valid for obv3 v1 guessed by context', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v1/bothSignatureTypes/didKey/legacy-noStatus-noExpiry-basicOBv3.json')
+        const result = await checkSchemas(vc)
+        expect(result.results[0].result.errors).to.not.exist
+        expect(result.results[0].result.valid).to.be.true
+    })
+
+    it('returns error if bad schema url', async () => {
         const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
         // change the good schema url to a non-existant url
         // @ts-ignore: Object is possibly 'null'.
@@ -60,6 +67,21 @@ describe('schemaCheck.checkSchemas', () => {
         expect(result).to.deep.equalInAnyOrder({ results: 'INVALID_SCHEMA - possibly not a valid url' })
     })
 
+    it('returns valid for obv3 v2 endorsement guessed by context', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/bothSignatureTypes/didkey/legacy-noStatus-notExpired-endorsement.json')
+        const result = await checkSchemas(vc)
+        expect(result.results[0].result.errors).to.not.exist
+        expect(result.results[0].result.valid).to.be.true
+    })
+
+     it('returns valid for obv3 v2 endorsement with credentialSchema property', async () => {
+        const vc = await fetchVC(' https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/bothSignatureTypes/didkey/legacy-noStatus-notExpired-endorsement-withSchema.json')
+        const result = await checkSchemas(vc)
+        expect(result.results[0].result.errors).to.not.exist
+        expect(result.results[0].result.valid).to.be.true
+    })
+
+   
 })
 
 describe('schema results for verification call', () => {
