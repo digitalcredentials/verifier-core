@@ -6,7 +6,7 @@ import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import { checkSchemas } from '../src/schemaCheck.js';
 import { SCHEMA_ENTRY_ID } from '../src/constants/verificationSteps.js';
 chai.use(deepEqualInAnyOrder);
-const {expect} = chai;
+const { expect } = chai;
 
 /* 
 Tests credential *schema* validation.
@@ -50,6 +50,16 @@ describe('schemaCheck.checkSchemas', () => {
         expect(result.results[0].result.errors).to.not.exist
         expect(result.results[0].result.valid).to.be.true
     })
+
+    it.only('returns error if bad schema url', async () => {
+        const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
+        // change the good schema url to a non-existant url
+        // @ts-ignore: Object is possibly 'null'.
+        vc.credentialSchema[0].id = 'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/non-existant_schema.json'
+        const result = await checkSchemas(vc)
+        expect(result).to.deep.equalInAnyOrder({ results: 'INVALID_SCHEMA - possibly not a valid url' })
+    })
+
 })
 
 describe('schema results for verification call', () => {
@@ -68,14 +78,14 @@ describe('schema results for verification call', () => {
         expect(result.additionalInformation![0].results![0].result.valid).to.be.false
         expect(result.additionalInformation![0].results![0].source).to.equal("Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'")
         expect(result.additionalInformation![0].results![0].result.errors![0]).to.deep.equalInAnyOrder({
-                "instancePath": "",
-                "schemaPath": "#/required",
-                "keyword": "required",
-                "params": {
-                  "missingProperty": "validFrom"
-                },
-                "message": "must have required property 'validFrom'"
-              })
+            "instancePath": "",
+            "schemaPath": "#/required",
+            "keyword": "required",
+            "params": {
+                "missingProperty": "validFrom"
+            },
+            "message": "must have required property 'validFrom'"
+        })
     })
 })
 

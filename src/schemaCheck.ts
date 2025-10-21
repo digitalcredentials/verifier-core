@@ -76,6 +76,7 @@ export const checkSchemas = async (vc: Credential): Promise<any> => {
 
   } catch (e) {
     console.log('error checking schema: ', e)
+    return {results: 'INVALID_SCHEMA - possibly not a valid url'}
   }
 }
 
