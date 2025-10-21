@@ -34,7 +34,7 @@ The verification checks that the credential:
 
 The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded (say because of a network error), which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
 
-Verification results also include an 'additionalInformation' section that as of November 2026 includes the results of checking the credential against any declared schema or guessed schema.
+Verification results also include an 'additionalInformation' section that as of October 2026 includes the results of checking the credential against any declared schema or guessed schema.
 
 As of May 2025 we've published a list of known DCC registries:
 
