@@ -70,7 +70,7 @@ This package exports two methods:
 #### arguments
 
 * credential - The W3C Verifiable Credential to be verified.
-* knownDidRegistries - a list of trusted registries.
+* knownDidRegistries - a list of issuer DIDs in which to lookup signing DIDs
 
 
 #### result
@@ -688,8 +688,38 @@ If one or more schemas are listed in the credentialSchema property of the creden
     ]
   ```
 
+  Or is there was an error:
+
+  ```json
+  "additionalInformation": [
+    {
+      "id": "schema_check",
+      "results": [
+        {
+          "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+          "result": {
+            "valid": false,
+            "errors": [
+              {
+                "instancePath": "",
+                "schemaPath": "#/required",
+                "keyword": "required",
+                "params": {
+                  "missingProperty": "validFrom"
+                },
+                "message": "must have required property 'validFrom'"
+              }
+            ]
+          },
+          "source": "Schema was listed in the credentialSchema property of the VC"
+        }
+      ]
+    }
+  ]
+  ```
+
 >[!NOTE]
->The schema result is not included with the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or diagnosing problems.
+>The schema result is in a separate section than the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or diagnosing problems.
 
 ### verifyPresentation
 
