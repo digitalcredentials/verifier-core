@@ -37,6 +37,12 @@ describe('schema checks', () => {
             expect(result).to.deep.equalInAnyOrder({ results: 'NO_SCHEMA' })
         })
 
+        it('returns NO_SCHEMA when ob context but no OB type', async () => {
+            const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/bothSignatureTypes/didkey/legacy-noStatus-noExpiry-nonOBWithOBContext.json')
+            const result = await checkSchemas(vc)
+            expect(result).to.deep.equalInAnyOrder({ results: 'NO_SCHEMA' })
+        })
+
         it('fails for obv3 guessed by context with missing achievement id', async () => {
             const vc = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-noStatus-noExpiry.json')
             // @ts-ignore: Property does not exist
