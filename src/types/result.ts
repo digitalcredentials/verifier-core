@@ -12,8 +12,20 @@ export interface VerificationError {
     "registriesNotLoaded"?: RegistriesNotLoaded[],
     "error"?: VerificationError
   }
+
+  export interface SchemaCheck {
+    "schema": string,
+    "result": {"valid": boolean, errors?: object[]},
+    "source": string
+  }
+
+  export interface AdditionalInformationEntry {
+    "id": string,
+    "results": SchemaCheck[]
+  }
   
   export interface VerificationResponse {
+    "additionalInformation"?: AdditionalInformationEntry[];
     "credential"?: object,
     "errors"?: VerificationError[],
     "log"?: VerificationStep[]

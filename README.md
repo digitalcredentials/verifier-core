@@ -34,6 +34,8 @@ The verification checks that the credential:
 
 The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded (say because of a network error), which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
 
+Verification results also include an 'additionalInformation' section that as of October 2026 includes the results of checking the credential against any declared schema or guessed schema.
+
 As of May 2025 we've published a list of known DCC registries:
 
 ```
@@ -49,6 +51,11 @@ const knownRegistries = await response.json();
 
 and then pass that knownRegistries variable into the call to verifyCredential, as explained below.
 
+You may of course freely substitute your own list of registries.
+
+>[!CAUTION]
+>The DCC registry list does not make any claims or affirmations about the registries in that list. It is simply a list of registries that the DCC knows about. It does not, in particular, say anyting at all about the quality, meaning, or value of the credentials issued by anyone in those registries.
+
 ## API
 
 This package exports two methods:
@@ -63,7 +70,7 @@ This package exports two methods:
 #### arguments
 
 * credential - The W3C Verifiable Credential to be verified.
-* knownDidRegistries - a list of trusted registries.
+* knownDidRegistries - a list of issuer DIDs in which to lookup signing DIDs
 
 
 #### result
@@ -136,17 +143,31 @@ Four steps are checked, returning a result per step in a log like so:
         }
       ],
       "uncheckedRegistries": [
+        {
+          "name": "DCC Community Registry",
+          "type": "dcc-legacy",
+          "url": "https://onldynoyrrrt.com/registry.json"
+        },
+        {
+          "name": "DCC Pilot Registry",
+          "type": "dcc-legacy",
+          "url": "https://onldynoyrt.com/registry.json"
+        }
+      ],
+      "additionalInformation": [
+        {
+          "id": "schema_check",
+          "results": [
             {
-             "name": "DCC Community Registry",
-             "type": "dcc-legacy",
-             "url": "https://onldynoyrrrt.com/registry.json"
-           },
-           {
-              "name": "DCC Pilot Registry",
-              "type": "dcc-legacy",
-              "url": "https://onldynoyrt.com/registry.json"
+              "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+              "result": {
+                "valid": true
+              },
+              "source": "Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'"
             }
-      ]
+          ]
+        }
+      ],
     }
   ]
 }
@@ -646,6 +667,59 @@ Some other error might also prevent verification, and an error, possibly with a 
 }
 ```
 
+#### schema check
+
+If one or more schemas are listed in the credentialSchema property of the credential, or if the schema can be guessed based on the context, then the credential is validated against those schemas and the results returned in the 'additionalInformation' section, like so:
+
+```json
+  "additionalInformation": [
+      {
+        "id": "schema_check",
+        "results": [
+          {
+            "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+            "result": {
+              "valid": true
+            },
+            "source": "Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'"
+          }
+        ]
+      }
+    ]
+  ```
+
+  Or is there was an error:
+
+  ```json
+  "additionalInformation": [
+    {
+      "id": "schema_check",
+      "results": [
+        {
+          "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+          "result": {
+            "valid": false,
+            "errors": [
+              {
+                "instancePath": "",
+                "schemaPath": "#/required",
+                "keyword": "required",
+                "params": {
+                  "missingProperty": "validFrom"
+                },
+                "message": "must have required property 'validFrom'"
+              }
+            ]
+          },
+          "source": "Schema was listed in the credentialSchema property of the VC"
+        }
+      ]
+    }
+  ]
+  ```
+
+>[!NOTE]
+>The schema result is in a separate section than the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or diagnosing problems.
 
 ### verifyPresentation
 

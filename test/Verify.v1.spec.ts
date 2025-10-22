@@ -2,28 +2,28 @@ import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { strict as assert } from 'assert';
 import { verifyCredential } from '../src/Verify.js'
-import { 
-  getVCv1Tampered, 
-  getVCv1Expired,  
-  getVCv1Revoked, 
-  getVCv1ValidStatus, 
-  getVCv1NoProof, 
+import {
+  getVCv1Tampered,
+  getVCv1Expired,
+  getVCv1Revoked,
+  getVCv1ValidStatus,
+  getVCv1NoProof,
   getVCv1NonURIId,
   getVCv1ExpiredAndTampered,
   getVCv1ExpiredWithValidStatus
 
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
-import { 
-  getExpectedVerifiedResult, 
-  getExpectedUnverifiedResult, 
+import {
+  getExpectedVerifiedResult,
+  getExpectedUnverifiedResult,
   getExpectedFatalResult
- } from '../src/test-fixtures/expectedResults.js';
+} from '../src/test-fixtures/expectedResults.js';
 import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF } from '../src/constants/errors.js';
-import { EXPIRATION_STEP_ID, REGISTERED_ISSUER_STEP_ID } from '../src/constants/verificationSteps.js';
+import { EXPIRATION_STEP_ID, REGISTERED_ISSUER_STEP_ID, REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
 
 chai.use(deepEqualInAnyOrder);
-const {expect} = chai;
+const { expect } = chai;
 
 const DISABLE_CONSOLE_WHEN_NO_ERRORS = true
 /*
@@ -44,9 +44,9 @@ tests to add:
 describe('Verify', () => {
 
   const originalLogFunction = console.log;
-  let output:string;
+  let output: string;
 
-  beforeEach(function(done) {
+  beforeEach(function (done) {
     if (DISABLE_CONSOLE_WHEN_NO_ERRORS) {
       output = '';
       console.log = (msg) => {
@@ -56,7 +56,7 @@ describe('Verify', () => {
     done()
   });
 
-  afterEach(function() {
+  afterEach(function () {
     if (DISABLE_CONSOLE_WHEN_NO_ERRORS) {
       console.log = originalLogFunction; // undo dummy log function
       if (this?.currentTest?.state === 'failed') {
@@ -71,85 +71,92 @@ describe('Verify', () => {
 
       describe('returns fatal error', () => {
         it('when tampered with', async () => {
-          const credential : any = getVCv1Tampered() 
-          const result = await verifyCredential({credential, knownDIDRegistries})
+          const credential: any = getVCv1Tampered()
+          const result = await verifyCredential({ credential, knownDIDRegistries })
           const expectedResult = getExpectedFatalResult({
-            credential, 
+            credential,
             errorMessage: 'The signature is not valid.',
             errorName: INVALID_SIGNATURE
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
 
-          it('when expired and tampered with', async () => {
-            const credential : any = getVCv1ExpiredAndTampered() 
-            const result = await verifyCredential({credential, knownDIDRegistries})
-            const expectedResult = getExpectedFatalResult({
-              credential, 
-              errorMessage: 'The signature is not valid.',
-              errorName: INVALID_SIGNATURE
-            })
-            expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        it('when expired and tampered with', async () => {
+          const credential: any = getVCv1ExpiredAndTampered()
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          const expectedResult = getExpectedFatalResult({
+            credential,
+            errorMessage: 'The signature is not valid.',
+            errorName: INVALID_SIGNATURE
           })
+          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+        })
 
         it('when no proof', async () => {
-          const credential : any = getVCv1NoProof() 
-          const result = await verifyCredential({credential, knownDIDRegistries})
+          const credential: any = getVCv1NoProof()
+          const result = await verifyCredential({ credential, knownDIDRegistries })
           const expectedResult = getExpectedFatalResult({
-            credential, 
+            credential,
             errorMessage: 'This is not a Verifiable Credential - it does not have a digital signature.',
             errorName: NO_PROOF
           })
           expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
         it('when credential id is not a uri', async () => {
-          const credential : any = getVCv1NonURIId() 
-          const result = await verifyCredential({credential, knownDIDRegistries})
+          const credential: any = getVCv1NonURIId()
+          const result = await verifyCredential({ credential, knownDIDRegistries })
           const expectedResult = getExpectedFatalResult({
-            credential, 
+            credential,
             errorMessage: "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement.",
             errorName: INVALID_CREDENTIAL_ID
           })
-          expect(result).to.deep.equalInAnyOrder(expectedResult) 
+          expect(result).to.deep.equalInAnyOrder(expectedResult)
         })
       })
 
       describe('returns as verified', () => {
         it('when status is valid', async () => {
-          const credential : any = getVCv1ValidStatus()
-          const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-          const result = await verifyCredential({credential, knownDIDRegistries})
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          const credential: any = getVCv1ValidStatus()
+          const expectedResult = getExpectedVerifiedResult({ credential, withStatus: true })
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          //  expect (result.log).to.deep.equalInAnyOrder(expectedResult.log)
+          expect(result).to.have.property("credential").that.equals(credential)
+          //  expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
         })
       })
 
       describe('returns unverified', () => {
         it('when expired', async () => {
-          const credential : any = getVCv1Expired() 
-          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:false})
-          const result = await verifyCredential({credential, knownDIDRegistries})
-          expect(result).to.deep.equalInAnyOrder(expectedResult)
+          const credential: any = getVCv1Expired()
+          const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus: false })
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
         it('when revoked', async () => {
-          const credential : any = getVCv1Revoked() 
-          const result = await verifyCredential({credential, knownDIDRegistries})
-          assert.ok(result.log);
+          const credential: any = getVCv1Revoked()
+          const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: REVOCATION_STATUS_STEP_ID, withStatus: true })
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
-        
+
         it('when expired with valid status', async () => {
-           const credential : any = getVCv1ExpiredWithValidStatus() 
-          const expectedResult = getExpectedUnverifiedResult({credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus:true})
-          const result = await verifyCredential({credential, knownDIDRegistries})
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          const credential: any = getVCv1ExpiredWithValidStatus()
+          const expectedResult = getExpectedUnverifiedResult({ credential, unVerifiedStep: EXPIRATION_STEP_ID, withStatus: true })
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
 
         it('when no matching registry', async () => {
-          const credential : any = getVCv1ValidStatus() 
+          const credential: any = getVCv1ValidStatus()
           const noMatchingRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           // set the one matching registry to a url that won't load
           noMatchingRegistryList[2].url = 'https://onldynoyrt.com/registry.json'
-          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
-          const expectedResultRegistryLogEntry = expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID)
+          const expectedResult: any = getExpectedVerifiedResult({ credential, withStatus: true })
+          const expectedResultRegistryLogEntry = expectedResult.log.find((entry: any) => entry.id === REGISTERED_ISSUER_STEP_ID)
           expectedResultRegistryLogEntry.uncheckedRegistries = [
             {
               "name": "DCC Sandbox Registry",
@@ -160,60 +167,63 @@ describe('Verify', () => {
           expectedResultRegistryLogEntry.valid = false;
           expectedResultRegistryLogEntry.matchingIssuers = []
 
-          const result = await verifyCredential({credential, knownDIDRegistries: noMatchingRegistryList})
-          
-          //console.log(JSON.stringify(result, null, 2))
-          expect(result).to.deep.equalInAnyOrder(expectedResult)
+          const result = await verifyCredential({ credential, knownDIDRegistries: noMatchingRegistryList })
+
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
       })
 
       describe('returns accurate registry list', () => {
 
         it('when one registry url does not exist', async () => {
-          const credential : any = getVCv1ValidStatus()
+          const credential: any = getVCv1ValidStatus()
           const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           badRegistryList[1].url = 'https://onldynoyrt.com/registry.json'
-          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
-          expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID).uncheckedRegistries = [
+          const expectedResult: any = getExpectedVerifiedResult({ credential, withStatus: true })
+          expectedResult.log.find((entry: any) => entry.id === REGISTERED_ISSUER_STEP_ID).uncheckedRegistries = [
             {
               "name": "DCC Pilot Registry",
               "type": "dcc-legacy",
               "url": "https://onldynoyrt.com/registry.json"
             }
           ]
-          const result = await verifyCredential({credential, knownDIDRegistries: badRegistryList}) 
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          const result = await verifyCredential({ credential, knownDIDRegistries: badRegistryList })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
 
         it('when two registry urls do not exist', async () => {
-          const credential : any = getVCv1ValidStatus()
+          const credential: any = getVCv1ValidStatus()
           const badRegistryList = JSON.parse(JSON.stringify(knownDIDRegistries))
           badRegistryList[1].url = 'https://onldynoyrt.com/registry.json'
           badRegistryList[3].url = 'https://onldynoyrrrt.com/registry.json'
-          const expectedResult : any = getExpectedVerifiedResult({credential, withStatus: true})
-          expectedResult.log.find((entry:any)=>entry.id===REGISTERED_ISSUER_STEP_ID).uncheckedRegistries = [
+          const expectedResult: any = getExpectedVerifiedResult({ credential, withStatus: true })
+          expectedResult.log.find((entry: any) => entry.id === REGISTERED_ISSUER_STEP_ID).uncheckedRegistries = [
             {
-             "name": "DCC Community Registry",
-             "type": "dcc-legacy",
-             "url": "https://onldynoyrrrt.com/registry.json"
-           },
-           {
+              "name": "DCC Community Registry",
+              "type": "dcc-legacy",
+              "url": "https://onldynoyrrrt.com/registry.json"
+            },
+            {
               "name": "DCC Pilot Registry",
               "type": "dcc-legacy",
               "url": "https://onldynoyrt.com/registry.json"
             }
           ]
-          const result = await verifyCredential({credential, knownDIDRegistries: badRegistryList}) 
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          const result = await verifyCredential({ credential, knownDIDRegistries: badRegistryList })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
         it('when all registries exist', async () => {
-          const credential : any = getVCv1ValidStatus()
-          const expectedResult = getExpectedVerifiedResult({credential, withStatus: true})
-          const result = await verifyCredential({credential, knownDIDRegistries})      
-          expect(result).to.deep.equalInAnyOrder(expectedResult) // eslint-disable-line no-use-before-define
+          const credential: any = getVCv1ValidStatus()
+          const expectedResult = getExpectedVerifiedResult({ credential, withStatus: true })
+          const result = await verifyCredential({ credential, knownDIDRegistries })
+          expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+          expect(result).to.have.property("credential").that.equals(credential)
         })
       })
     })
-})
+  })
 })
 
