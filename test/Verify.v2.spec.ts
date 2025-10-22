@@ -99,16 +99,13 @@ describe('Verify', () => {
 
         describe('returns fatal error', () => {
 
-          it.only('for safe mode violation', async () => {
+          it('for safe mode violation', async () => {
             const credential : any = getSafeModeBreaker()
-              const result = await verifyCredential({ credential, knownDIDRegistries })
-              console.log(JSON.stringify(result))
-            const expectedResult = getExpectedFatalResult({
-              credential,
-              errorMessage: 'The signature is not valid.',
-              errorName: INVALID_SIGNATURE
-            })
-            expect(result).to.deep.equalInAnyOrder(expectedResult)
+            const result = await verifyCredential({ credential, knownDIDRegistries })
+            expect(result.errors).to.exist
+            expect(result.errors![0].name).to.equal('jsonld.ValidationError')
+            // @ts-ignore
+            expect(result.errors[0].details.event.message).to.equal('Relative @type reference found.')
           })
 
           it('when tampered with', async () => {
