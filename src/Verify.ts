@@ -92,7 +92,6 @@ export async function verifyCredential({ credential, knownDIDRegistries}: { cred
       checkStatus: statusChecker,
       verifyMatchingIssuers: false
     });
-
     const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries)
     return adjustedResponse;
   } catch (error) {
@@ -133,9 +132,7 @@ async function transformResponse(verificationResponse: any, credential: Credenti
   return verificationResponse as VerificationResponse;
 }
 
-function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
-  return { credential, errors: [{ name, message: fatalErrorMessage, ...(stackTrace ? { stackTrace } : null) }] };
-}
+
 
 function handleAnyFatalCredentialErrors(credential: Credential): VerificationResponse | null {
   const validVCContexts = [
@@ -195,17 +192,17 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
   if (verificationResponse.error) {
 
     if (verificationResponse?.error?.name === VERIFICATION_ERROR) {
-      // Can't validate the signature. 
-      // Either a bad signature or maybe a did:web that can't
-      // be resolved. Because we can't validate the signature, we
+      // Can't verify the signature. Maybe a bad signature or a did:web that can't
+      // be resolved or a json-ld error. Because we can't validate the signature, we
       // can't therefore say anything conclusive about the various 
-      // steps in verification.
-      // So, return a fatal error and no log (because we can't say
-      // anything meaningful about the steps in the log)
+      // steps in verification, so return a fatal error and no log
       let fatalErrorMessage = ""
       let errorName = ""
       // check to see if the error is http related
       const httpError = verificationResponse.error.errors.find((error: any) => error.name === 'HTTPError')
+      // or a json-ld parsing error
+      const jsonLdError = verificationResponse.error.errors.find((error: any) => error.name === 'jsonld.ValidationError')
+      
       if (httpError) {
         fatalErrorMessage = 'An http error prevented the signature check.'
         errorName = HTTP_ERROR_WITH_SIGNATURE_CHECK
@@ -219,8 +216,16 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
             errorName = DID_WEB_UNRESOLVED
           }
         }
+      } else if (jsonLdError) {
+        const errors = verificationResponse.error.errors.map((error:any)=>{
+          // need to rename the stack property to stackTrace to fit with old error structure
+          error.stackTrace = error.stack;
+          delete error.stack;
+          return error
+        })
+        return {credential, errors}
       } else {
-        // not an http error, so likely bad signature
+        // not an http or json-ld error, so likely bad signature
         fatalErrorMessage = 'The signature is not valid.'
         errorName = INVALID_SIGNATURE
       }
@@ -244,4 +249,6 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
 
 
 
-
+function buildFatalErrorObject(fatalErrorMessage: string, name: string, credential: Credential, stackTrace: string | null): VerificationResponse {
+  return { credential, errors: [{ name, message: fatalErrorMessage, ...(stackTrace ? { stackTrace } : null) }] };
+}
