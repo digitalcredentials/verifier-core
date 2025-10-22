@@ -4,6 +4,8 @@ import { v2Revoked } from "./verifiableCredentials/v2/v2Revoked.js"
 import { v2WithValidStatus } from "./verifiableCredentials/v2/v2WithValidStatus.js"
 import { v2ExpiredWithValidStatus } from "./verifiableCredentials/v2/v2ExpiredWithValidStatus.js"
 
+import {safeModeBreaker} from "./verifiableCredentials/eddsa/v2/safeModeBreaker.js"
+
 import { v1WithValidStatus } from "./verifiableCredentials/v1/v1WithValidStatus.js"
 import { v1NoStatus } from "./verifiableCredentials/v1/v1NoStatus.js"
 import { v1Revoked } from "./verifiableCredentials/v1/v1Revoked.js"
@@ -142,6 +144,9 @@ const getVCv2SimpleIssuerId = (): any => {
   return JSON.parse(JSON.stringify(v2SimpleIssuerId))
 }
 
+const getSafeModeBreaker = (): any => {
+  return JSON.parse(JSON.stringify(safeModeBreaker))
+}
 export {
 
   getCredentialWithoutContext,
@@ -174,5 +179,7 @@ export {
   getVCv1ExpiredAndTampered,
   getVCv1ExpiredWithValidStatus,
   getVCv1NoProof,
-  getVCv1NonURIId
+  getVCv1NonURIId,
+
+  getSafeModeBreaker
 }
