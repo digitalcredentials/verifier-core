@@ -1,6 +1,6 @@
 import chai from 'chai'
 import deepEqualInAnyOrder from 'deep-equal-in-any-order'
-import { strict as assert } from 'assert';
+
 import { verifyCredential } from '../src/Verify.js'
 import {
   getVCv2Expired,
@@ -17,7 +17,8 @@ import {
   getVCv2DoubleSigWithBadStatusUrl,
   getVCv2DidWebWithValidStatus,
   getVCv2WithBadDidWebUrl,
-  getVCv2DidWebMultikeyWithValidStatus
+  getVCv2DidWebMultikeyWithValidStatus,
+  getSafeModeBreaker
 
 } from '../src/test-fixtures/vc.js'
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
@@ -33,7 +34,7 @@ chai.use(deepEqualInAnyOrder);
 const { expect } = chai;
 
 const REGISTERED_ISSUER_STEP_ID = 'registered_issuer'
-const DISABLE_CONSOLE_WHEN_NO_ERRORS = true
+const DISABLE_CONSOLE_WHEN_NO_ERRORS = false
 
 describe('Verify', () => {
 
@@ -97,6 +98,18 @@ describe('Verify', () => {
 
 
         describe('returns fatal error', () => {
+
+          it.only('for safe mode violation', async () => {
+            const credential : any = getSafeModeBreaker()
+              const result = await verifyCredential({ credential, knownDIDRegistries })
+              console.log(JSON.stringify(result))
+            const expectedResult = getExpectedFatalResult({
+              credential,
+              errorMessage: 'The signature is not valid.',
+              errorName: INVALID_SIGNATURE
+            })
+            expect(result).to.deep.equalInAnyOrder(expectedResult)
+          })
 
           it('when tampered with', async () => {
             const credential: any = getVCv2Tampered()
