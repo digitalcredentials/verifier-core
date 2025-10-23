@@ -72,7 +72,6 @@ This package exports two methods:
 * credential - The W3C Verifiable Credential to be verified.
 * knownDidRegistries - a list of issuer DIDs in which to lookup signing DIDs
 
-
 #### result
 
 The typescript definitions for the result can be found [here](./src/types/result.ts)
@@ -279,7 +278,6 @@ But can't retrieve (from the network) any one of:
 
 * the revocation status
 * an issuer registry from our list of trusted issuers
-* the issuer's DID document 
 
 which are needed to verify the revocation status and issuer identity.
 
@@ -650,6 +648,36 @@ The proof property is missing, likely because the credential hasn't been signed:
 }
 ```
 
+<b><i>jsonld.ValidationError</i></b>
+
+An error was returnd by the json-ld parser. This is often a safe-mode error, and in particular
+is often that a property has been included for which there is no definition in the context. 
+
+Another common error here is an @type property that contains a value that is 'relative', meaning
+that it cannot be resolved to an absolute IRI (which it must be according to the spec).
+
+A example (just the errors section) of a relative @type reference.
+
+```json
+{ "errors": [{
+    "name": "jsonld.ValidationError",
+    "details": {
+        "event": {
+            "type": [
+                "JsonLdEvent"
+            ],
+            "code": "relative @type reference",
+            "level": "warning",
+            "message": "Relative @type reference found.",
+            "details": {
+                "type": "StatusList2021Entry"
+            }
+        }
+    },
+    "message": "Safe mode validation error.",
+    "stack": "jsonld.ValidationError: Safe mode validation error....etc. removed for brevity."
+}]}
+```
 
 <b>other problem</b>
   
