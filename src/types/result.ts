@@ -2,6 +2,7 @@
 export interface VerificationError {								
     "message": string,
     "name"?: string,
+    "details"?: object,
     "stackTrace"?: any
   }
   
@@ -28,7 +29,7 @@ export interface VerificationError {
     "additionalInformation"?: AdditionalInformationEntry[];
     "credential"?: object,
     "errors"?: VerificationError[],
-    "log"?: VerificationStep[]
+    "log"?: VerificationStep[],
   }
 
 

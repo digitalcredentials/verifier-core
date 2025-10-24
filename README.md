@@ -1,8 +1,8 @@
 # verifier-core _(@digitalcredentials/verifier-core)_
 
-[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/main.yml?branch=jc-implement)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3A%22Node.js+CI%22)
-[![NPM Version](https://img.shields.io/npm/v/@digitalcredentials/verifier-core.svg)](https://npm.im/@digitalcredentials/verifier-core)
-[![Coverage Status](https://coveralls.io/repos/github/digitalcredentials/verifier-core/badge.svg?branch=jc-implement)](https://coveralls.io/github/digitalcredentials/verifier-core?branch=jc-implement)
+[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/main.yml?branch=main)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3A%22Node.js+CI%22)
+[![NPM Version](https://img.shields.io/npm/v/@digitalcredentials/verifier-core.svg)](https://npm.im/package/@digitalcredentials/verifier-core/v/1.0.0-beta.10)
+[![Coverage Status](https://coveralls.io/repos/github/digitalcredentials/verifier-core/badge.svg?branch=main)](https://coveralls.io/github/digitalcredentials/verifier-core?branch=main)
 
 > Verifies W3C Verifiable Credentials in the browser, Node.js, and React Native.
 
@@ -71,7 +71,6 @@ This package exports two methods:
 
 * credential - The W3C Verifiable Credential to be verified.
 * knownDidRegistries - a list of issuer DIDs in which to lookup signing DIDs
-
 
 #### result
 
@@ -279,7 +278,6 @@ But can't retrieve (from the network) any one of:
 
 * the revocation status
 * an issuer registry from our list of trusted issuers
-* the issuer's DID document 
 
 which are needed to verify the revocation status and issuer identity.
 
@@ -650,6 +648,38 @@ The proof property is missing, likely because the credential hasn't been signed:
 }
 ```
 
+<b><i>jsonld.ValidationError</i></b>
+
+An error was returnd by the json-ld parser. This is often a safe-mode error, and in particular
+is often that a property has been included in the VC, but for which there is no definition for the property in the context.  
+
+A common example is including either or both of the 'issuanceDate' or the 'expirationDate' properties in a Verifiable Credential that uses version 2 of the Verifiable Credential Data Model. Those two properties are used in version 1 only, and have been replaced by validFrom and validUntil in version 2. So including the old properties in a Verifiable Credential for which only the version 2 context has been specified precipitates a safe-mode error.
+
+Another common error here is an @type property that contains a value that is 'relative', meaning
+that it cannot be resolved to an absolute IRI (which it must be according to the spec).
+
+A example of a relative @type reference (showing just the just the errors section of the verification result):
+
+```json
+{ "errors": [{
+    "name": "jsonld.ValidationError",
+    "details": {
+        "event": {
+            "type": [
+                "JsonLdEvent"
+            ],
+            "code": "relative @type reference",
+            "level": "warning",
+            "message": "Relative @type reference found.",
+            "details": {
+                "type": "StatusList2021Entry"
+            }
+        }
+    },
+    "message": "Safe mode validation error.",
+    "stack": "jsonld.ValidationError: Safe mode validation error....etc. removed for brevity."
+}]}
+```
 
 <b>other problem</b>
   
