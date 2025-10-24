@@ -1,7 +1,6 @@
 # verifier-core _(@digitalcredentials/verifier-core)_
 
 [![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/main.yml?branch=main)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3A%22Node.js+CI%22)
-[![NPM Version](https://img.shields.io/npm/v/@digitalcredentials/verifier-core.svg)](https://npm.im/package/@digitalcredentials/verifier-core/v/1.0.0-beta.10)
 [![Coverage Status](https://coveralls.io/repos/github/digitalcredentials/verifier-core/badge.svg?branch=main)](https://coveralls.io/github/digitalcredentials/verifier-core?branch=main)
 
 > Verifies W3C Verifiable Credentials in the browser, Node.js, and React Native.
