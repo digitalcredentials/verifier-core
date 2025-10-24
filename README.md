@@ -651,12 +651,14 @@ The proof property is missing, likely because the credential hasn't been signed:
 <b><i>jsonld.ValidationError</i></b>
 
 An error was returnd by the json-ld parser. This is often a safe-mode error, and in particular
-is often that a property has been included for which there is no definition in the context. 
+is often that a property has been included in the VC, but for which there is no definition for the property in the context.  
+
+A common example is including either or both of the 'issuanceDate' or the 'expirationDate' properties in a Verifiable Credential that uses version 2 of the Verifiable Credential Data Model. Those two properties are used in version 1 only, and have been replaced by validFrom and validUntil in version 2. So including the old properties in a Verifiable Credential for which only the version 2 context has been specified precipitates a safe-mode error.
 
 Another common error here is an @type property that contains a value that is 'relative', meaning
 that it cannot be resolved to an absolute IRI (which it must be according to the spec).
 
-A example (just the errors section) of a relative @type reference.
+A example of a relative @type reference (showing just the just the errors section of the verification result):
 
 ```json
 { "errors": [{
