@@ -131,6 +131,7 @@ describe('Verify.verifyPresentation', () => {
       const verifiableCredential = [v2WithStatus]
       const presentation = await getSignedVP({ holder, verifiableCredential }) as VerifiablePresentation
       const credentialResults = [expectedV2WithStatusResult]
+      expect(presentation.holder).to.equal(holder)
       const expectedPresentationResult = getExpectedVerifiedPresentationResult({ credentialResults })
       const result = await verifyPresentation({ presentation, knownDIDRegistries })
       result.credentialResults?.forEach(credResult => delete credResult.additionalInformation)
