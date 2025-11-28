@@ -61,6 +61,14 @@ This package exports two methods:
 
 * verifyCredential
 * verifyPresentation
+* parseAndValidateUrl
+* checkUrlSafety
+
+### URL utilities
+
+`parseAndValidateUrl(value, options)` normalizes and validates URLs for use inside LCW or Verifier Plus. It enforces `http/https` schemes by default, optional TLD requirements, rejects private/localhost hosts, and lets you provide block/allow lists so a single rule-set can be shared across applications.
+
+`checkUrlSafety(value, options)` builds on the validator and lets you plug in blocklists or external reputation matchers (for example Google Safe Browsing). The helper returns `{ status: 'safe' | 'suspicious' | 'blocked', reasons: [...] }` so callers can disable links or show warnings while reusing the same policy surface in multiple repos.
 
 ### verifyCredential
 
