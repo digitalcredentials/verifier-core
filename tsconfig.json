@@ -6,12 +6,16 @@
     "module": "es2022",
     "moduleResolution": "node",
     "outDir": "dist",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
     "baseUrl": ".",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
     "resolveJsonModule": true,
     "paths": {
       "@digitalcredentials/vc": ["src/types/@digitalcredentials/vc.d.ts"]
@@ -22,7 +26,8 @@
   },
   "include": [
     "src/**/*",
-    "test/**/*"
+    ".eslintrc.js",
+    "karma.conf.js"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "test", "src/test-fixtures"]
 }

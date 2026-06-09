@@ -41,8 +41,10 @@ import {
   getVCv1ExpiredWithValidStatus
 } from '../src/test-fixtures/vc.js'
 
+import { purposes } from '@digitalcredentials/jsonld-signatures';
 import { getSignedVP, getUnSignedVP } from './vpUtils.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
+
 import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, PRESENTATION_ERROR } from '../src/constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_UNSIGNED } from '../src/constants/verificationSteps.js';
 
@@ -165,6 +167,35 @@ describe('Verify.verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, knownDIDRegistries, challenge: 'blahblahblue' })
       result.credentialResults?.forEach(credResult => delete credResult.additionalInformation)
       expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+    })
+
+    it('when presentation has proofPurpose authentication and matching challenge', async () => {
+      const challenge = 'auth-challenge-123'
+      const verifiableCredential = [v2WithStatus]
+      const presentation = await getSignedVP({
+        holder,
+        verifiableCredential,
+        presentationPurpose: new purposes.AuthenticationProofPurpose({ challenge }),
+        challenge
+      }) as VerifiablePresentation
+      const credentialResults = [expectedV2WithStatusResult]
+      const expectedPresentationResult = getExpectedVerifiedPresentationResult({ credentialResults })
+      const result = await verifyPresentation({ presentation, knownDIDRegistries, challenge })
+      result.credentialResults?.forEach(credResult => delete credResult.additionalInformation)
+      expect(result).to.deep.equalInAnyOrder(expectedPresentationResult)
+    })
+
+    it('when presentation has proofPurpose authentication but wrong challenge', async () => {
+      const challenge = 'auth-challenge-123'
+      const verifiableCredential = [v2WithStatus]
+      const presentation = await getSignedVP({
+        holder,
+        verifiableCredential,
+        presentationPurpose: new purposes.AuthenticationProofPurpose({ challenge }),
+        challenge
+      }) as VerifiablePresentation
+      const result = await verifyPresentation({ presentation, knownDIDRegistries, challenge: 'wrong-challenge' })
+      expect(result?.presentationResult?.signature).to.equal(SIGNATURE_INVALID)
     })
 
   })

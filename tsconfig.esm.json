@@ -1,30 +1,9 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "strict": true,
-    "target": "es2022",
-    "lib": ["es2022", "dom"],
-    "module": "es2022",
-    "moduleResolution": "node",
     "outDir": "dist",
     "sourceMap": true,
     "declaration": true,
-    "declarationMap": true,
-    "noImplicitAny": true,
-    "removeComments": false,
-    "preserveConstEnums": true,
-    "baseUrl": ".",
-    "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
-    "resolveJsonModule": true
-  },
-  "ts-node": {
-    "files": true
-  },
-  "include": [
-    "src/**/*",
-    ".eslintrc.js",
-    "karma.conf.js"
-  ],
-  "exclude": ["node_modules", "dist", "test", "src/test-fixtures"]
+    "declarationMap": true
+  }
 }

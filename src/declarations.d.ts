@@ -1,6 +1,5 @@
 declare module '@digitalcredentials/did-io';
 declare module '@digitalcredentials/did-method-key';
-declare module '@digitalcredentials/vc';
 declare module '@digitalcredentials/vc-bitstring-status-list';
 declare module '@digitalcredentials/vc-status-list';
 declare module '@digitalcredentials/vpqr';

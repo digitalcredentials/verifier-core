@@ -9,7 +9,6 @@ const documentLoader = securityLoader().build()
 import pkg from '@digitalcredentials/jsonld-signatures';
 import { VerifiablePresentation } from '../src/types/presentation.js';
 const { purposes } = pkg;
-const presentationPurpose = new purposes.AssertionProofPurpose();
 
 const key = await Ed25519VerificationKey2020.generate(
     {
@@ -26,13 +25,31 @@ const key = await Ed25519VerificationKey2020.generate(
 
 const signingSuite = new Ed25519Signature2020({key});
 
-export const getSignedVP = async ({holder, verifiableCredential}:{holder:string,verifiableCredential?:any}):Promise<any> => {
-    const presentation = createPresentation({holder, verifiableCredential});
-    const challenge = 'canbeanything33'
-    return await signPresentation({
-        presentation, suite:signingSuite, documentLoader, challenge, purpose: presentationPurpose
-    });
-}
+export const getSignedVP = async ({
+  holder,
+  verifiableCredential,
+  presentationPurpose,
+  challenge = 'canbeanything33'
+}: {
+  holder: string;
+  verifiableCredential?: any;
+  presentationPurpose?: any;
+  challenge?: string;
+}): Promise<any> => {
+  const presentation = createPresentation({ holder, verifiableCredential });
+
+  // TODO: AuthenticationProofPurpose({challenge}) ('authentication') is used by
+  // LCW and is correct, but the package currently seems to verify presentations
+  // from systems that use assertionMethod.
+  const purpose = presentationPurpose ?? new purposes.AssertionProofPurpose();
+  return await signPresentation({
+    presentation,
+    suite: signingSuite,
+    documentLoader,
+    challenge,
+    purpose
+  });
+};
 
 export const getUnSignedVP = ({verifiableCredential}:{verifiableCredential?:any}):VerifiablePresentation => {
     return createPresentation({verifiableCredential});

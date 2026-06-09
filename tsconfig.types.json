@@ -15,7 +15,10 @@
     "resolveJsonModule": true,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationDir": "dist"
+    "declarationDir": "dist",
+    "paths": {
+      "@digitalcredentials/vc": ["src/types/@digitalcredentials/vc.d.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test", "src/test-fixtures"]
