@@ -2,7 +2,7 @@ import type { Credential, Proof, Issuer } from './credential.js';
 
 export interface VerifiablePresentation {
   readonly '@context': string[];
-  readonly issuer: Issuer;
+  readonly holder: Issuer;
   readonly type: string;
   readonly verifiableCredential: Credential | Credential[];
   readonly proof: Proof;
