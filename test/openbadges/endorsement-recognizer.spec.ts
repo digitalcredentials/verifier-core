@@ -25,7 +25,6 @@ import { FakeCryptoService } from '../factories/services/fake-crypto-service.js'
 const ctx: VerificationContext = {
   documentLoader: async () => ({}),
   fetchJson: async () => ({}),
-  cryptoSuites: [],
   cryptoServices: [],
   challenge: null,
   unsignedPresentation: false

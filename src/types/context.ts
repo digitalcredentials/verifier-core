@@ -12,7 +12,6 @@
 
 import type { CacheService } from '../services/cache-service/cache-service.js';
 import type { CryptoService } from './crypto-service.js';
-import type { CryptoSuite } from './crypto-suite.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { TimeService } from '../services/time-service/time-service.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
@@ -56,19 +55,11 @@ export interface VerificationContext {
    */
   cacheService?: CacheService;
   /**
-   * Linked Data Proof / Data Integrity suite instances for `@digitalcredentials/vc`.
-   *
-   * @internal Slated for removal. Currently still consumed by
-   * `bitstring-status-check`, which passes the concrete suite instances
-   * to the third-party `checkStatus` function from
-   * `@digitalcredentials/vc-bitstring-status-list`. A follow-up phase
-   * will refactor that check (e.g. recursively verify the status list
-   * credential via `Verifier.verifyCredential`) and drop this field.
-   */
-  cryptoSuites: CryptoSuite[];
-  /**
    * Pluggable crypto verification services (Data Integrity today; JWT / others later).
-   * The proof suite dispatches to the first service whose `canVerify(subject)` is true.
+   * Governs proof verification for presentations, credentials, and the
+   * BitstringStatusListCredentials fetched during a status check. The proof
+   * suite and the status suite both dispatch to the first service whose
+   * `canVerify(subject)` is true.
    */
   cryptoServices: CryptoService[];
   registries?: EntityIdentityRegistry[];
@@ -81,16 +72,6 @@ export interface VerificationContext {
   challenge?: string | null;
   /** Whether to allow unsigned presentations (skip VP signature check). */
   unsignedPresentation?: boolean;
-  /**
-   * When true (default), verify the BitstringStatusListCredential proof before reading
-   * revocation bits. Set false for tests with unsigned list credentials from factories.
-   *
-   * @internal Slated for removal alongside {@link cryptoSuites} when
-   * `bitstring-status-check` is refactored. Not exposed via
-   * `VerifierConfig` or `VerifyXCall` — only consumed by tests that
-   * build a {@link VerificationContext} directly.
-   */
-  verifyBitstringStatusListCredential?: boolean;
   /**
    * Pluggable credential recognizers. Threaded through from
    * {@link VerifierConfig.recognizers} so the built-in

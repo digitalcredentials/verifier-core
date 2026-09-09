@@ -6,7 +6,7 @@ import { signatureCheck } from './signature-check.js';
  *
  * Dispatches to {@link VerificationContext.cryptoServices} — the first service whose
  * `canVerify(subject)` is true runs verification. The default stack is built in
- * `defaults.ts` as `[DataIntegrityCryptoService({ suites: cryptoSuites })]`.
+ * `default-services.ts` as `[DataIntegrityCryptoService({ suites: defaultCryptoSuites() })]`.
  *
  * The Data Integrity adapter wraps `@digitalcredentials/vc`, handles
  * AuthenticationProofPurpose vs AssertionProofPurpose for presentations, and maps

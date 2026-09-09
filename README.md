@@ -33,8 +33,7 @@ Verifies the following versions of W3C Verifiable Credentials:
 
 Supports the
 [eddsa-rdfc-2022](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite)
-and
-[ecdsa-rdfc-2019](https://www.w3.org/TR/vc-di-ecdsa/) (P-256/P-384 Multikey)
+and [ecdsa-rdfc-2019](https://www.w3.org/TR/vc-di-ecdsa/) (P-256/P-384 Multikey)
 Data Integrity Proof cryptosuites, and the
 [ed25519-signature-2020 Linked Data Proof](https://github.com/digitalbazaar/ed25519-signature-2020)
 cryptosuite.
@@ -42,13 +41,13 @@ cryptosuite.
 Verification runs an ordered pipeline of **suites**, each containing one or more
 **checks**:
 
-| Suite           | Phase           | What it checks                                                                                                         | Fatal? |
-| --------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------- | ------ |
-| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                          | Yes    |
-| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured) | No     |
-| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                   | Yes    |
-| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification                                      | Yes    |
-| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                            | No     |
+| Suite           | Phase           | What it checks                                                                                                                                                  | Fatal? |
+| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                   | Yes    |
+| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                          | No     |
+| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                            | Yes    |
+| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. The list credential's proof is checked with the configured `cryptoServices`. | Yes    |
+| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                     | No     |
 
 The **Phase** column drives the optional `phases:` filter on `VerifierConfig`
 and per-call args, used for
@@ -122,8 +121,9 @@ interface VerifyCredentialOptions {
 
 Only `credential` is required. All other fields override sensible defaults
 (security-document-loader, Ed25519 + EdDSA + ECDSA crypto suites, in-memory
-cache).
-`VerifyCredentialOptions` is the type alias
+cache). The configured `cryptoServices` verify presentation proofs, credential
+proofs, and the proofs on BitstringStatusListCredentials fetched during a status
+check. `VerifyCredentialOptions` is the type alias
 `VerifierConfig & VerifyCredentialCall`, so callers building the options object
 piece-by-piece can compose against either half.
 
@@ -365,7 +365,9 @@ interface VerifyPresentationOptions {
 ```
 
 Like `VerifyCredentialOptions`, this is the alias
-`VerifierConfig & VerifyPresentationCall`.
+`VerifierConfig & VerifyPresentationCall`. The same `cryptoServices` that verify
+the presentation also verify each embedded credential and any status list
+credentials those credentials name.
 
 #### Result
 
@@ -439,6 +441,10 @@ Each verifier owns its own `InMemoryCacheService` by default; cache contents are
 isolated from other verifiers in the same process. To share cache state across
 verifiers, construct one cache adapter and pass it to each
 `createVerifier({ cacheService })`.
+
+The `cryptoServices` passed to `createVerifier` are the complete and only set
+that governs proof verification — for presentations, credentials, and the
+BitstringStatusListCredentials fetched during a status check.
 
 ```typescript
 import { createVerifier } from '@digitalcredentials/verifier-core';

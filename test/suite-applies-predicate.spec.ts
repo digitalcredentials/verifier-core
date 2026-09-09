@@ -11,7 +11,6 @@ import type { VerificationSubject } from '../src/types/subject.js';
 const ctx: VerificationContext = {
   documentLoader: async () => ({}),
   fetchJson: async () => ({}),
-  cryptoSuites: [],
   cryptoServices: [],
   challenge: null,
   unsignedPresentation: false

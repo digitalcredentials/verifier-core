@@ -29,6 +29,7 @@ src/
 ├── default-suites.ts                Internal: defaultSuites array (core → recognition → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` submodule
 ├── default-services.ts              Internal: lazy factories for default httpGetService, cryptoServices, documentLoader (memoized) + per-call createDefaultCacheService
 ├── run-suites.ts                    Suite orchestration engine
+├── crypto-dispatch.ts               Shared CryptoService selection + invocation (proof suite and status suite)
 ├── extract-credentials-from.ts      Normalize VP's embedded credentials to array
 ├── flatten-presentation-results.ts  flattenPresentationResults helper + FlattenedCheckResult provenance-tagged union
 ├── problem-types.ts                 ProblemTypes const map + ProblemType union (catalog of built-in ProblemDetail.type URIs)
@@ -222,6 +223,10 @@ issuer DID documents (via the `CachedResolver` baked into the document loader), 
 registry payloads, OIDF entity statements, and any data the registry handlers store under
 `cacheService`.
 
+The `cryptoServices` passed to `createVerifier` is the complete and only set governing proof
+verification — for presentations, for credentials, and for the BitstringStatusListCredentials
+fetched during a status check.
+
 Each `createVerifier()` without an explicit `cacheService` gets a fresh `InMemoryCacheService`. The default cache is no longer process-wide; two verifiers built from defaults isolate their cache contents. The default `BuiltinHttpGetService` is still memoized because the adapter itself is stateless, and the default crypto stack and document loader are also memoized for the same reason — only the cache, which holds caller-visible mutable state, is per-instance by default. To deliberately share cache state across verifiers, construct one `InMemoryCacheService` (or any `CacheService` adapter) and pass it as `createVerifier({ cacheService })` to each.
 
 #### Default document loader routing
@@ -264,7 +269,9 @@ The fix: `createVerifier` forward-declares the verifier reference, then passes
 `createRegistryLookup` a `getVerifier` thunk that closes over a mutable slot. After the verifier
 object is built, the slot is filled. Handlers receive the verifier through
 `RegistryHandlerContext`, and `vc-recognition` passes `registries: []` to its recursive
-`verifier.verifyCredential(...)` as a recursion guard.
+`verifier.verifyCredential(...)` as a recursion guard. Status-list credential proofs do **not**
+take this path: they go through `dispatchProofVerification` against `cryptoServices` (see the
+status suite) rather than a recursive `Verifier.verifyCredential` call.
 
 ## Suites and checks
 
@@ -307,7 +314,7 @@ break when the flag is left at its default (`false`). See
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
 | Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
@@ -688,11 +695,12 @@ without network dependencies, and composable — consumers wire in exactly the b
   Replacing the default crypto service requires understanding the LD-Proofs / Data Integrity
   internals. The default crypto service verifies signatures only — credential status checking
   is the sole responsibility of the status suite (P-E, 2026-04-19).
-- **Status suite** consumes `@digitalcredentials/vc-bitstring-status-list` directly and reads
-  the legacy `cryptoSuites` and `verifyBitstringStatusListCredential` fields off
-  `VerificationContext`. Both context fields are marked `@internal` and slated for removal once
-  `bitstring-status-check` is refactored to recursively verify the status list credential through
-  `Verifier.verifyCredential` instead.
+- **Status suite** still consumes `@digitalcredentials/vc-bitstring-status-list` for purpose
+  matching, validity dates, bitstring decoding, and index reading. The status list credential's
+  proof is verified through the injected `CryptoService`s via `src/crypto-dispatch.ts` — the
+  same dispatch presentations and credentials use. Recursively calling `Verifier.verifyCredential`
+  on the status list credential is deferred (it needs a recursion guard the status suite cannot
+  currently express without a suite-suppression API).
 - **Registry handlers** (`dcc-legacy`, `oidf`, `vc-recognition`) consume third-party clients and
   parsing libraries inline rather than through narrower ports — though they do share the verifier's
   `httpGetService` and `cacheService`, so caching and HTTP behavior are uniform.
@@ -708,11 +716,9 @@ without network dependencies, and composable — consumers wire in exactly the b
 With `HttpGetService`, `CacheService`, `CryptoService`, and `RegistryHandler` ports in place,
 the remaining hexagonal work is:
 
-1. Route the bitstring-status check through `Verifier.verifyCredential` (drop the direct
-   `cryptoSuites` dependency on `VerificationContext`).
-2. Wrap AJV behind a `JsonSchemaValidator` port. (The "lift the OBv3 schema check into a
+1. Wrap AJV behind a `JsonSchemaValidator` port. (The "lift the OBv3 schema check into a
    separate vertical" half of this item is done — see the `/openbadges` submodule.)
-3. Introduce a `Clock` port for testable TTL behavior.
+2. Introduce a `Clock` port for testable TTL behavior.
 
 This is a direction, not a mandate. Progress is incremental — each change that moves a concrete
 dependency behind an interface moves the library closer to the target architecture.

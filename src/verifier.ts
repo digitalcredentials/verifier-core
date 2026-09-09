@@ -83,7 +83,6 @@ import {
   defaultHttpGetService,
   createDefaultCacheService,
   defaultCryptoServices,
-  defaultCryptoSuites,
   defaultDocumentLoaderFor
 } from './default-services.js';
 import { createRegistryLookup } from './services/registry-lookup.js';
@@ -310,11 +309,9 @@ interface BuildContextInput {
 }
 
 /**
- * Internal context builder for `createVerifier`. Populates the legacy
- * `cryptoSuites` field from {@link defaultCryptoSuites} so
- * `bitstring-status-check` (which still consumes the concrete suite
- * instances) keeps working. That field is slated for removal in a
- * follow-up phase that refactors `bitstring-status-check`.
+ * Internal context builder for `createVerifier`. Assembles the injected
+ * adapters (HTTP, cache, crypto services, document loader) into the
+ * {@link VerificationContext} every check receives.
  */
 function buildContext(input: BuildContextInput): VerificationContext {
   return {
@@ -323,7 +320,6 @@ function buildContext(input: BuildContextInput): VerificationContext {
     httpGetService: input.httpGetService,
     cacheService: input.cacheService,
     cryptoServices: input.cryptoServices,
-    cryptoSuites: defaultCryptoSuites(),
     registries: input.registries,
     recognizers: input.recognizers,
     lookupIssuers: input.lookupIssuers,

@@ -49,6 +49,11 @@ Verifier results now fold per-suite checks into a single
   only. Pass `verbose: true` to restore the prior shape.
 - `flattenPresentationResults` semantically unchanged; in folded mode the
   returned array is naturally smaller.
+- **Status list credential proofs** are verified through the `cryptoServices`
+  configured on `createVerifier`, not through a second, non-injectable suite
+  list. Consumers who inject custom `CryptoService`s now get them applied to
+  BitstringStatusListCredentials fetched during a status check as well as to
+  presentation and credential proofs.
 - **Tooling / packaging** (infrastructure aligned with
   `isomorphic-lib-template`, no library behavior change): build is a single-pass
   `tsc` under `moduleResolution: Bundler`; tests run on **vitest** (Node) +
@@ -66,10 +71,9 @@ Verifier results now fold per-suite checks into a single
   `IssuerObjectSchema` deleted every key on `issuer.image` except `id` and
   `type` — including `caption`, which Open Badges 3.0 §B.1.13 defines and real
   issuers populate. Dropping a signed key changes the canonicalized N-Quads and
-  the proof check then fails. The parse result is now discarded and the
-  caller's original object is verified and returned as
-  `result.verifiableCredential`, which also fixes consumers that re-verify that
-  field in a second pass.
+  the proof check then fails. The parse result is now discarded and the caller's
+  original object is verified and returned as `result.verifiableCredential`,
+  which also fixes consumers that re-verify that field in a second pass.
 - `issuer.image.type` accepts an array (`['Image']`) as well as a string. The
   previous string-only union failed the entire credential parse.
 
@@ -77,6 +81,15 @@ Verifier results now fold per-suite checks into a single
 
 - `CheckResult.check` and `CheckResult.suite` — use `CheckResult.id` instead.
   Removal target: the next major.
+
+### Removed
+
+- `cryptoSuites` and `verifyBitstringStatusListCredential` on
+  `VerificationContext`. Both were `@internal` and neither was reachable through
+  `VerifierConfig`, so only code constructing a `VerificationContext` directly
+  (test helpers) is affected. Tests that used
+  `verifyBitstringStatusListCredential: false` should inject a permissive
+  `CryptoService` instead.
 
 ### Migration
 
