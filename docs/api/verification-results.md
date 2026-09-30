@@ -205,7 +205,13 @@ interface SuiteSummary {
 | Failures only | `"<n> of <m> checks failed"` |
 | Mixed | `"<n> of <m> checks failed (<k> passed)"` |
 | Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero) |
+| Halted by an earlier suite's fatal failure | `"<suite-id> not run: <check-id> failed"` |
 | Explicit `applies` skip | `"<suite-id> not applicable: <reason>"` |
+
+> "Not run" rows are the `skipped` results `runSuites` emits, with reason
+> `"Not run: <check-id> failed"`, for checks halted by a fatal failure. They
+> count toward `counts.skipped` but not toward the "skipped" wording: the
+> message reports them as "not run after fatal" instead.
 
 > Singular `check` is used when `n === 1`.
 

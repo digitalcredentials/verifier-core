@@ -301,8 +301,16 @@ break when the flag is left at its default (`false`). See
 
 - **`appliesTo`** limits a check to credential-only or presentation-only subjects. If unset, the
   check runs for both.
-- **`fatal`** on a check means a failure stops remaining checks *in that suite only*. Later suites
-  still run. This ensures the report is always complete.
+- **`fatal`** on a check means a failure halts every remaining check for the subject, in that
+  suite and in all later suites: once the subject is known to be invalid, later checks would
+  only report misleading follow-on failures or do needless network I/O. Each check that would
+  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`
+  (visible with `verbose: true`), so the report stays complete. Suites that would not have run
+  anyway (phase filter, `applies` false) stay silent.
+- **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
+  `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
+  yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
+  Verification never rejects because a check threw.
 - **Failures** carry `ProblemDetail[]` — RFC 9457-inspired structured errors with `type` (URI),
   `title`, and `detail`.
 - **Skips** carry a `reason` string explaining why (e.g. "Credential has no credentialStatus").

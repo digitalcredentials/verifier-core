@@ -37,6 +37,24 @@ const fakeVerified = {
 const cloneEndorsement = (): Record<string, unknown> =>
   structuredClone(sampleEndorsementCredential);
 
+/**
+ * The endorsement fixture carries no proof, and a missing proof is a
+ * fatal `core.proof-exists` failure that halts every later suite. The
+ * end-to-end tests need recognition to run, so they add a placeholder
+ * proof that `FakeCryptoService({ verified: true })` accepts.
+ */
+const signedEndorsement = (): Record<string, unknown> => ({
+  ...cloneEndorsement(),
+  proof: {
+    type: 'Ed25519Signature2020',
+    created: '2024-01-01T00:00:00Z',
+    verificationMethod: 'did:example:issuer#z6MkPlaceholder',
+    proofPurpose: 'assertionMethod',
+    proofValue:
+      'z000000000000000000000000000000000000000000000000000000000000000000'
+  }
+});
+
 describe('obv3p0EndorsementRecognizer', () => {
   it('exposes a stable id and human-readable name', () => {
     expect(obv3p0EndorsementRecognizer.id).toBe('obv3p0.endorsement');
@@ -145,7 +163,7 @@ describe('obv3p0EndorsementRecognizer', () => {
         recognizers: [obv3p0EndorsementRecognizer]
       });
       const result = await verifier.verifyCredential({
-        credential: cloneEndorsement()
+        credential: signedEndorsement()
       });
 
       expect(result.recognizedProfile).toBe('obv3p0.endorsement');
@@ -158,7 +176,7 @@ describe('obv3p0EndorsementRecognizer', () => {
         recognizers: [obv3p0Recognizer]
       });
       const result = await verifier.verifyCredential({
-        credential: cloneEndorsement()
+        credential: signedEndorsement()
       });
 
       expect(result.recognizedProfile).toBe(undefined);
@@ -171,7 +189,7 @@ describe('obv3p0EndorsementRecognizer', () => {
         recognizers: [obv3p0Recognizer, obv3p0EndorsementRecognizer]
       });
       const result = await verifier.verifyCredential({
-        credential: cloneEndorsement()
+        credential: signedEndorsement()
       });
 
       expect(result.recognizedProfile).toBe('obv3p0.endorsement');
@@ -183,7 +201,7 @@ describe('obv3p0EndorsementRecognizer', () => {
         recognizers: [obv3p0EndorsementRecognizer]
       });
       const result = await verifier.verifyCredential({
-        credential: cloneEndorsement(),
+        credential: signedEndorsement(),
         additionalSuites: [openBadgesSuite]
       });
 

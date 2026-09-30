@@ -74,8 +74,10 @@ export interface CheckResult {
   outcome: CheckOutcome;
   /**
    * Whether this check was marked fatal in its suite definition.
-   * Fatal failures affect the overall `verified` status; non-fatal ones
-   * are informational/warnings only.
+   * Fatal failures affect the overall `verified` status and halt every
+   * later check for the subject; non-fatal ones are
+   * informational/warnings only. A `'skipped'` "Not run" row carries
+   * its check's flag too, but only a `'failure'` counts as fatal.
    */
   fatal?: boolean;
   /**
@@ -143,7 +145,11 @@ export interface VerificationCheck {
   description?: string;
   /** Restricts this check to specific subject types. Unset = runs for all. */
   appliesTo?: readonly VerificationSubjectType[];
-  /** If true, a failure stops remaining checks in this suite (later suites still run). */
+  /**
+   * If true, a failure halts every remaining check for the subject, in
+   * this suite and all later suites. Checks that would have run are
+   * reported as `'skipped'` with reason `Not run: <check-id> failed`.
+   */
   fatal?: boolean;
   execute: (
     subject: VerificationSubject,

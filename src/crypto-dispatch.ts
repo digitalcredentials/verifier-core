@@ -57,19 +57,21 @@ export async function dispatchProofVerification(
     return { kind: 'no-service' };
   }
 
-  const service = services.find(s => s.canVerify(subject));
-  if (!service) {
-    return { kind: 'no-service' };
-  }
-
-  const presentation = subject.verifiablePresentation;
-  const credential = subject.verifiableCredential;
-
-  if (!presentation && !credential) {
-    return { kind: 'no-service' };
-  }
-
   try {
+    // Service selection sits inside the `try` so a throwing `canVerify`
+    // is reported as `threw` rather than rejecting the caller.
+    const service = services.find(s => s.canVerify(subject));
+    if (!service) {
+      return { kind: 'no-service' };
+    }
+
+    const presentation = subject.verifiablePresentation;
+    const credential = subject.verifiableCredential;
+
+    if (!presentation && !credential) {
+      return { kind: 'no-service' };
+    }
+
     const cryptoResult = presentation
       ? await service.verifyPresentation(presentation, options)
       : await service.verifyCredential(credential, options);

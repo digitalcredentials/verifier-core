@@ -41,6 +41,9 @@ export const ProblemTypes = {
   /** Spec — input could not be parsed. (W3C VC Data Model 2.0 §7.1) */
   PARSING_ERROR: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
 
+  /** Synthesized — a check threw instead of returning an outcome. */
+  CHECK_ERROR: 'https://www.w3.org/TR/vc-data-model#CHECK_ERROR',
+
   /** Synthesized — cryptographic signature did not verify. */
   INVALID_SIGNATURE: 'https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE',
   /** Synthesized — proof verification raised an error before reaching a verdict. */

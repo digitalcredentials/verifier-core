@@ -9,6 +9,7 @@ import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
 import { runSuites } from '../src/run-suites.js';
 import { defaultSuites } from '../src/default-suites.js';
 import { VerificationCheck, CheckOutcome } from '../src/types/check.js';
+import { ProblemTypes } from '../src/problem-types.js';
 import {
   BitstringStatusEntry,
   CredentialFactory,
@@ -240,6 +241,96 @@ describe('verifyCredential', () => {
       expect(result.verified).toBe(false);
       const customResult = result.results.find(r => r.suite === 'custom');
       expect(customResult?.outcome.status).toBe('failure');
+    });
+
+    it('a custom check that throws yields a CHECK_ERROR result, not a rejection', async () => {
+      const throwingCheck: VerificationCheck = {
+        id: 'custom.throws',
+        name: 'Throwing Check',
+        fatal: false,
+        execute: async (): Promise<CheckOutcome> => {
+          throw new Error('custom check exploded');
+        }
+      };
+
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        additionalSuites: [
+          { id: 'custom', name: 'Custom Suite', checks: [throwingCheck] }
+        ],
+        ...fakeVerified
+      });
+
+      const customResult = result.results.find(
+        r => r.check === 'custom.throws'
+      );
+      expect(customResult?.outcome).toEqual({
+        status: 'failure',
+        problems: [
+          {
+            type: ProblemTypes.CHECK_ERROR,
+            title: 'Check Error',
+            detail: 'Check "custom.throws" threw: custom check exploded'
+          }
+        ]
+      });
+      // Non-fatal, so the credential still verifies.
+      expect(result.verified).toBe(true);
+    });
+  });
+
+  describe('halt after fatal', () => {
+    it('reports proof.signature as not run for a credential with no proof', async () => {
+      const credential = CredentialFactory({ version: 'v2', credential: {} });
+      delete (credential as { proof?: unknown }).proof;
+
+      // Default crypto services: their `canVerify` rejects an unsigned
+      // credential, which used to surface as a second, misleading failure.
+      const result = await verifyCredential({ credential, verbose: true });
+
+      expect(result.verified).toBe(false);
+      const proofExists = result.results.find(
+        r => r.check === 'core.proof-exists'
+      );
+      expect(proofExists?.outcome.status).toBe('failure');
+
+      const signature = result.results.find(r => r.check === 'proof.signature');
+      expect(signature?.outcome).toEqual({
+        status: 'skipped',
+        reason: 'Not run: core.proof-exists failed'
+      });
+
+      const noServiceRows = result.results.filter(
+        r =>
+          r.outcome.status === 'failure' &&
+          r.outcome.problems.some(
+            p => p.title === 'No Applicable Crypto Service'
+          )
+      );
+      expect(noServiceRows).toEqual([]);
+
+      const summaryMessages = Object.fromEntries(
+        result.summary.map(s => [s.suite, s.message])
+      );
+      expect(summaryMessages.core).toBe('1 of 4 checks failed (3 passed)');
+      expect(summaryMessages.proof).toBe(
+        'proof not run: core.proof-exists failed'
+      );
+    });
+
+    it('summarizes a core failure mid-suite with the not-run tail', async () => {
+      const credential = CredentialFactory({
+        version: 'v2',
+        credential: { id: 'not-a-valid-url' }
+      });
+
+      const result = await verifyCredential({ credential, verbose: true });
+
+      const core = result.summary.find(s => s.suite === 'core');
+      expect(core?.message).toBe(
+        '1 of 4 checks failed (2 passed, 1 not run after fatal)'
+      );
     });
   });
 

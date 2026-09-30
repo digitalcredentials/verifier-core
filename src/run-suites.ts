@@ -6,6 +6,15 @@
  * check, respects `appliesTo` filtering and `fatal` short-circuiting,
  * and returns a flat `CheckResult[]` report.
  *
+ * Invariants:
+ * - The first fatal failure halts the subject: no later check executes,
+ *   in the same suite or any later one. Each check that would have run is
+ *   reported as a `'skipped'` row with reason
+ *   `Not run: <check-id> failed`, so the report still lists it.
+ * - A throw never escapes. A throwing `execute` or `applies` becomes a
+ *   `failure` result carrying {@link ProblemTypes.CHECK_ERROR}, so
+ *   `runSuites` always resolves.
+ *
  * This module is pure orchestration — it has no knowledge of what any
  * check actually does.
  */
@@ -18,9 +27,13 @@ import {
   SuitePhase
 } from './types/check.js';
 import { VerificationContext } from './types/context.js';
+import { ProblemTypes } from './problem-types.js';
 import { VerificationSubject } from './types/subject.js';
 import type { TimeService } from './services/time-service/time-service.js';
 import type { TaskTiming } from './types/timing.js';
+
+/** Reason prefix on the `'skipped'` rows emitted for checks halted by an earlier fatal failure. */
+export const NOT_RUN_REASON_PREFIX = 'Not run: ';
 
 /**
  * Optional orchestration knobs.
@@ -98,9 +111,19 @@ function appliesToSubject(
  *   silently skipped, except when their id appears in
  *   `options.explicitSuiteIds` — in which case a synthetic
  *   `<suite-id>.applies` `'skipped'` `CheckResult` is emitted.
+ * - A throwing `applies` predicate becomes a `<suite-id>.applies`
+ *   `failure` carrying `CHECK_ERROR`, and that suite's checks do not
+ *   run. The row is fatal when the suite has any fatal check (a suite
+ *   that could have failed the subject must not silently pass).
  * - Checks are executed in order within each suite.
  * - Checks with `appliesTo` restrictions are skipped if they don't match the subject.
- * - Fatal failures stop remaining checks in that suite only (other suites continue).
+ * - A throwing check becomes a `failure` carrying `CHECK_ERROR`, and
+ *   keeps the check's own `fatal` flag.
+ * - A fatal failure halts every remaining check for the subject, in
+ *   this suite and all later suites. Each check that would have run is
+ *   reported as `'skipped'` with reason `Not run: <check-id> failed`.
+ *   Phase filtering and `applies` are still evaluated after a halt, so
+ *   suites that would not have run stay silent.
  * - Returns a flat array of all check results.
  */
 export async function runSuites(
@@ -112,13 +135,31 @@ export async function runSuites(
   const results: CheckResult[] = [];
   const timing = context.timing === true;
   const timeService = context.timeService;
+  /** Local id of the first fatal failure; once set, no check executes. */
+  let haltedBy: string | undefined;
 
   for (const suite of suites) {
     if (!suiteRunsInPhases(suite, options.phases)) {
       continue;
     }
 
-    if (suite.applies && !suite.applies(subject, context)) {
+    let applies = true;
+    if (suite.applies) {
+      try {
+        applies = suite.applies(subject, context);
+      } catch (error) {
+        const fatal = suite.checks.some(c => c.fatal === true);
+        results.push(
+          buildAppliesErrorResult(suite.id, error, fatal, timing, timeService)
+        );
+        if (fatal && haltedBy === undefined) {
+          haltedBy = `${suite.id}.applies`;
+        }
+        continue;
+      }
+    }
+
+    if (!applies) {
       if (options.explicitSuiteIds?.has(suite.id)) {
         results.push(
           buildSyntheticAppliesSkipResult(suite.id, timing, timeService)
@@ -132,8 +173,20 @@ export async function runSuites(
         continue;
       }
 
+      if (haltedBy !== undefined) {
+        results.push(
+          buildNotRunResult(suite.id, check, haltedBy, timing, timeService)
+        );
+        continue;
+      }
+
       const taskTiming = timing ? startTaskTiming(timeService) : undefined;
-      const outcome: CheckOutcome = await check.execute(subject, context);
+      let outcome: CheckOutcome;
+      try {
+        outcome = await check.execute(subject, context);
+      } catch (error) {
+        outcome = buildCheckErrorOutcome(check.id, error);
+      }
       const finishedTiming = taskTiming
         ? finishTaskTiming(taskTiming, timeService)
         : undefined;
@@ -150,12 +203,78 @@ export async function runSuites(
       results.push(result);
 
       if (check.fatal && outcome.status === 'failure') {
-        break;
+        haltedBy = check.id;
       }
     }
   }
 
   return results;
+}
+
+/**
+ * Internal: turn a throw from `check.execute` into a `failure`
+ * outcome carrying {@link ProblemTypes.CHECK_ERROR}. Only the
+ * message is kept — never the stack.
+ */
+function buildCheckErrorOutcome(id: string, error: unknown): CheckOutcome {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    status: 'failure',
+    problems: [
+      {
+        type: ProblemTypes.CHECK_ERROR,
+        title: 'Check Error',
+        detail: `Check "${id}" threw: ${message}`
+      }
+    ]
+  };
+}
+
+/**
+ * Internal: build the `<suite-id>.applies` failure emitted when a
+ * suite's `applies` predicate throws. Timed as an instantaneous
+ * decision, like {@link buildSyntheticAppliesSkipResult}.
+ */
+function buildAppliesErrorResult(
+  suiteId: string,
+  error: unknown,
+  fatal: boolean,
+  timing: boolean,
+  timeService: TimeService | undefined
+): CheckResult {
+  const checkId = `${suiteId}.applies`;
+  const result: CheckResult = {
+    check: checkId,
+    suite: suiteId,
+    outcome: buildCheckErrorOutcome(checkId, error),
+    fatal
+  };
+  return withInstantTiming(result, timing, timeService);
+}
+
+/**
+ * Internal: build the `'skipped'` row for a check that would have
+ * run but did not, because `haltedBy` failed fatally earlier for
+ * this subject. Timed as an instantaneous decision, like
+ * {@link buildSyntheticAppliesSkipResult}.
+ */
+function buildNotRunResult(
+  suiteId: string,
+  check: VerificationCheck,
+  haltedBy: string,
+  timing: boolean,
+  timeService: TimeService | undefined
+): CheckResult {
+  const result: CheckResult = {
+    check: check.id,
+    suite: suiteId,
+    outcome: {
+      status: 'skipped',
+      reason: `${NOT_RUN_REASON_PREFIX}${haltedBy} failed`
+    },
+    fatal: check.fatal
+  };
+  return withInstantTiming(result, timing, timeService);
 }
 
 /**
@@ -180,6 +299,19 @@ function buildSyntheticAppliesSkipResult(
       reason: 'suite predicate returned false'
     }
   };
+  return withInstantTiming(result, timing, timeService);
+}
+
+/**
+ * Internal: attach a collapsed timing window to a synthetic row
+ * when `timing` is on. The window samples each clock once, so
+ * suite rollups keep summing cleanly over synthetic rows.
+ */
+function withInstantTiming(
+  result: CheckResult,
+  timing: boolean,
+  timeService: TimeService | undefined
+): CheckResult {
   if (timing) {
     const started = startTaskTiming(timeService);
     result.timing = finishTaskTiming(started, timeService);

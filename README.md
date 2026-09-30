@@ -185,8 +185,9 @@ interface ProblemDetail {
 #### Example: Invalid signature (fatal)
 
 An invalid signature is fatal — it means any part of the credential could have
-been tampered with, so subsequent checks within the proof suite stop. Other
-suites still run.
+been tampered with, so every later check for the credential, in any suite, is
+halted. With `verbose: true`, each check that would have run appears as
+`skipped` with reason `Not run: <check-id> failed`.
 
 ```json
 {
@@ -219,7 +220,18 @@ suites still run.
     {
       "suite": "status",
       "check": "status.bitstring",
-      "outcome": { "status": "skipped", "reason": "..." }
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
+    },
+    {
+      "suite": "registry",
+      "check": "registry.issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
     }
   ]
 }

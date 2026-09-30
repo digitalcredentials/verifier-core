@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeId, foldCheckResults } from '../src/fold-results.js';
+import { NOT_RUN_REASON_PREFIX } from '../src/run-suites.js';
 import type {
   CheckResult,
   SuitePhase,
@@ -76,6 +77,13 @@ function mkResult(
     check,
     outcome: { status: 'skipped', reason: options.reason ?? 'n/a' }
   };
+}
+
+/** A halt skip, shaped exactly as `runSuites` emits it. */
+function mkNotRun(suite: string, check: string, haltedBy: string): CheckResult {
+  return mkResult(suite, check, 'skipped', {
+    reason: `${NOT_RUN_REASON_PREFIX}${haltedBy} failed`
+  });
 }
 
 describe('foldCheckResults', () => {
@@ -208,7 +216,9 @@ describe('foldCheckResults', () => {
     );
     const checks: CheckResult[] = [
       mkResult('proof', 'proof.a', 'success'),
-      mkResult('proof', 'proof.b', 'failure', { fatal: true })
+      mkResult('proof', 'proof.b', 'failure', { fatal: true }),
+      mkNotRun('proof', 'proof.c', 'proof.b'),
+      mkNotRun('proof', 'proof.d', 'proof.b')
     ];
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
@@ -220,12 +230,117 @@ describe('foldCheckResults', () => {
     expect(summaries[0].counts).toEqual({
       passed: 1,
       failed: 1,
-      skipped: 0
+      skipped: 2
     });
     expect(summaries[0].fatalFailureAt).toBe('cryptographic.proof.b');
     expect(summaries[0].message).toBe(
       '1 of 4 checks failed (1 passed, 2 not run after fatal)'
     );
+  });
+
+  describe('not-run rows after a fatal failure', () => {
+    const core = mkSuite(
+      'core',
+      [
+        mkCheck('core.context-exists', 'failure', { fatal: true }),
+        mkCheck('core.vc-context', 'success', { fatal: true }),
+        mkCheck('core.credential-id', 'success', { fatal: true }),
+        mkCheck('core.proof-exists', 'success', { fatal: true })
+      ],
+      { phase: 'cryptographic' }
+    );
+    const proof = mkSuite(
+      'proof',
+      [mkCheck('proof.signature', 'success', { fatal: true })],
+      { phase: 'cryptographic' }
+    );
+    const haltedChecks: CheckResult[] = [
+      mkResult('core', 'core.context-exists', 'failure', { fatal: true }),
+      mkNotRun('core', 'core.vc-context', 'core.context-exists'),
+      mkNotRun('core', 'core.credential-id', 'core.context-exists'),
+      mkNotRun('core', 'core.proof-exists', 'core.context-exists'),
+      mkNotRun('proof', 'proof.signature', 'core.context-exists')
+    ];
+
+    it('counts not-run rows in the halting suite as "not run after fatal"', () => {
+      const { summaries } = foldCheckResults(haltedChecks, [core, proof]);
+
+      expect(summaries[0].message).toBe(
+        '1 of 4 checks failed (3 not run after fatal)'
+      );
+      expect(summaries[0].status).toBe('failure');
+      expect(summaries[0].counts).toEqual({
+        passed: 0,
+        failed: 1,
+        skipped: 3
+      });
+      expect(summaries[0].fatalFailureAt).toBe(
+        'cryptographic.core.context-exists'
+      );
+    });
+
+    it('reports a fully halted suite as not run, naming the failed check', () => {
+      const { summaries } = foldCheckResults(haltedChecks, [core, proof]);
+
+      expect(summaries[1].message).toBe(
+        'proof not run: core.context-exists failed'
+      );
+      expect(summaries[1].status).toBe('skipped');
+      expect(summaries[1].verified).toBe(true);
+      expect(summaries[1].counts).toEqual({
+        passed: 0,
+        failed: 0,
+        skipped: 1
+      });
+      expect(summaries[1].fatalFailureAt).toBeUndefined();
+    });
+
+    it('does not surface not-run rows in non-verbose results', () => {
+      const { results } = foldCheckResults(haltedChecks, [core, proof]);
+
+      expect(results.map(r => r.check)).toEqual(['core.context-exists']);
+    });
+
+    it('keeps an ordinary skip out of both the ran and not-run counts', () => {
+      const suite = mkSuite(
+        'mix',
+        [
+          mkCheck('mix.a', 'success'),
+          mkCheck('mix.b', 'skipped'),
+          mkCheck('mix.c', 'failure', { fatal: true }),
+          mkCheck('mix.d', 'success')
+        ],
+        { phase: 'semantic' }
+      );
+      const checks: CheckResult[] = [
+        mkResult('mix', 'mix.a', 'success'),
+        mkResult('mix', 'mix.b', 'skipped', { reason: 'nothing to check' }),
+        mkResult('mix', 'mix.c', 'failure', { fatal: true }),
+        mkNotRun('mix', 'mix.d', 'mix.c')
+      ];
+
+      const { summaries } = foldCheckResults(checks, [suite]);
+
+      expect(summaries[0].message).toBe(
+        '1 of 3 checks failed (1 passed, 1 not run after fatal)'
+      );
+    });
+
+    it('leaves a suite with only an ordinary skip unchanged', () => {
+      const suite = mkSuite('status', [mkCheck('status.x', 'skipped')], {
+        phase: 'cryptographic'
+      });
+      const checks: CheckResult[] = [
+        mkResult('status', 'status.x', 'skipped', {
+          reason: 'Credential has no credentialStatus'
+        })
+      ];
+
+      const { summaries } = foldCheckResults(checks, [suite]);
+
+      expect(summaries[0].message).toBe('1 of 1 check skipped');
+      expect(summaries[0].status).toBe('skipped');
+    });
   });
 
   it('6. phase derivation: tagged suite carries through to summary', () => {

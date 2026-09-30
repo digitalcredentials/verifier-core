@@ -242,4 +242,20 @@ describe('dispatchProofVerification', () => {
     });
     expect(dispatched).toEqual({ kind: 'no-service' });
   });
+
+  it('returns threw when a service canVerify throws', async () => {
+    const error = new Error('canVerify boom');
+    const dispatched = await dispatchProofVerification({
+      services: [
+        FakeCryptoService({
+          canVerify: () => {
+            throw error;
+          }
+        })
+      ],
+      subject: credentialSubject,
+      options: dummyOptions
+    });
+    expect(dispatched).toEqual({ kind: 'threw', error });
+  });
 });
