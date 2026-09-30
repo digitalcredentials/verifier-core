@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { JsonLdField } from './jsonld-field.js';
 import { ProofSchema } from './proof.js';
 import { CredentialSchema } from './credential.js';
+import { HolderSchema } from './holder.js';
 
 export const PresentationSchema = z
   .object({
@@ -10,7 +11,7 @@ export const PresentationSchema = z
     verifiableCredential: z
       .union([CredentialSchema, z.array(CredentialSchema)])
       .optional(),
-    holder: z.string().optional(),
+    holder: HolderSchema.optional(),
     proof: z.union([ProofSchema, z.array(ProofSchema)]).optional()
   })
   .passthrough();

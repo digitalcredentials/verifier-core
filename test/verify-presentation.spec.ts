@@ -7,7 +7,10 @@ import {
 } from '../src/default-services.js';
 import { createVerifier } from '../src/verifier.js';
 import { flattenPresentationResults } from '../src/flatten-presentation-results.js';
-import { CredentialFactory } from './factories/data/credential-factory.js';
+import {
+  CredentialFactory,
+  DEFAULT_TEST_ISSUER_DID
+} from './factories/data/credential-factory.js';
 import { PresentationFactory } from './factories/data/presentation-factory.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 import { FakeDocumentLoader } from './factories/services/fake-document-loader.js';
@@ -88,6 +91,24 @@ describe('verifyPresentation', () => {
 
       expect(result.presentationResults).toBeInstanceOf(Array);
       expect(result.credentialResults).toHaveLength(0);
+    });
+
+    it('accepts a holder object with an id', async () => {
+      const presentation = PresentationFactory({
+        holder: { id: DEFAULT_TEST_ISSUER_DID }
+      });
+      expect(presentation.holder).toEqual({ id: DEFAULT_TEST_ISSUER_DID });
+
+      const result = await verifyPresentation({
+        presentation,
+        ...fakeVerified
+      });
+
+      expect(result.presentationResults.length).toBeGreaterThan(0);
+      for (const r of result.presentationResults) {
+        expect(r.check).not.toBe('parsing.envelope');
+        expect(r.id).not.toMatch(/parsing\.envelope$/);
+      }
     });
   });
 

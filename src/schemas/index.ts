@@ -19,6 +19,9 @@ export type { VerifiablePresentation } from './presentation.js';
 export { IssuerSchema, IssuerObjectSchema } from './issuer.js';
 export type { Issuer } from './issuer.js';
 
+export { HolderSchema, HolderObjectSchema } from './holder.js';
+export type { Holder } from './holder.js';
+
 export { ProofSchema } from './proof.js';
 export type { Proof } from './proof.js';
 
