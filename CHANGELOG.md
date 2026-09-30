@@ -76,6 +76,8 @@ Verifier results now fold per-suite checks into a single
   which also fixes consumers that re-verify that field in a second pass.
 - `issuer.image.type` accepts an array (`['Image']`) as well as a string. The
   previous string-only union failed the entire credential parse.
+- Verifiable presentation `holder` now accepts an object with an `id` as well as
+  a URL string, per VCDM 2.0 (supersedes upstream #22).
 
 ### Deprecated
 

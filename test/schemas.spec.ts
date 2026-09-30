@@ -191,6 +191,55 @@ describe('Zod Envelope Schemas', () => {
       expect(result.verifiableCredential).toBeTypeOf('object');
     });
 
+    describe('holder', () => {
+      const withHolder = (holder: unknown) => ({
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiablePresentation'],
+        verifiableCredential: [],
+        holder
+      });
+
+      it('parses a holder object with an id', () => {
+        const result = PresentationSchema.parse(
+          withHolder({ id: 'did:example:holder' })
+        );
+        expect(result.holder).toEqual({ id: 'did:example:holder' });
+      });
+
+      it('preserves extra properties on a holder object', () => {
+        const result = PresentationSchema.parse(
+          withHolder({ id: 'did:example:holder', name: 'Alice' })
+        );
+        expect(result.holder).toEqual({
+          id: 'did:example:holder',
+          name: 'Alice'
+        });
+      });
+
+      it('parses a presentation with no holder', () => {
+        const presentation = {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiablePresentation'],
+          verifiableCredential: []
+        };
+        expect(parsePresentation(presentation).success).toBe(true);
+      });
+
+      it('rejects a holder object without an id', () => {
+        expect(parsePresentation(withHolder({ name: 'Alice' })).success).toBe(
+          false
+        );
+      });
+
+      it('rejects a holder object with a non-string id', () => {
+        expect(parsePresentation(withHolder({ id: 42 })).success).toBe(false);
+      });
+
+      it('rejects a non-string, non-object holder', () => {
+        expect(parsePresentation(withHolder(42)).success).toBe(false);
+      });
+    });
+
     it('returns error on parse failure', () => {
       const presentation = {
         type: ['VerifiablePresentation'], // missing @context
