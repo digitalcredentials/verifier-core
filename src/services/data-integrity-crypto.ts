@@ -17,6 +17,7 @@ import type { CryptoSuite, ProofPurpose } from '../types/crypto-suite.js';
 import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
+import { documentHasProof } from '../util/document-has-proof.js';
 
 /**
  * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
@@ -174,22 +175,6 @@ function getPresentationPurpose(
   return new purposes.AssertionProofPurpose();
 }
 
-function documentHasProof(doc: Record<string, unknown> | undefined): boolean {
-  if (!doc) {
-    return false;
-  }
-  const proof = doc.proof;
-  if (proof === undefined || proof === null) {
-    return false;
-  }
-  if (Array.isArray(proof)) {
-    return (
-      proof.length > 0 && typeof proof[0] === 'object' && proof[0] !== null
-    );
-  }
-  return typeof proof === 'object';
-}
-
 export interface DataIntegrityCryptoConfig {
   suites: CryptoSuite[];
 }
@@ -282,7 +267,9 @@ export function DataIntegrityCryptoService(
           presentationPurpose: purpose,
           suite: suites,
           documentLoader: options.documentLoader,
-          unsignedPresentation: options.unsignedPresentation ?? false,
+          // Never `true`: the library would then skip a proof that *is*
+          // present. `signatureCheck` decides the unsigned case before dispatch.
+          unsignedPresentation: false,
           challenge: options.challenge ?? 'meaningless',
           verifyMatchingIssuers: false,
           checkStatus: noopCheckStatus
@@ -292,15 +279,10 @@ export function DataIntegrityCryptoService(
         // `verified` also ANDs in every embedded credential, so one bad
         // credential would read as a bad presentation signature. Embedded
         // credentials get their own `verifyCredential` run and result.
-        // With `unsignedPresentation` the library skips the proof and
-        // returns no `presentationResult`.
         const presentationResult = result.presentationResult as
           | { verified?: boolean; error?: unknown }
           | undefined;
-        const verified =
-          presentationResult === undefined
-            ? options.unsignedPresentation === true
-            : presentationResult.verified === true;
+        const verified = presentationResult?.verified === true;
         if (verified) {
           return {
             verified: true,

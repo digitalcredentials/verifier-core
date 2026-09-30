@@ -70,7 +70,11 @@ export interface VerificationContext {
   lookupIssuers?: LookupIssuers;
   /** Expected challenge for VP authentication proof purpose. */
   challenge?: string | null;
-  /** Whether to allow unsigned presentations (skip VP signature check). */
+  /**
+   * Accept a presentation that has no proof. Default `false`: an unsigned
+   * presentation fails `proof.signature`. A proof that is present is always
+   * verified, whatever this is set to.
+   */
   unsignedPresentation?: boolean;
   /**
    * Pluggable credential recognizers. Threaded through from

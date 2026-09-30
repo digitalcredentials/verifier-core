@@ -353,7 +353,7 @@ import { verifyPresentation } from '@digitalcredentials/verifier-core';
 const result = await verifyPresentation({
   presentation, // The VP to verify
   challenge: 'abc123', // Optional: expected challenge
-  unsignedPresentation: false, // Optional: allow unsigned VP
+  unsignedPresentation: false, // Optional: accept a VP with no proof
   registries // Optional: issuer trust registries
 });
 ```
@@ -403,8 +403,9 @@ rollups live on `credentialResults[i].summary`.
 Presentation verification does two things:
 
 1. **Verifies the VP itself** — checks the presentation's structure
-   (`core.vp-structure`), then its signature (or skips the signature if
-   `unsignedPresentation: true`). Results go in `presentationResults`.
+   (`core.vp-structure`), then its signature. A VP with no proof fails unless
+   `unsignedPresentation: true`, in which case the check is skipped. A proof
+   that is present is always verified. Results go in `presentationResults`.
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.
 
@@ -417,7 +418,9 @@ result objects by property path) can reach it without carrying the original
 input separately.
 
 A VP needn't be signed — it can simply package credentials together. Set
-`unsignedPresentation: true` to skip the VP signature check.
+`unsignedPresentation: true` to accept a VP that has no proof; its
+`proof.signature` check is then skipped. The flag never turns off verification
+of a proof that is present.
 
 #### Flattening results
 

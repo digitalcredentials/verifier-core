@@ -78,6 +78,16 @@ Verifier results now fold per-suite checks into a single
   previous string-only union failed the entire credential parse.
 - Verifiable presentation `holder` now accepts an object with an `id` as well as
   a URL string, per VCDM 2.0 (supersedes upstream #22).
+- **Security: `unsignedPresentation: true` no longer skips a presentation proof
+  that is present.** The flag was forwarded to `@digitalcredentials/vc`, which
+  reads it as "skip the presentation proof", so a VP with a tampered holder
+  signature verified whenever the caller set it. A proof that is present is now
+  always verified. The flag only accepts a VP that has no proof, and that VP's
+  `proof.signature` is `skipped` rather than failing with "No Applicable Crypto
+  Service". Without the flag, a VP with no proof fails `proof.signature` as
+  `Presentation Not Signed`. `CryptoVerifyOptions` no longer carries
+  `unsignedPresentation`, because a `CryptoService` is only asked to verify
+  proofs that exist.
 
 ### Deprecated
 

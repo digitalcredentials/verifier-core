@@ -4,6 +4,7 @@ import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
 import { dispatchProofVerification } from '../../crypto-dispatch.js';
+import { documentHasProof } from '../../util/document-has-proof.js';
 
 const NO_APPLICABLE_SERVICE: ProblemDetail = {
   type: ProblemTypes.PROOF_VERIFICATION_ERROR,
@@ -12,14 +13,29 @@ const NO_APPLICABLE_SERVICE: ProblemDetail = {
     'No registered crypto service can verify this subject (check canVerify / cryptoServices).'
 };
 
+const PRESENTATION_NOT_SIGNED: ProblemDetail = {
+  type: ProblemTypes.PROOF_VERIFICATION_ERROR,
+  title: 'Presentation Not Signed',
+  detail:
+    'The presentation has no proof. Pass unsignedPresentation: true to accept an unsigned presentation.'
+};
+
+const UNSIGNED_PRESENTATION_ACCEPTED =
+  'Presentation is unsigned; accepted because unsignedPresentation is set.';
+
 /**
  * Signature verification check — dispatches to {@link VerificationContext.cryptoServices}.
+ *
+ * A presentation must carry a proof unless
+ * {@link VerificationContext.unsignedPresentation} is set, in which case a
+ * proof-less presentation is skipped rather than verified. A proof that is
+ * present is always verified, whatever the flag says.
  */
 export const signatureCheck: VerificationCheck = {
   id: 'proof.signature',
   name: 'Signature Verification',
   description:
-    'Verifies the cryptographic signature of the credential or presentation.',
+    'Verifies the cryptographic signature of the credential or presentation. A presentation must be signed unless unsignedPresentation is set.',
   fatal: true,
   appliesTo: ['verifiableCredential', 'verifiablePresentation'],
   execute: async (
@@ -46,13 +62,18 @@ export const signatureCheck: VerificationCheck = {
       };
     }
 
+    if (presentation && !documentHasProof(presentation)) {
+      return context.unsignedPresentation
+        ? { status: 'skipped', reason: UNSIGNED_PRESENTATION_ACCEPTED }
+        : { status: 'failure', problems: [PRESENTATION_NOT_SIGNED] };
+    }
+
     const dispatched = await dispatchProofVerification({
       services: context.cryptoServices,
       subject,
       options: {
         documentLoader: context.documentLoader,
-        challenge: context.challenge,
-        unsignedPresentation: context.unsignedPresentation
+        challenge: context.challenge
       }
     });
 

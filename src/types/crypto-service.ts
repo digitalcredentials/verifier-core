@@ -25,7 +25,6 @@ export type CryptoResult =
 export interface CryptoVerifyOptions {
   documentLoader: DocumentLoader;
   challenge?: string | null;
-  unsignedPresentation?: boolean;
 }
 
 /**

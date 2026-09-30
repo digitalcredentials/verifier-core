@@ -365,7 +365,15 @@ describe('verifyPresentation', () => {
         ...fakeVerified
       });
 
-      expect(result.presentationResults).toBeInstanceOf(Array);
+      expect(result.verified).toBe(true);
+      const signature = result.presentationResults.find(
+        r => r.check === 'proof.signature'
+      );
+      expect(signature?.outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'Presentation is unsigned; accepted because unsignedPresentation is set.'
+      });
     });
   });
 

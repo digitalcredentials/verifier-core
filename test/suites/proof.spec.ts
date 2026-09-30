@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { runSuites } from '../../src/run-suites.js';
 import { defaultCryptoServices } from '../../src/default-services.js';
 import { proofSuite } from '../../src/suites/proof/index.js';
@@ -137,9 +137,11 @@ describe('Proof Verification Suite', () => {
       expect(results[0].outcome.status).toBe('success');
     });
 
-    it('handles unsigned presentation when context allows it', async () => {
+    it('skips an unsigned presentation when context allows it', async () => {
+      const service = FakeCryptoService({ verified: true });
+      const verifySpy = vi.spyOn(service, 'verifyPresentation');
       const context = buildTestContext({
-        cryptoServices: [FakeCryptoService({ verified: true })],
+        cryptoServices: [service],
         unsignedPresentation: true
       });
       const presentation = PresentationFactory();
@@ -148,7 +150,31 @@ describe('Proof Verification Suite', () => {
       const subject = createPresentationSubject(presentation);
       const results = await runSuites([proofSuite], subject, context);
 
-      expect(results[0].outcome.status).toBe('success');
+      expect(results[0].outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'Presentation is unsigned; accepted because unsignedPresentation is set.'
+      });
+      expect(verifySpy).not.toHaveBeenCalled();
+    });
+
+    it('fails an unsigned presentation when context does not allow it', async () => {
+      const service = FakeCryptoService({ verified: true });
+      const verifySpy = vi.spyOn(service, 'verifyPresentation');
+      const context = buildTestContext({ cryptoServices: [service] });
+      const presentation = PresentationFactory();
+      delete (presentation as { proof?: unknown }).proof;
+
+      const subject = createPresentationSubject(presentation);
+      const results = await runSuites([proofSuite], subject, context);
+
+      expect(results[0].outcome.status).toBe('failure');
+      if (results[0].outcome.status === 'failure') {
+        expect(results[0].outcome.problems[0].title).toBe(
+          'Presentation Not Signed'
+        );
+      }
+      expect(verifySpy).not.toHaveBeenCalled();
     });
   });
 
