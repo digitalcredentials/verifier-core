@@ -261,7 +261,16 @@ describe('verifyPresentation', () => {
       });
 
       expect(result.verified).toBe(false);
-      expect(result.presentationResults[0]?.outcome.status).toBe('failure');
+      // The bad credential fails its own gate; the presentation's does not.
+      expect(
+        result.presentationResults.some(r => r.check === 'parsing.envelope')
+      ).toBe(false);
+      expect(result.credentialResults).toHaveLength(2);
+      expect(result.credentialResults[0].verified).toBe(true);
+      expect(result.credentialResults[1].verified).toBe(false);
+      expect(result.credentialResults[1].results[0]?.check).toBe(
+        'parsing.envelope'
+      );
     });
 
     it('separates credential results correctly', async () => {

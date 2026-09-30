@@ -300,18 +300,18 @@ with no `credentialStatus` skips the status check:
 
 All failures use `ProblemDetail` with a `type` URI. Common error types:
 
-| Type URI                              | Title                                                              | When                                   |
-| ------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
-| `...#PARSING_ERROR`                   | Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Structural problems                    |
-| `...#INVALID_SIGNATURE`               | Invalid Signature                                                  | Signature doesn't match content        |
-| `...#DID_WEB_UNRESOLVED`              | DID Web Unresolved                                                 | `did:web` document couldn't be fetched |
-| `...#HTTP_ERROR`                      | HTTP Error                                                         | Network error during signature check   |
-| `...#CREDENTIAL_REVOKED_OR_SUSPENDED` | Credential Revoked or Suspended                                    | Status list indicates revocation       |
-| `...#STATUS_LIST_NOT_FOUND`           | Status List Not Found                                              | Status list URL unreachable            |
-| `...#STATUS_LIST_EXPIRED`             | Status List Expired                                                | Status list VC has expired             |
-| `...#STATUS_LIST_SIGNATURE_ERROR`     | Status List Signature Error                                        | Status list VC signature invalid       |
-| `...#ISSUER_NOT_REGISTERED`           | Issuer Not Registered                                              | Issuer DID not in any registry         |
-| `...#REGISTRY_UNCHECKED`              | Registry Unchecked                                                 | Some registries couldn't be reached    |
+| Type URI                              | Title                                                                                                                                                          | When                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `...#PARSING_ERROR`                   | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems |
+| `...#INVALID_SIGNATURE`               | Invalid Signature                                                                                                                                              | Signature doesn't match content             |
+| `...#DID_WEB_UNRESOLVED`              | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched      |
+| `...#HTTP_ERROR`                      | HTTP Error                                                                                                                                                     | Network error during signature check        |
+| `...#CREDENTIAL_REVOKED_OR_SUSPENDED` | Credential Revoked or Suspended                                                                                                                                | Status list indicates revocation            |
+| `...#STATUS_LIST_NOT_FOUND`           | Status List Not Found                                                                                                                                          | Status list URL unreachable                 |
+| `...#STATUS_LIST_EXPIRED`             | Status List Expired                                                                                                                                            | Status list VC has expired                  |
+| `...#STATUS_LIST_SIGNATURE_ERROR`     | Status List Signature Error                                                                                                                                    | Status list VC signature invalid            |
+| `...#ISSUER_NOT_REGISTERED`           | Issuer Not Registered                                                                                                                                          | Issuer DID not in any registry              |
+| `...#REGISTRY_UNCHECKED`              | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached         |
 
 #### Problem types
 

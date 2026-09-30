@@ -34,13 +34,12 @@ src/
 ├── flatten-presentation-results.ts  flattenPresentationResults helper + FlattenedCheckResult provenance-tagged union
 ├── problem-types.ts                 ProblemTypes const map + ProblemType union (catalog of built-in ProblemDetail.type URIs)
 ├── declarations.d.ts                Ambient type declarations for untyped DCC packages
-├── schemas/                         Zod parsing schemas
+├── schemas/                         Minimal Zod envelope gates (structure is judged by the core suite)
 │   ├── index.ts                     Re-exports parseCredential, parsePresentation
-│   ├── credential.ts                VC schema (v1 + v2 union)
-│   ├── presentation.ts              VP schema
-│   ├── issuer.ts                    Issuer field schema
-│   ├── proof.ts                     Proof field schema
-│   └── jsonld-field.ts              @context field schema
+│   ├── credential.ts                VC gate: @context, type, issuer, credentialSubject; rejects enveloped credentials
+│   ├── presentation.ts              VP gate: @context, type, holder
+│   ├── issuer.ts                    Issuer: a string, or an object with a string id
+│   └── holder.ts                    Holder: a string, or an object with a string id
 ├── services/                        Ports and adapters for injectable dependencies
 │   ├── cache-service/               CacheService port + InMemoryCacheService adapter
 │   ├── http-get-service/            HttpGetService port + BuiltinHttpGetService (fetch-based) adapter
@@ -107,7 +106,8 @@ test/
 ├── smoke.spec.ts                        Networked interop regression (npm run test:smoke)
 ├── run-suites.spec.ts                   Suite orchestration tests
 ├── types.spec.ts                        Type validation tests
-├── schemas.spec.ts                      Zod schema tests
+├── schemas.spec.ts                      Zod envelope gate tests
+├── spec-legal-inputs.spec.ts            Offline real-crypto: spec-legal inputs verify; structure failures halt
 ├── factories/
 │   ├── data/                            CredentialFactory + helpers for synthesizing test VCs
 │   └── services/                        Service test doubles (FakeCryptoService, FakeHttpGetService, …)
@@ -137,7 +137,7 @@ test/
                   │ verifier.verifyCredential(call)
                   ▼
             ┌──────────┐
-            │  Parse   │  Zod schema → VerifiableCredential | parse error
+            │  Parse   │  minimal Zod envelope gate → pass | parse error
             └────┬─────┘
                  │
                  ▼
@@ -165,8 +165,15 @@ per-type `registryHandlers` — falling back to internal lazy-memoized factories
 `default-services.ts` when the caller omits them. It then builds a single `lookupIssuers` keyed
 to those services, and returns a `Verifier` whose methods share all of the above.
 
-**Parse.** Zod schemas (`schemas/credential.ts`) validate the input. A parse failure produces a
-synthetic `parsing.envelope` check result with a `ProblemDetail` describing what went wrong.
+**Parse.** A minimal Zod gate (`schemas/credential.ts`) checks only what the pipeline needs to
+run safely: that `@context`, `type`, `issuer` and `credentialSubject` are present and readable
+(for a presentation, `schemas/presentation.ts` checks `@context`, `type` and, when present,
+`holder`). It also rejects enveloped credentials (`EnvelopedVerifiableCredential`, i.e.
+VC-JOSE-COSE), which this verifier does not support. A parse failure produces a synthetic
+`parsing.envelope` check result with a `ProblemDetail` describing what went wrong. The gate is
+not a VC Data Model validator: structure is judged by `core.vc-structure` / `core.vp-structure`,
+and a fatal failure there halts every check after it. The gate's output is discarded; the
+caller's original object is what the suites verify (see the invariant in `src/verifier.ts`).
 The credential is `unknown` on entry — callers don't need to pre-validate.
 
 **Context.** Each `verifyCredential` / `verifyPresentation` call builds an internal
@@ -200,9 +207,11 @@ in the array, so the report is always complete.
 2. Each embedded credential is extracted (`extractCredentialsFrom`) and verified individually by
    recursing into the **same `Verifier` instance** (`this.verifyCredential(...)`), so the cache,
    document loader, crypto services, and registries are automatically shared across every embedded
-   VC.
+   VC. The presentation's own gate does not look inside `verifiableCredential`: each embedded
+   credential passes or fails its own gate, so one malformed or enveloped credential yields its own
+   `parsing.envelope` failure in `credentialResults` rather than rejecting the whole VP.
 
-The result is a `PresentationVerificationResult` with `verifiablePresentation` (the parsed VP),
+The result is a `PresentationVerificationResult` with `verifiablePresentation` (the VP as given),
 `presentationResults` (VP-level check results), and `credentialResults` (one
 `CredentialVerificationResult` per embedded VC). The `flattenPresentationResults` helper in
 `src/flatten-presentation-results.ts` returns a single provenance-tagged
@@ -642,7 +651,7 @@ their own URIs without requiring an entry in any catalog.
 | `@digitalcredentials/security-document-loader`       | Bundled JSON-LD context resolution + `CachedResolver`                |
 | `@digitalcredentials/did-method-key`, `did-method-web` | DID resolution drivers used by the document loader                  |
 | `@digitalcredentials/vc-bitstring-status-list`       | BitstringStatusList status checking                                   |
-| `zod`                                                | Input parsing and structural validation                              |
+| `zod`                                                | Minimal input envelope gate; strict OB 3.0 envelopes (recognition)   |
 | `ajv` / `ajv-formats`                                | JSON Schema validation for OBv3 schema checks                        |
 
 ### Test

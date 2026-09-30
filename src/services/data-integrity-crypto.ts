@@ -288,7 +288,19 @@ export function DataIntegrityCryptoService(
           checkStatus: noopCheckStatus
         });
 
-        const verified = result.verified ?? false;
+        // Judge the presentation's own proof only. The library's top-level
+        // `verified` also ANDs in every embedded credential, so one bad
+        // credential would read as a bad presentation signature. Embedded
+        // credentials get their own `verifyCredential` run and result.
+        // With `unsignedPresentation` the library skips the proof and
+        // returns no `presentationResult`.
+        const presentationResult = result.presentationResult as
+          | { verified?: boolean; error?: unknown }
+          | undefined;
+        const verified =
+          presentationResult === undefined
+            ? options.unsignedPresentation === true
+            : presentationResult.verified === true;
         if (verified) {
           return {
             verified: true,
@@ -296,20 +308,12 @@ export function DataIntegrityCryptoService(
           };
         }
 
-        let error: unknown = result.error;
-        if (!error && result.credentialResults) {
-          const failedCredential = result.credentialResults.find(
-            (r: { verified?: boolean; error?: unknown }) =>
-              !r.verified && r.error
-          );
-          if (failedCredential?.error) {
-            error = failedCredential.error;
-          }
-        }
-
         return {
           verified: false,
-          problems: classifySignatureError(error, undefined)
+          problems: classifySignatureError(
+            presentationResult?.error ?? result.error,
+            undefined
+          )
         };
       } catch (e) {
         return {

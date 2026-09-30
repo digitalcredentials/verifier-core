@@ -99,6 +99,27 @@ describe('verifyCredential', () => {
       expect(result.results[0].outcome.status).toBe('failure');
     });
 
+    it('reports plain, self-contained parse messages', async () => {
+      const notAnObject = await verifyCredential({
+        credential: 'not a credential',
+        ...fakeVerified
+      });
+      const { issuer: _issuer, ...withoutIssuer } = CredentialFactory();
+      const noIssuer = await verifyCredential({
+        credential: withoutIssuer,
+        ...fakeVerified
+      });
+
+      const detail = (r: typeof notAnObject) =>
+        r.results[0].outcome.status === 'failure'
+          ? r.results[0].outcome.problems[0].detail
+          : undefined;
+      expect(detail(notAnObject)).toBe('The credential must be a JSON object.');
+      expect(detail(noIssuer)).toBe(
+        '"issuer" is required and must be a string or an object with a string "id".'
+      );
+    });
+
     it('returns verified: false for empty object', async () => {
       const result = await verifyCredential({
         credential: {},

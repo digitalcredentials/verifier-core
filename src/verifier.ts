@@ -21,18 +21,21 @@
  *
  * ## INVARIANT: suites see the bytes the issuer signed
  *
- * `parseCredential` / `parsePresentation` are validation gates only. Their
- * output is discarded and the caller's original object is what flows into
- * `runSuites` and back out as `result.verifiableCredential`.
+ * `parseCredential` / `parsePresentation` are minimal envelope gates only.
+ * They check just enough (`@context`, `type`, `issuer`, `credentialSubject`,
+ * `holder`) for the pipeline to run safely; structure is judged by the
+ * `core` suite. Their output is discarded and the caller's original object
+ * is what flows into `runSuites` and back out as
+ * `result.verifiableCredential`.
  *
  * Zod rewrites what it parses. `.passthrough()` does not extend into nested
  * object schemas, so any nested `z.object({...})` deletes the keys it does
- * not name, and `JsonLdField` rewrites scalars into arrays. Either change
+ * not name, and a `.transform` can rewrite scalars into arrays. Either change
  * alters the canonicalized N-Quads, which makes a valid proof fail as
  * `INVALID_SIGNATURE` — a failure that looks like a bad credential and is
  * actually a bug here. That is not hypothetical: a spec-legal
- * `issuer.image.caption` was dropped by `IssuerObjectSchema` and rejected
- * production Open Badges credentials.
+ * `issuer.image.caption` was once dropped by a nested issuer image schema
+ * and rejected production Open Badges credentials.
  *
  * Returning the original object also matters downstream, because consumers
  * re-verify `result.verifiableCredential` (the async Open Badges pass in
@@ -206,10 +209,11 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         );
         return finalizePresentationResult(result, topLevel, timeService);
       }
-      // Same discipline as `verifyCredential`: validate with Zod, then verify
-      // the object the holder actually signed. Using `parseResult.data` here
-      // also handed the recursive `verifyCredential` calls below a rewritten
-      // copy of each embedded credential.
+      // Same discipline as `verifyCredential`: gate with Zod, then verify the
+      // object the holder actually signed. The gate does not look inside
+      // `verifiableCredential`; each embedded credential is gated and
+      // verified by its own `verifyCredential` call below, on the original
+      // object.
       const presentation = call.presentation as VerifiablePresentation;
 
       const ctx = buildContext({
@@ -471,15 +475,13 @@ function parseErrorSummary(check: CheckResult): SuiteSummary[] {
 
 function parseFailureCredentialResult(
   credential: unknown,
-  error: { errors: Array<{ path: Array<string | number>; message: string }> },
+  error: { errors: Array<{ message: string }> },
   timeService: TimeService | undefined
 ): CredentialVerificationResult {
   const problem: ProblemDetail = {
     type: ProblemTypes.PARSING_ERROR,
     title: 'Credential Parsing Failed',
-    detail: error.errors
-      .map(e => `${e.path.join('.')}: ${e.message}`)
-      .join('; ')
+    detail: error.errors.map(e => e.message).join('; ')
   };
   const check = parseErrorResult(problem, timeService);
   return {
@@ -492,15 +494,13 @@ function parseFailureCredentialResult(
 
 function parseFailurePresentationResult(
   presentation: unknown,
-  error: { errors: Array<{ path: Array<string | number>; message: string }> },
+  error: { errors: Array<{ message: string }> },
   timeService: TimeService | undefined
 ): PresentationVerificationResult {
   const problem: ProblemDetail = {
     type: ProblemTypes.PARSING_ERROR,
     title: 'Presentation Parsing Failed',
-    detail: error.errors
-      .map(e => `${e.path.join('.')}: ${e.message}`)
-      .join('; ')
+    detail: error.errors.map(e => e.message).join('; ')
   };
   const check = parseErrorResult(problem, timeService);
   return {
