@@ -179,7 +179,7 @@ The credential is `unknown` on entry — callers don't need to pre-validate.
 **Context.** Each `verifyCredential` / `verifyPresentation` call builds an internal
 `VerificationContext` from the verifier's long-lived services plus per-call inputs (the parsed
 credential or presentation, optional `additionalSuites`, optional `registries` override, optional
-`challenge` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
+`challenge` / `domain` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
 not a public composition point. Because `documentLoader` and `cacheService` live on the verifier,
 they're shared across every call on the same instance — this is what makes batch verification
 reuse fetches.
@@ -226,7 +226,7 @@ and per-call inputs is the core of the design:
 | Lives on the verifier (`VerifierConfig`)         | Per call (`VerifyCredentialCall` / `VerifyPresentationCall`)              |
 |--------------------------------------------------|---------------------------------------------------------------------------|
 | `httpGetService`, `cacheService`, `cryptoServices` | `credential` (or `presentation`)                                        |
-| `documentLoader`, `registries`, `registryHandlers` | `additionalSuites`, `registries` (per-call override), `challenge`, `unsignedPresentation` |
+| `documentLoader`, `registries`, `registryHandlers` | `additionalSuites`, `registries` (per-call override), `challenge`, `domain`, `unsignedPresentation` |
 
 Hold a `Verifier` whenever you'll perform more than one verification. The cache reuse covers
 issuer DID documents (via the `CachedResolver` baked into the document loader), DCC-legacy

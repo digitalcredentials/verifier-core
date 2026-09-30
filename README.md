@@ -353,6 +353,7 @@ import { verifyPresentation } from '@digitalcredentials/verifier-core';
 const result = await verifyPresentation({
   presentation, // The VP to verify
   challenge: 'abc123', // Optional: expected challenge
+  domain: 'verifier.example', // Optional: expected domain (requires challenge)
   unsignedPresentation: false, // Optional: accept a VP with no proof
   registries // Optional: issuer trust registries
 });
@@ -364,6 +365,7 @@ const result = await verifyPresentation({
 interface VerifyPresentationOptions {
   presentation: unknown;
   challenge?: string | null;
+  domain?: string;
   unsignedPresentation?: boolean;
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
@@ -405,7 +407,10 @@ Presentation verification does two things:
 1. **Verifies the VP itself** — checks the presentation's structure
    (`core.vp-structure`), then its signature. A VP with no proof fails unless
    `unsignedPresentation: true`, in which case the check is skipped. A proof
-   that is present is always verified. Results go in `presentationResults`.
+   that is present is always verified. When `challenge` is passed, the
+   presentation's proof must use the `authentication` purpose and carry that
+   challenge (and `domain`, if passed). Without it only the signature is
+   checked. Results go in `presentationResults`.
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.
 

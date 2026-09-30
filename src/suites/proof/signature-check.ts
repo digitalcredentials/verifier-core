@@ -20,6 +20,13 @@ const PRESENTATION_NOT_SIGNED: ProblemDetail = {
     'The presentation has no proof. Pass unsignedPresentation: true to accept an unsigned presentation.'
 };
 
+const CHALLENGE_REQUIRED: ProblemDetail = {
+  type: ProblemTypes.PROOF_VERIFICATION_ERROR,
+  title: 'Challenge Required',
+  detail:
+    'A domain was supplied without a challenge. The domain can only be checked alongside a challenge.'
+};
+
 const UNSIGNED_PRESENTATION_ACCEPTED =
   'Presentation is unsigned; accepted because unsignedPresentation is set.';
 
@@ -30,6 +37,10 @@ const UNSIGNED_PRESENTATION_ACCEPTED =
  * {@link VerificationContext.unsignedPresentation} is set, in which case a
  * proof-less presentation is skipped rather than verified. A proof that is
  * present is always verified, whatever the flag says.
+ *
+ * A supplied {@link VerificationContext.challenge} (and
+ * {@link VerificationContext.domain}) is always enforced on a presentation's
+ * proof. A domain without a challenge fails before dispatch.
  */
 export const signatureCheck: VerificationCheck = {
   id: 'proof.signature',
@@ -68,12 +79,21 @@ export const signatureCheck: VerificationCheck = {
         : { status: 'failure', problems: [PRESENTATION_NOT_SIGNED] };
     }
 
+    if (
+      presentation &&
+      context.domain !== undefined &&
+      typeof context.challenge !== 'string'
+    ) {
+      return { status: 'failure', problems: [CHALLENGE_REQUIRED] };
+    }
+
     const dispatched = await dispatchProofVerification({
       services: context.cryptoServices,
       subject,
       options: {
         documentLoader: context.documentLoader,
-        challenge: context.challenge
+        challenge: context.challenge,
+        domain: context.domain
       }
     });
 

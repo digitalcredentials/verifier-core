@@ -42,6 +42,7 @@ Verifier results now fold per-suite checks into a single
   any future check that needs to ask "what time is it?" — useful groundwork for
   credential expiration, signature clock-skew, key rotation, and status-list
   freshness work.
+- `domain` on `verifyPresentation`, checked alongside `challenge`.
 
 ### Changed
 
@@ -88,6 +89,12 @@ Verifier results now fold per-suite checks into a single
   `Presentation Not Signed`. `CryptoVerifyOptions` no longer carries
   `unsignedPresentation`, because a `CryptoService` is only asked to verify
   proofs that exist.
+- **Security: a supplied `challenge` is now always enforced.** Previously a VP
+  whose proof claimed `assertionMethod` was verified without checking it, so a
+  replayed presentation verified. With no challenge supplied, an
+  `authentication` VP now verifies on its signature instead of failing against
+  the placeholder challenge `meaningless`. The VP proof check no longer
+  re-verifies embedded credentials.
 
 ### Deprecated
 

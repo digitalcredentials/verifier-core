@@ -226,6 +226,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         registries: call.registries ?? constructorRegistries,
         recognizers,
         challenge: call.challenge ?? null,
+        domain: call.domain,
         unsignedPresentation: call.unsignedPresentation ?? false,
         timeService,
         timing
@@ -309,6 +310,7 @@ interface BuildContextInput {
   registries?: EntityIdentityRegistry[];
   recognizers?: RecognizerSpec[];
   challenge?: string | null;
+  domain?: string;
   unsignedPresentation?: boolean;
   timeService: TimeService;
   timing: boolean;
@@ -330,6 +332,7 @@ function buildContext(input: BuildContextInput): VerificationContext {
     recognizers: input.recognizers,
     lookupIssuers: input.lookupIssuers,
     challenge: input.challenge ?? null,
+    domain: input.domain,
     unsignedPresentation: input.unsignedPresentation ?? false,
     timeService: input.timeService,
     timing: input.timing

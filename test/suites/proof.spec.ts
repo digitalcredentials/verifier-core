@@ -176,6 +176,46 @@ describe('Proof Verification Suite', () => {
       }
       expect(verifySpy).not.toHaveBeenCalled();
     });
+
+    it('fails when domain is set without challenge', async () => {
+      const service = FakeCryptoService({ verified: true });
+      const verifySpy = vi.spyOn(service, 'verifyPresentation');
+      const context = buildTestContext({
+        cryptoServices: [service],
+        domain: 'verifier.example'
+      });
+
+      const subject = createPresentationSubject(PresentationFactory());
+      const results = await runSuites([proofSuite], subject, context);
+
+      expect(results[0].outcome.status).toBe('failure');
+      if (results[0].outcome.status === 'failure') {
+        expect(results[0].outcome.problems[0].title).toBe('Challenge Required');
+      }
+      expect(verifySpy).not.toHaveBeenCalled();
+    });
+
+    it('passes challenge and domain to the crypto service', async () => {
+      const service = FakeCryptoService({ verified: true });
+      const verifySpy = vi.spyOn(service, 'verifyPresentation');
+      const context = buildTestContext({
+        cryptoServices: [service],
+        challenge: 'factory-challenge',
+        domain: 'verifier.example'
+      });
+
+      const subject = createPresentationSubject(PresentationFactory());
+      const results = await runSuites([proofSuite], subject, context);
+
+      expect(results[0].outcome.status).toBe('success');
+      expect(verifySpy).toHaveBeenCalledWith(
+        subject.verifiablePresentation,
+        expect.objectContaining({
+          challenge: 'factory-challenge',
+          domain: 'verifier.example'
+        })
+      );
+    });
   });
 
   describe('did:web-style resolution (orchestrated failure)', () => {
