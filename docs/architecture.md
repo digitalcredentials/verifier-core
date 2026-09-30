@@ -53,7 +53,7 @@ src/
 │       ├── vc-recognition-handler.ts Recognition VC registry (recursively verified via the parent Verifier)
 │       └── cache-ttl.ts             TTL helpers (Cache-Control, validUntil)
 ├── suites/                          Verification suite implementations (default suites only)
-│   ├── core/                        Structure checks (context, VC context, credential id, proof exists)
+│   ├── core/                        Structure checks (context, VC context, VC structure, VP structure, credential id, proof exists)
 │   ├── recognition/                 Pluggable recognizer dispatch; produces normalized credential form
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
@@ -195,7 +195,8 @@ in the array, so the report is always complete.
 
 `verifyPresentation` follows the same pipeline with two additions:
 
-1. The VP itself is verified for its signature (proof suite with presentation-specific proof purpose).
+1. The VP itself runs the `core` suite, where only `core.vp-structure` applies to a presentation,
+   and then the proof suite, which verifies its signature with a presentation-specific proof purpose.
 2. Each embedded credential is extracted (`extractCredentialsFrom`) and verified individually by
    recursing into the **same `Verifier` instance** (`this.verifyCredential(...)`), so the cache,
    document loader, crypto services, and registries are automatically shared across every embedded
@@ -319,7 +320,7 @@ break when the flag is left at its default (`false`). See
 
 | Suite              | ID            | Phase           | Checks                                                                         | Fatal | Purpose                                                          |
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
-| Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
+| Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
 | Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
 | Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. |

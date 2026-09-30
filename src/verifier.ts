@@ -77,6 +77,7 @@ import {
 import { runSuites } from './run-suites.js';
 import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
+import { coreSuite } from './suites/core/index.js';
 import { proofSuite } from './suites/proof/index.js';
 import { computeId, foldCheckResults } from './fold-results.js';
 import {
@@ -228,6 +229,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       const additionalSuites = call.additionalSuites ?? [];
       const presentationSuites: VerificationSuite[] = [
+        coreSuite,
         proofSuite,
         ...additionalSuites
       ];

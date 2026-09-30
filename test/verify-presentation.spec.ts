@@ -93,6 +93,21 @@ describe('verifyPresentation', () => {
       expect(result.credentialResults).toHaveLength(0);
     });
 
+    it('runs core.vp-structure ahead of the proof suite', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({
+        presentation,
+        ...fakeVerified
+      });
+
+      const structure = result.presentationResults.find(
+        r => r.id === 'cryptographic.core.vp-structure'
+      );
+      expect(structure?.outcome.status).toBe('success');
+      expect(result.presentationResults[0]).toBe(structure);
+      expect(result.presentationResults.map(r => r.suite)).toContain('proof');
+    });
+
     it('accepts a holder object with an id', async () => {
       const presentation = PresentationFactory({
         holder: { id: DEFAULT_TEST_ISSUER_DID }

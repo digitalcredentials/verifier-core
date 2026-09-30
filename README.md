@@ -173,6 +173,7 @@ interface ProblemDetail {
   "results": [
     { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
     { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
+    { "suite": "core",   "check": "core.vc-structure",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
@@ -401,7 +402,8 @@ rollups live on `credentialResults[i].summary`.
 
 Presentation verification does two things:
 
-1. **Verifies the VP itself** — checks the presentation's signature (or skips if
+1. **Verifies the VP itself** — checks the presentation's structure
+   (`core.vp-structure`), then its signature (or skips the signature if
    `unsignedPresentation: true`). Results go in `presentationResults`.
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.

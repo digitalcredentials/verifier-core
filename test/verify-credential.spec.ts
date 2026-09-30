@@ -313,7 +313,7 @@ describe('verifyCredential', () => {
       const summaryMessages = Object.fromEntries(
         result.summary.map(s => [s.suite, s.message])
       );
-      expect(summaryMessages.core).toBe('1 of 4 checks failed (3 passed)');
+      expect(summaryMessages.core).toBe('1 of 5 checks failed (4 passed)');
       expect(summaryMessages.proof).toBe(
         'proof not run: core.proof-exists failed'
       );
@@ -329,7 +329,7 @@ describe('verifyCredential', () => {
 
       const core = result.summary.find(s => s.suite === 'core');
       expect(core?.message).toBe(
-        '1 of 4 checks failed (2 passed, 1 not run after fatal)'
+        '1 of 5 checks failed (3 passed, 1 not run after fatal)'
       );
     });
   });
