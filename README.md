@@ -663,11 +663,17 @@ const result = await verifier.verifyCredential({
 
 ### Bundle variants
 
-| Bundle                    | Contents                                                           | Network?                                      |
-| ------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
-| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch on first use; cached after) |
-| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                                            |
-| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes                                           |
+| Bundle                    | Contents                                                           | Network?                      |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------- |
+| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch; see below) |
+| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                            |
+| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes (schema fetch; see below) |
+
+The schema check fetches the four published OB 3.0 schemas once per
+`cacheService`, and compiles them once per verifier, so reuse a verifier for
+repeated work. Verifiers that share a `cacheService` share the fetched schemas.
+A `credentialSchema` URL outside the published four is fetched and compiled on
+every verification and never cached.
 
 Pick `openBadgesSemanticSuite` when you want the OB-specific semantic checks
 (`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,

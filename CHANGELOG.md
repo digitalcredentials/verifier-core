@@ -122,6 +122,14 @@ Verifier results now fold per-suite checks into a single
   When every registry is unchecked, the result says registration could not be
   determined (`REGISTRY_UNCHECKED` only). dcc-legacy lookups ignore prototype
   keys such as `__proto__`, and registry cache keys can no longer collide.
+- **The OBv3 schema check no longer fetches and compiles its schema on every
+  verification.** The four published OB 3.0 schemas are now fetched once per
+  `cacheService` (cached for 24 h under `schema:<url>`) and compiled once per
+  verifier, so verifiers that share a `cacheService` share the fetch. Only a
+  successfully fetched JSON object is cached. Any other `credentialSchema` URL
+  is still fetched and compiled on every verification, so an issuer cannot grow
+  the cache. The docs previously claimed the schema was cached after first use;
+  it was not.
 
 ### Deprecated
 

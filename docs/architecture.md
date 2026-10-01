@@ -60,7 +60,9 @@ src/
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
 │   ├── registry/                    Issuer DID lookup via context.lookupIssuers
-│   └── schema/obv3/                 AJV-backed OBv3 JSON Schema check; consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
+│   └── schema/
+│       ├── schema-loader.ts         Cached AJV loadSchema: schema JSON in cacheService under schema:<url>, for allow-listed URLs only
+│       └── obv3/                    AJV-backed OBv3 JSON Schema check (validators compiled once per verifier); consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
 ├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`)
 │   ├── index.ts                     Curated barrel — suites, individual checks, factory, recognition helpers, problem-type catalog, vocabulary
 │   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite (all phase: 'semantic')

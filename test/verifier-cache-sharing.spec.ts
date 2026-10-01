@@ -22,6 +22,7 @@ import {
   defaultHttpGetService
 } from '../src/default-services.js';
 import { InMemoryCacheService } from '../src/services/cache-service/in-memory-cache-service.js';
+import { openBadgesSchemaSuite } from '../src/openbadges/openbadges-suite.js';
 import {
   BitstringStatusEntry,
   StatusListCredentialFactory
@@ -231,5 +232,89 @@ describe('Verifier cache sharing', () => {
     // verifyPresentation recurses into verifier.verifyCredential for each
     // embedded VC; both share the verifier's cacheService.
     expect(http.callsTo(REGISTRY_URL)).toBe(1);
+  });
+  describe('OBv3 schema documents', () => {
+    const OBV3_V2_ACHIEVEMENT_SCHEMA_URL =
+      'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json';
+
+    const schemaHttp = () =>
+      FakeHttpGetService({
+        [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: okJsonBody({
+          $id: OBV3_V2_ACHIEVEMENT_SCHEMA_URL,
+          $schema: 'https://json-schema.org/draft/2019-09/schema',
+          type: 'object',
+          required: ['@context', 'type', 'issuer', 'credentialSubject']
+        })
+      });
+
+    /** An OpenBadgeCredential with no `credentialSchema`, so the check infers the IMS URL. */
+    function makeBadge(id: string): Record<string, unknown> {
+      const credential = makeCredential(id);
+      return {
+        ...credential,
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json'
+        ],
+        type: ['VerifiableCredential', 'OpenBadgeCredential']
+      };
+    }
+
+    const verifySchema = async (
+      verifier: ReturnType<typeof createVerifier>,
+      id: string
+    ) => {
+      const result = await verifier.verifyCredential({
+        credential: makeBadge(id),
+        additionalSuites: [openBadgesSchemaSuite],
+        verbose: true
+      });
+      // Sanity: the schema check ran and passed, so the count below is
+      // about caching rather than a check that never got that far.
+      expect(
+        result.results.find(r => r.check === 'schema.obv3.json')?.outcome.status
+      ).toBe('success');
+    };
+
+    it('fetches the schema once across three verifications on one Verifier', async () => {
+      const http = schemaHttp();
+      const verifier = createVerifier({
+        httpGetService: http,
+        cryptoServices: [FakeCryptoService({ verified: true })]
+      });
+
+      await verifySchema(verifier, 'urn:uuid:schema-1');
+      await verifySchema(verifier, 'urn:uuid:schema-2');
+      await verifySchema(verifier, 'urn:uuid:schema-3');
+
+      expect(http.callsTo(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)).toBe(1);
+    });
+
+    it('fetches the schema once per Verifier when each has its own default cache', async () => {
+      const http = schemaHttp();
+      const config = {
+        httpGetService: http,
+        cryptoServices: [FakeCryptoService({ verified: true })]
+      };
+
+      await verifySchema(createVerifier(config), 'urn:uuid:schema-a');
+      await verifySchema(createVerifier(config), 'urn:uuid:schema-b');
+
+      expect(http.callsTo(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)).toBe(2);
+    });
+
+    it('fetches the schema once across Verifiers sharing an injected cacheService', async () => {
+      const http = schemaHttp();
+      const config = {
+        httpGetService: http,
+        cacheService: InMemoryCacheService(),
+        cryptoServices: [FakeCryptoService({ verified: true })]
+      };
+
+      await verifySchema(createVerifier(config), 'urn:uuid:schema-x');
+      await verifySchema(createVerifier(config), 'urn:uuid:schema-y');
+
+      expect(http.callsTo(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)).toBe(1);
+    });
   });
 });
