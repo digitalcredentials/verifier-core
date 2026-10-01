@@ -5,6 +5,7 @@ import type { Verifier } from '../../../src/types/verifier.js';
 import type { CredentialVerificationResult } from '../../../src/types/result.js';
 import type { RegistryHandlerContext } from '../../../src/services/registry-handlers/types.js';
 import { lookupVcRecognition } from '../../../src/services/registry-handlers/vc-recognition-handler.js';
+import { DEFAULT_TTL_MS } from '../../../src/services/registry-handlers/cache-ttl.js';
 import { FakeCacheService } from '../../factories/services/fake-cache-service.js';
 import {
   FakeHttpGetService,
@@ -203,8 +204,21 @@ describe('lookupVcRecognition', () => {
     expect(verifyCalls).toBe(1);
   });
 
-  it('uses validUntil for cache TTL', async () => {
-    const future = new Date(Date.now() + 7200_000).toISOString();
+  function cacheWithTtlSpy() {
+    const base = FakeCacheService();
+    const sets: Array<{ ttl?: number }> = [];
+    const cacheService = {
+      get: base.get.bind(base),
+      set: async (key: string, value: unknown, ttl?: number) => {
+        sets.push({ ttl });
+        return base.set(key, value, ttl);
+      }
+    };
+    return { cacheService, sets };
+  }
+
+  it('uses validUntil for cache TTL when it is under an hour away', async () => {
+    const future = new Date(Date.now() + 600_000).toISOString();
     const vc = buildVc({ validUntil: future });
     const base = FakeCacheService();
     const sets: Array<{ ttl?: number }> = [];
@@ -221,8 +235,19 @@ describe('lookupVcRecognition', () => {
     });
     await lookupVcRecognition('did:web:university.example', registry, ctx);
     const ttlArg = sets[0]?.ttl as number;
-    expect(ttlArg).toBeGreaterThan(7000_000);
-    expect(ttlArg).toBeLessThanOrEqual(7200_000);
+    expect(ttlArg).toBeGreaterThan(590_000);
+    expect(ttlArg).toBeLessThanOrEqual(600_000);
+  });
+
+  it('caps the cache TTL at an hour when validUntil is years away', async () => {
+    const vc = buildVc({ validUntil: '2099-01-01T00:00:00Z' });
+    const { cacheService, sets } = cacheWithTtlSpy();
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      cacheService
+    });
+    await lookupVcRecognition('did:web:university.example', registry, ctx);
+    expect(sets[0]?.ttl).toBe(DEFAULT_TTL_MS);
   });
 
   it('returns unchecked on fetch failure', async () => {

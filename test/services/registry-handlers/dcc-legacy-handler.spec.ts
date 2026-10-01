@@ -64,6 +64,21 @@ describe('lookupDccLegacy', () => {
     expect(result).toEqual({ status: 'found', registryName: 'Sandbox' });
   });
 
+  it.each(['__proto__', 'constructor', 'toString'])(
+    'returns not-found for the inherited key %s',
+    async did => {
+      const httpGetService = FakeHttpGetService({
+        [registryUrl]: okJsonBody(sampleBody)
+      });
+      const result = await lookupDccLegacy(
+        did,
+        dccRegistry,
+        buildCtx({ httpGetService })
+      );
+      expect(result).toEqual({ status: 'not-found' });
+    }
+  );
+
   it('returns not-found when DID is absent', async () => {
     const httpGetService = FakeHttpGetService({
       [registryUrl]: okJsonBody(sampleBody)

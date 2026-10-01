@@ -49,7 +49,9 @@ src/
 │   └── registry-handlers/           Per-type registry handlers behind a port
 │       ├── types.ts                 RegistryHandler, RegistryHandlerMap, RegistryHandlerContext
 │       ├── dcc-legacy-handler.ts    DCC legacy DID-list registry
-│       ├── oidf-handler.ts          OpenID Federation entity-statement registry
+│       ├── oidf-handler.ts          OpenID Federation registry: verifies the entity configuration and subordinate statement (ES256/EdDSA), `iss` / `sub` / `exp`
+│       ├── jws-verify.ts            Compact JWS verification against a JWK Set with the shipped key libraries
+│       ├── jwt-payload-decode.ts    Portable base64url / JWT payload decoding (no Buffer)
 │       ├── vc-recognition-handler.ts Recognition VC registry (recursively verified via the parent Verifier)
 │       └── cache-ttl.ts             TTL helpers (Cache-Control, validUntil)
 ├── suites/                          Verification suite implementations (default suites only)
@@ -93,9 +95,8 @@ src/
     ├── document-loader-from-http-get.ts  Build a JSON-LD loader backed by an HttpGetService
     ├── did-web-driver-with-http-get.ts   did:web resolution via HttpGetService (cache-sharing)
     ├── fetch-json-from-http-get.ts       Wrap an HttpGetService as a FetchJson
-    ├── registry-key-hash.ts              Stable hash of a registry list for cache keys
-    ├── json-pointer.ts                   formatJsonPointer (RFC 6901) for ProblemDetail.instance values
-    └── jwt-payload-decode.ts             Minimal JWT payload decoder (OIDF handler)
+    ├── registry-key-hash.ts              Stable cache key for a registry list (the sorted ids, JSON-encoded)
+    └── json-pointer.ts                   formatJsonPointer (RFC 6901) for ProblemDetail.instance values
 ```
 
 ```

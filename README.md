@@ -85,6 +85,16 @@ const registries = await response.json();
 const result = await verifyCredential({ credential, registries });
 ```
 
+For OpenID Federation (`oidf`) registries, both the trust anchor's entity
+configuration and the issuer's subordinate statement are signature-verified
+(ES256 or EdDSA), with their `iss`, `sub` and `exp` checked. Trust is rooted in
+the HTTPS fetch of the configured `trustAnchorEC`: there are no pinned anchor
+keys. A registry that cannot be checked — unreachable, or serving a statement
+that does not verify — is reported as "could not be determined"
+(`REGISTRY_UNCHECKED`), not as "not registered", and a lookup that included one
+is retried after a minute rather than cached for an hour. Pass `registries: []`
+to skip the registry check.
+
 > [!CAUTION] The DCC registry list does not make claims about the registries it
 > contains. It is a list of registries that the DCC knows about — it says
 > nothing about the quality, meaning, or value of credentials issued by anyone

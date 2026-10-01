@@ -109,6 +109,19 @@ Verifier results now fold per-suite checks into a single
   `Body is unusable`, and errors name only the URL and the reason: response text
   no longer reaches problem details. This covers the built-in service only; an
   injected `httpGetService` or `documentLoader` keeps its own policy.
+- **Security: OIDF registry membership is now verified.** Previously both entity
+  statements were payload-decoded without checking their signatures, and any
+  statement with a `metadata` object counted as registered. The trust anchor's
+  entity configuration and the issuer's subordinate statement are now
+  signature-verified (ES256 or EdDSA), with `iss`, `sub` and `exp` checked; a
+  statement that does not verify reports the registry as unchecked. OIDF lookups
+  now work in browsers and React Native (no `Buffer`). A lookup that included an
+  unreachable registry is cached for 60 s instead of 1 h, and a recognition
+  credential for at most 1 h instead of until its `validUntil`. `registries: []`
+  skips the registry check instead of reporting the issuer as not registered.
+  When every registry is unchecked, the result says registration could not be
+  determined (`REGISTRY_UNCHECKED` only). dcc-legacy lookups ignore prototype
+  keys such as `__proto__`, and registry cache keys can no longer collide.
 
 ### Deprecated
 
