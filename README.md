@@ -1,13 +1,24 @@
 # verifier-core _(@digitalcredentials/verifier-core)_
 
-[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/main.yml?branch=main)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3A%22Node.js+CI%22)
-[![Coverage Status](https://coveralls.io/repos/github/digitalcredentials/verifier-core/badge.svg?branch=main)](https://coveralls.io/github/digitalcredentials/verifier-core?branch=main)
+[![Build status](https://img.shields.io/github/actions/workflow/status/digitalcredentials/verifier-core/ci.yml?branch=main)](https://github.com/digitalcredentials/verifier-core/actions?query=workflow%3ACI)
 
 > Verifies W3C Verifiable Credentials in the browser, Node.js, and React Native.
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [API](#api)
+  - [verifyCredential](#verifycredential)
+  - [verifyPresentation](#verifypresentation)
+  - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
+- [Custom Suites](#custom-suites)
+- [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
+- [Capturing timing data](#capturing-timing-data)
+- [Pluggable clock (TimeService)](#pluggable-clock-timeservice)
+- [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
+- [Credential recognition + two-pass verification](#credential-recognition--two-pass-verification)
+- [Architecture](#architecture)
+- [Migration from earlier 1.0.0-beta.x](#migration-from-earlier-100-betax)
 - [Install](#install)
 - [Contribute](#contribute)
 - [License](#license)
@@ -16,1167 +27,820 @@
 
 Verifies the following versions of W3C Verifiable Credentials:
 
-* [1.0](https://www.w3.org/TR/2019/REC-vc-data-model-20191119/)
-* [1.1](https://www.w3.org/TR/2022/REC-vc-data-model-20220303/)
-* [2.0](https://www.w3.org/TR/vc-data-model-2.0/)
+- [1.0](https://www.w3.org/TR/2019/REC-vc-data-model-20191119/)
+- [1.1](https://www.w3.org/TR/2022/REC-vc-data-model-20220303/)
+- [2.0](https://www.w3.org/TR/vc-data-model-2.0/)
 
-And verifies signatures from both [eddsa-rdfc-2022 Data Integrity Proof](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite) and [ed25519-signature-2020 Linked Data Proof](https://github.com/digitalbazaar/ed25519-signature-2020) cryptosuites.
+Supports the
+[eddsa-rdfc-2022](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite)
+and [ecdsa-rdfc-2019](https://www.w3.org/TR/vc-di-ecdsa/) (P-256/P-384 Multikey)
+Data Integrity Proof cryptosuites, and the
+[ed25519-signature-2020 Linked Data Proof](https://github.com/digitalbazaar/ed25519-signature-2020)
+cryptosuite.
 
-The verification checks that the credential:
+Verification runs an ordered pipeline of **suites**, each containing one or more
+**checks**:
 
-* has a valid signature, and so therefore:
-  * the credential hasn't been tampered with
-  * the public signing key was successfully retrieved from the did document
-* hasn't expired
-* hasn't been revoked
-* was signed by a trusted issuer
+| Suite           | Phase           | What it checks                                                                                                                                                  | Fatal? |
+| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                   | Yes    |
+| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                          | No     |
+| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                            | Yes    |
+| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. The list credential's proof is checked with the configured `cryptoServices`. | Yes    |
+| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                     | No     |
 
-The verification will also tell us if any of the registries listed in the trusted registry list couldn't be loaded (say because of a network error), which is important because those missing registries might be the very registries that affirm the trustworthiness of the issuer of a given credential.
+The **Phase** column drives the optional `phases:` filter on `VerifierConfig`
+and per-call args, used for
+[two-pass verification](#credential-recognition--two-pass-verification).
 
-Verification results also include an 'additionalInformation' section that as of October 2026 includes the results of checking the credential against any declared schema or guessed schema.
+Open Badges 3.0 verification lives in the opt-in submodule
+[`@digitalcredentials/verifier-core/openbadges`](#open-badges-30-verification-opt-in-submodule)
+and is not part of the default suite list.
 
-As of May 2025 we've published a list of known DCC registries:
+The result doesn't make a single "valid/invalid" judgment. It returns the
+outcome of every check, letting consumers decide what matters for their use
+case. A credential with a revoked status will fail (`verified: false`) — that's
+an issuer-asserted state we can't ignore — but other distinctions, like an
+unregistered issuer (the registry might just not be up to date), are surfaced as
+non-fatal results for the consumer to weigh.
+
+### Trust Registries
+
+Registry checks look up the credential's issuer DID in known registries. The DCC
+publishes a list of known registries:
 
 ```
 https://digitalcredentials.github.io/dcc-known-registries/known-did-registries.json
-  ```
-
- that you would retrieve something like so:
-
 ```
-const response = await fetch("https://digitalcredentials.github.io/dcc-known-registries/known-did-registries.json");
-const knownRegistries = await response.json();
-  ```
 
-and then pass that knownRegistries variable into the call to verifyCredential, as explained below.
+Fetch and pass it to verification:
 
-You may of course freely substitute your own list of registries.
+```typescript
+const response = await fetch(
+  'https://digitalcredentials.github.io/dcc-known-registries/known-did-registries.json'
+);
+const registries = await response.json();
 
->[!CAUTION]
->The DCC registry list does not make any claims or affirmations about the registries in that list. It is simply a list of registries that the DCC knows about. It does not, in particular, say anyting at all about the quality, meaning, or value of the credentials issued by anyone in those registries.
+const result = await verifyCredential({ credential, registries });
+```
+
+> [!CAUTION] The DCC registry list does not make claims about the registries it
+> contains. It is a list of registries that the DCC knows about — it says
+> nothing about the quality, meaning, or value of credentials issued by anyone
+> in those registries.
 
 ## API
 
-This package exports two methods:
-
-* verifyCredential
-* verifyPresentation
-
 ### verifyCredential
 
-```verifyCredential({credential, knownDidRegistries, reloadIssuerRegistry = true})```
+```typescript
+import { verifyCredential } from '@digitalcredentials/verifier-core';
 
-#### arguments
-
-* credential - The W3C Verifiable Credential to be verified.
-* knownDidRegistries - a list of issuer DIDs in which to lookup signing DIDs
-
-#### result
-
-The typescript definitions for the result can be found [here](./src/types/result.ts)
-
-Note that the verification result doesn't make any conclusion about the overall validity of a credential. It only checks the validity of each of the four steps, leaving it up to the consumer of the result to decide on the overall validity. The consumer might not, for example, consider a credential that had expired or had been revoked to be 'invalid'. The credential might still in fact be useful as a record of history, i.e, I had a driver's licence that expired two years ago, but it was valid during the period 2018 to 2023, and that information might be useful.
-
-Four steps are checked, returning a result per step in a log like so:
-
-
+const result = await verifyCredential({
+  credential, // The VC to verify (any version, passed as unknown)
+  registries // Optional: issuer trust registries
+});
 ```
-{
-  "credential": {the VC that was submitted is returned here},
-  "log": [
-    {
-      "id": "valid_signature",
-      "valid": true (if it is false then an error is returned instead of the log)
-    },
-    {
-      "id": "expiration",
-      "valid": true/false
-    },
-    {
-      "id": "revocation_status",
-      "valid": true/false
-    },
-    {
-      "id": "registered_issuer",
-      "valid": true/false,
-      "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC test issuer",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        },
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "OneUni University",
-              "homepage_uri": "https://oneuni.edu",
-              "logo_uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAB4SURBVEhLY1Da6ENTNGoBQTRqAUE0Yixwkq3X5tNgAANBkRlosvgQERbM0OaAmAwFNLFAkMNdW2KGkwjIE1S3AIFGLSCIRi0giEYtwIHq5Tk0BCEIaDwIwLh89RiKMRBRFkDNxQBUsoAyNGoBQTRqAUE01C3Y6AMAsDxJowXOs6oAAAAASUVORK5CYII="
-            },
-            "institution_additional_information": {
-              "legal_name": "Board and Trustees of OneUni University"
-            },
-            "credential_registry_entity": {
-              "ctid": "ce-e8a41a52-6ff6-48f0-9872-889c87b093b7",
-              "ce_url": "https://credentialengineregistry.org/resources/ce-e8a41a52-6ff6-48f0-9872-889c87b093b7"
-            },
-            "ror_entity": {
-              "rorid": "042nb2s44",
-              "ror_url": "https://ror.org/042nb2s44"
-            }
-          },
-          "registry": {
-            "type": "oidf",
-            "fetchEndpoint": "https://test.registry.dcconsortium.org/fetch?sub=",
-            "name": "DCC Member Registry"
-          }
-        }
-      ],
-      "uncheckedRegistries": [
-        {
-          "name": "DCC Community Registry",
-          "type": "dcc-legacy",
-          "url": "https://onldynoyrrrt.com/registry.json"
-        },
-        {
-          "name": "DCC Pilot Registry",
-          "type": "dcc-legacy",
-          "url": "https://onldynoyrt.com/registry.json"
-        }
-      ],
-      "additionalInformation": [
-        {
-          "id": "schema_check",
-          "results": [
-            {
-              "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
-              "result": {
-                "valid": true
-              },
-              "source": "Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'"
-            }
-          ]
-        }
-      ],
-    }
-  ]
+
+#### Options
+
+```typescript
+interface VerifyCredentialOptions {
+  credential: unknown;
+  registries?: EntityIdentityRegistry[];
+  additionalSuites?: VerificationSuite[];
+
+  // Service overrides (otherwise sensible defaults are used):
+  httpGetService?: HttpGetService;
+  cacheService?: CacheService;
+  cryptoServices?: CryptoService[];
+  registryHandlers?: RegistryHandlerMap;
+  documentLoader?: DocumentLoader;
 }
 ```
 
-Variations and errors are covered next...
+Only `credential` is required. All other fields override sensible defaults
+(security-document-loader, Ed25519 + EdDSA + ECDSA crypto suites, in-memory
+cache). The configured `cryptoServices` verify presentation proofs, credential
+proofs, and the proofs on BitstringStatusListCredentials fetched during a status
+check. `VerifyCredentialOptions` is the type alias
+`VerifierConfig & VerifyCredentialCall`, so callers building the options object
+piece-by-piece can compose against either half.
 
-There are three general flavours of result that might be returned:
+#### Result
 
-- all checks were conclusive
-- verification was partially successful
-- verification was fatal
-
-1. <b>all checks were conclusive</b>
-
-All of the checks were run *conclusively*, meaning that we determined whether each of the four steps in verification (signature, expiry, revocation, known issuer) was true or false.
-
-A conclusive verification might look like this example where all steps returned valid=true:
-
-```
-{
-  "credential": {the supplied vc - left out here for brevity/clarity},
-  "log": [
-    {
-      "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "expiration",
-      "valid": true
-    },
-    {
-      "id": "revocation_status",
-      "valid": true
-    },
-    {
-      "id": "registered_issuer",
-      "valid": true,
-      "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC did:web test",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        }
-      ],
-      "uncheckedRegistries": []
-    }
-  ]
+```typescript
+interface CredentialVerificationResult {
+  verified: boolean;
+  verifiableCredential: VerifiableCredential;
+  results: CheckResult[];
+  summary: SuiteSummary[];
 }
 ```
 
-An invalid signature is considered fatal, rather than conclusive (even though in a sense it conclusively rejects the entire credential) because an invalid signature means that the revocation status, expiry data, or issuer id may have been tampered with, and so we can't say anything conclusive about any of those steps, and can't even check them because they could be fraudulent.
+`verified` is `true` when no check returned a failure. By default (since v2.0.0)
+`results` carries only failures and explicit `<suite>.applies` skips, while
+`summary` provides the per-suite rollup (see
+[Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)). Pass
+`verbose: true` to receive every check that ran in `results`.
 
-And here is a slightly different verification result where we have still made conclusive determinations about each step, and all are true except for the expiry:
+Each `CheckResult` contains a discriminated `CheckOutcome`:
 
+```typescript
+type CheckOutcome =
+  | { status: 'success'; message: string }
+  | { status: 'failure'; problems: ProblemDetail[] }
+  | { status: 'skipped'; reason: string };
 ```
-{
-  "credential": {the supplied vc - left out here for brevity/clarity},
-  "log": [
-    {
-      "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "expiration",
-      "valid": false
-    },
-      "id": "revocation_status",
-      "valid": true
-    },
-    {
-      "id": "registered_issuer",
-      "valid": true,
-      "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC did:web test",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        }
-      ],
-      "uncheckedRegistries": []
-    }
-  ]
+
+Failures carry one or more `ProblemDetail` entries (inspired by
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)):
+
+```typescript
+interface ProblemDetail {
+  type: string; // URI identifying the problem
+  title: string; // Short human-readable summary
+  detail: string; // Specific explanation of this occurrence
 }
 ```
 
-2. <b> partially successful verification</b>
-
-A verification might partly succeed if it can conclusively determine some of the steps - most 
-importantly that the credential hasn't been tampered with - but can't conclusively verify (as true or false) some other steps.
-
-A good example is if there are network problems and the verifier can't retrieve things an issuer registry, and so can't say whether the did used to sign the VC is listed in the registry. It might be, but it might not be.
-
-Another example is the revocation status - if we can't retrieve the status list from the network then we again 
-can't see one way or the other if the credential has been revoked. It might have been, it might not have been.
-
-The revocation status is an especially interesting example because the status list is itself a Verifiable Credential, which could have expired, been revoked, or been tampered with. And if so, then we again can't say anything about the status of the VC we are trying to to verify because the status list is not valid.
-
-For the valid_signature and revocation_status steps, if we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
-
-For the registered_issuer step we always return false if the issuer isn't found in a loaded registry, but with the caveat that if the 'registriesNotLoaded' property does contain one or more registries, then the credential *might* have been in one of those registries. It is up to the consumer of the result to decide how to deal with that.
-
-A partially successful verification might look like this example, where we couldn't retrieve one of the registries:
-
-```
-{
-  "credential": {the supplied vc - left out here for brevity/clarity},
-  "log": [
-    {
-      "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "expiration",
-      "valid": true
-    },
-    {
-      "id": "registered_issuer",
-      "valid": false,
-      "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC did:web test",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        }
-      ],
-      "uncheckedRegistries": [
-            {
-             "name": "DCC Community Registry",
-             "type": "dcc-legacy",
-             "url": "https://onldynoyrrrt.com/registry.json"
-           },
-           {
-              "name": "DCC Pilot Registry",
-              "type": "dcc-legacy",
-              "url": "https://onldynoyrt.com/registry.json"
-            }
-      ]
-    }
-  ]
-}
-```
-
-Or for a status list that couldn't be retrieved:
-
-```
-{
-  "credential": {the supplied vc - left out here for brevity/clarity},
-  "log": [
-    {
-      "id": "valid_signature",
-      "valid": true
-    },
-    {
-      "id": "expiration",
-      "valid": true
-    },
-    {
-      "id": "revocation_status",
-      "error": {
-            "name": "'status_list_not_found'",
-            "message": "Could not retrieve the revocation status list."
-      }   
-    },
-    {
-      "id": "registered_issuer",
-      "valid": true,
-      "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC did:web test",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-The status list errors that we return include:
-```
-  "error": {
-            "name": "status_list_not_found",
-            "message": "Could not retrieve the revocation status list."
-      }  
-```
-
-```
-  "error": {
-            "name": "status_list_expired",
-            "message": "The status list verifiable credential has expired."
-      }  
-```
-
-```
-  "error": {
-            "name": "status_list_signature_error",
-            "message": "The signature on the status list is invalid."
-      } 
-```
-
-``` 
-  "error": {
-            "name": "status_list_type_error",
-            "message": "Status list credential type must include \"BitstringStatusListCredential\"."
-      }  
-```
-
-```
-  "error": {
-            "name": "status_list_not_yet_valid",
-            "message": "The validFrom date on the status list credential is in the future."
-      }  
-```
-And a fallback for any unknown error:
-```
-       "error": {
-            "name": "status_list_error",
-            "message": "The status list couldn't be verified."
-      }  
-```
-
-3. <b>fatal error</b>
-
-Fatal errors are errors that prevent us from saying anything conclusive about the credential, and so we don't list the results of each step (the 'log') because we can't decisively say if any are true or false. Reverting to saying they are all false would be misleading, because that could be interepreted to mean that the credential was, for example, revoked when really we just don't know one way or the other.
-
-Examples of fatal errors:
-
-<b>invalid signature</b>
-  
-Fatal because if the signature is invalid it means any part of the credential could have been tampered with, including the revocation status, expiration, and issuer identity. In these cases we don't return a 'valid' property, but instead an 'errors' property
-
-```
-{
-  "credential": {vc removed for brevity/clarity in this example},
-  "errors": [
-    {
-      "name": "invalid_signature",
-      "message": "The signature is not valid."
-    }
-  ]
-}
-```
-
-<b>unresolvable did</b>
-
-Fatal because we couldn't retrieve the DID document containing the public signing key with which to check the signature. This error is most likely to happen with a did:web if the url for the did:web document is wrong or
-has been taken down, or there is a network error.
-
-```
-{
-  "credential": {vc removed for brevity/clarity},
-  "errors": [
-    {
-      "name": "did_web_unresolved",
-      "message": "The signature could not be checked because the public signing key could not be retrieved from https://digitalcredentials.github.io/dcc-did-web-bad/did.json"
-    }
-  ]
-}
-```
-
-<b>unknown http error</b>
-
-A catchall error for unknown http errors when verifying the signature.
-
-```
-{
-  "credential": {vc removed for brevity/clarity},
-  "errors": [
-    {
-      "name": "http_error_with_signature_check",
-      "message": "An http error prevented the signature check."
-    }
-  ]
-}
-```
-
-
-
-<b>malformed credential</b>
-  
-The supplied credential may not conform to the VerifiableCredential or LinkedData specifications(possibly because it follows some older convention, or maybe hasn't yet been signed) and might not even be a Verifiable Credential at all.
-
-Specific cases:
-
-<b><i>invalid_jsonld</i></b>
-
-There is no @context property at the top level of the credential:
-
-```
-{
-  "credential": {
-    "id": "http://example.com/credentials/3527",
-    "type": [
-      "VerifiableCredential",
-      "OpenBadgeCredential"
-    ],
-    "issuer": {
-      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "type": [
-        "Profile"
-      ],
-      "name": "Example Corp"
-    },
-    "validFrom": "2010-01-01T00:00:00Z",
-    "name": "Teamwork Badge",
-    "credentialSubject": {
-      "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
-      "type": [
-        "AchievementSubject"
-      ],
-      "achievement": {
-        "id": "https://example.com/achievements/21st-century-skills/teamwork",
-        "type": [
-          "Achievement"
-        ],
-        "criteria": {
-          "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
-        },
-        "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
-        "name": "Teamwork"
-      }
-    },
-    "proof": {
-      "type": "Ed25519Signature2020",
-      "created": "2025-01-09T17:58:33Z",
-      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "proofPurpose": "assertionMethod",
-      "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
-    }
-  },
-  "errors": [
-    {
-      "name": "invalid_jsonld",
-      "message": "The credential does not appear to be a valid jsonld document - there is no context."
-    }
-  ]
-}
-```
-
-<b><i>no_vc_context</i></b>
-
-Although this is a linked data document, with an @context property, the Verifiable Credential context (i.e, "https://www.w3.org/2018/credentials/v1") is missing:
-
-```
-{
-  "credential": {
-    "@context": [
-      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
-      "https://w3id.org/security/suites/ed25519-2020/v1"
-    ],
-    "id": "http://example.com/credentials/3527",
-    "type": [
-      "VerifiableCredential",
-      "OpenBadgeCredential"
-    ],
-    "issuer": {
-      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "type": [
-        "Profile"
-      ],
-      "name": "Example Corp"
-    },
-    "validFrom": "2010-01-01T00:00:00Z",
-    "name": "Teamwork Badge",
-    "credentialSubject": {
-      "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
-      "type": [
-        "AchievementSubject"
-      ],
-      "achievement": {
-        "id": "https://example.com/achievements/21st-century-skills/teamwork",
-        "type": [
-          "Achievement"
-        ],
-        "criteria": {
-          "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
-        },
-        "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
-        "name": "Teamwork"
-      }
-    },
-    "proof": {
-      "type": "Ed25519Signature2020",
-      "created": "2025-01-09T17:58:33Z",
-      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "proofPurpose": "assertionMethod",
-      "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
-    }
-  },
-  "errors": [
-    {
-      "name": "no_vc_context",
-      "message": "The credential doesn't have a verifiable credential context."
-    }
-  ]
-}
-```
-
-<b><i>invalid_credential_id</i></b>
-
-In this example, the top level id property on the credential is not a uri, but should be:
-
-```
-{
-  "credential": {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
-      "https://w3id.org/security/suites/ed25519-2020/v1"
-    ],
-    "id": "0923lksjf",
-    "type": [
-      "VerifiableCredential",
-      "OpenBadgeCredential"
-    ],
-    "name": "DCC Test Credential",
-    "issuer": {
-      "type": [
-        "Profile"
-      ],
-      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "name": "Digital Credentials Consortium Test Issuer",
-      "url": "https://dcconsortium.org",
-      "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
-    },
-    "issuanceDate": "2023-08-02T17:43:32.903Z",
-    "credentialSubject": {
-      "type": [
-        "AchievementSubject"
-      ],
-      "achievement": {
-        "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
-        "type": [
-          "Achievement"
-        ],
-        "achievementType": "Diploma",
-        "name": "Badge",
-        "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
-        "criteria": {
-          "type": "Criteria",
-          "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
-        },
-        "image": {
-          "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
-          "type": "Image"
-        }
-      },
-      "name": "Jane Doe"
-    },
-    "proof": {
-      "type": "Ed25519Signature2020",
-      "created": "2023-10-05T11:17:41Z",
-      "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "proofPurpose": "assertionMethod",
-      "proofValue": "z5fk6gq9upyZvcFvJdRdeL5KmvHr69jxEkyDEd2HyQdyhk9VnDEonNSmrfLAcLEDT9j4gGdCG24WHhojVHPbRsNER"
-    }
-  },
-  "errors": [
-    {
-      "name": "invalid_credential_id",
-      "message": "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement."
-    }
-  ]
-}
-```
-
-<b><i>no_proof</i></b>
-
-The proof property is missing, likely because the credential hasn't been signed:
-
-```
-{
-  "credential": {
-    "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
-      "https://w3id.org/security/suites/ed25519-2020/v1"
-    ],
-    "id": "urn:uuid:2fe53dc9-b2ec-4939-9b2c-0d00f6663b6c",
-    "type": [
-      "VerifiableCredential",
-      "OpenBadgeCredential"
-    ],
-    "name": "DCC Test Credential",
-    "issuer": {
-      "type": [
-        "Profile"
-      ],
-      "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-      "name": "Digital Credentials Consortium Test Issuer",
-      "url": "https://dcconsortium.org",
-      "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
-    },
-    "issuanceDate": "2023-08-02T17:43:32.903Z",
-    "credentialSubject": {
-      "type": [
-        "AchievementSubject"
-      ],
-      "achievement": {
-        "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
-        "type": [
-          "Achievement"
-        ],
-        "achievementType": "Diploma",
-        "name": "Badge",
-        "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
-        "criteria": {
-          "type": "Criteria",
-          "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
-        },
-        "image": {
-          "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
-          "type": "Image"
-        }
-      },
-      "name": "Jane Doe"
-    }
-  },
-  "errors": [
-    {
-      "name": "no_proof",
-      "message": "This is not a Verifiable Credential - it does not have a digital signature."
-    }
-  ]
-}
-```
-
-<b><i>jsonld.ValidationError</i></b>
-
-An error was returnd by the json-ld parser. This is often a safe-mode error, and in particular
-is often that a property has been included in the VC, but for which there is no definition for the property in the context.  
-
-A common example is including either or both of the 'issuanceDate' or the 'expirationDate' properties in a Verifiable Credential that uses version 2 of the Verifiable Credential Data Model. Those two properties are used in version 1 only, and have been replaced by validFrom and validUntil in version 2. So including the old properties in a Verifiable Credential for which only the version 2 context has been specified precipitates a safe-mode error.
-
-Another common error here is an @type property that contains a value that is 'relative', meaning
-that it cannot be resolved to an absolute IRI (which it must be according to the spec).
-
-A example of a relative @type reference (showing just the just the errors section of the verification result):
+#### Example: Successful verification
 
 ```json
-{ "errors": [{
-    "name": "jsonld.ValidationError",
-    "details": {
-        "event": {
-            "type": [
-                "JsonLdEvent"
-            ],
-            "code": "relative @type reference",
-            "level": "warning",
-            "message": "Relative @type reference found.",
-            "details": {
-                "type": "StatusList2021Entry"
-            }
-        }
-    },
-    "message": "Safe mode validation error.",
-    "stack": "jsonld.ValidationError: Safe mode validation error....etc. removed for brevity."
-}]}
-```
-
-<b>other problem</b>
-  
-Some other error might also prevent verification, and an error, possibly with a stack trace, might be returned:
-
-```
 {
-  "errors": [
-    {
-      "name": "unknown_error",
-      "message": "Some kind of error - this message will depend on the error",
-      "stackTrace": "some kind of stack trace"
-    }
+  "verified": true,
+  "verifiableCredential": { "...parsed credential..." },
+  "results": [
+    { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
+    { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
+    { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
+    { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
+    { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
+    { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } }
   ]
 }
 ```
 
-#### schema check
+#### Example: Invalid signature (fatal)
 
-If one or more schemas are listed in the credentialSchema property of the credential, or if the schema can be guessed based on the context, then the credential is validated against those schemas and the results returned in the 'additionalInformation' section, like so:
+An invalid signature is fatal — it means any part of the credential could have
+been tampered with, so subsequent checks within the proof suite stop. Other
+suites still run.
 
 ```json
-  "additionalInformation": [
-      {
-        "id": "schema_check",
-        "results": [
+{
+  "verified": false,
+  "results": [
+    {
+      "suite": "core",
+      "check": "core.context-exists",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.proof-exists",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "proof",
+      "check": "proof.signature",
+      "outcome": {
+        "status": "failure",
+        "problems": [
           {
-            "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
-            "result": {
-              "valid": true
-            },
-            "source": "Assumed based on vc.type: 'OpenBadgeCredential' and vc version: 'version 2'"
+            "type": "https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE",
+            "title": "Invalid Signature",
+            "detail": "The signature is not valid."
           }
         ]
       }
-    ]
-  ```
-
-  Or is there was an error:
-
-  ```json
-  "additionalInformation": [
+    },
     {
-      "id": "schema_check",
-      "results": [
-        {
-          "schema": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
-          "result": {
-            "valid": false,
-            "errors": [
-              {
-                "instancePath": "",
-                "schemaPath": "#/required",
-                "keyword": "required",
-                "params": {
-                  "missingProperty": "validFrom"
-                },
-                "message": "must have required property 'validFrom'"
-              }
-            ]
-          },
-          "source": "Schema was listed in the credentialSchema property of the VC"
-        }
-      ]
+      "suite": "status",
+      "check": "status.bitstring",
+      "outcome": { "status": "skipped", "reason": "..." }
     }
   ]
-  ```
+}
+```
 
->[!NOTE]
->The schema result is in a separate section than the other verificaiton results because it doesn't affect the validity of any statements made in the credential. The schema results are returned simply as information that might be helpful, especially when developing new credentials or diagnosing problems.
+#### Example: Revoked credential (fatal, sourced from status)
+
+When a credential's status list marks it revoked or suspended — or the verifier
+can't confidently evaluate the list (missing, expired, wrong type, signature
+invalid) — the status suite fails the credential. The proof check still passes
+on its own merits.
+
+```json
+{
+  "verified": false,
+  "results": [
+    {
+      "suite": "core",
+      "check": "core.context-exists",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "proof",
+      "check": "proof.signature",
+      "outcome": {
+        "status": "success",
+        "message": "Signature verified successfully."
+      }
+    },
+    {
+      "suite": "status",
+      "check": "status.bitstring",
+      "outcome": {
+        "status": "failure",
+        "problems": [
+          {
+            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED",
+            "title": "Credential Revoked or Suspended",
+            "detail": "The credential has been revoked or suspended according to the status list."
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+#### Example: Check skipped
+
+Checks skip when they're irrelevant to the input. For instance, a credential
+with no `credentialStatus` skips the status check:
+
+```json
+{
+  "suite": "status",
+  "check": "status.bitstring",
+  "outcome": {
+    "status": "skipped",
+    "reason": "Credential has no credentialStatus."
+  }
+}
+```
+
+#### Error taxonomy
+
+All failures use `ProblemDetail` with a `type` URI. Common error types:
+
+| Type URI                              | Title                                                              | When                                   |
+| ------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| `...#PARSING_ERROR`                   | Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Structural problems                    |
+| `...#INVALID_SIGNATURE`               | Invalid Signature                                                  | Signature doesn't match content        |
+| `...#DID_WEB_UNRESOLVED`              | DID Web Unresolved                                                 | `did:web` document couldn't be fetched |
+| `...#HTTP_ERROR`                      | HTTP Error                                                         | Network error during signature check   |
+| `...#CREDENTIAL_REVOKED_OR_SUSPENDED` | Credential Revoked or Suspended                                    | Status list indicates revocation       |
+| `...#STATUS_LIST_NOT_FOUND`           | Status List Not Found                                              | Status list URL unreachable            |
+| `...#STATUS_LIST_EXPIRED`             | Status List Expired                                                | Status list VC has expired             |
+| `...#STATUS_LIST_SIGNATURE_ERROR`     | Status List Signature Error                                        | Status list VC signature invalid       |
+| `...#ISSUER_NOT_REGISTERED`           | Issuer Not Registered                                              | Issuer DID not in any registry         |
+| `...#REGISTRY_UNCHECKED`              | Registry Unchecked                                                 | Some registries couldn't be reached    |
+
+#### Problem types
+
+Every built-in problem URI is also exported as a constant. Branch on the const
+map for type-safe checks:
+
+```typescript
+import {
+  ProblemTypes,
+  type ProblemType
+} from '@digitalcredentials/verifier-core';
+
+switch (problem.type as ProblemType) {
+  case ProblemTypes.INVALID_SIGNATURE:
+    // ...
+    break;
+  case ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED:
+    // ...
+    break;
+  case ProblemTypes.STATUS_LIST_NOT_FOUND:
+    // ...
+    break;
+  // ...
+}
+```
+
+`ProblemDetail.type` stays typed as `string` so custom suites can emit their own
+problem URIs; the cast above is opt-in for callers that only need to branch on
+built-in types. See the per-token JSDoc on `ProblemTypes` for which entries are
+W3C-spec error identifiers (currently only `PARSING_ERROR`) and which are
+synthesized placeholders we use until a wider problem-type vocabulary is
+published.
 
 ### verifyPresentation
 
-```verifyPresentation({presentation, reloadIssuerRegistry = true, unsignedPresentation = false})```
+```typescript
+import { verifyPresentation } from '@digitalcredentials/verifier-core';
 
-A Verifiable Presentation (VP) is a wrapper around zero or more Verifiable Credentials. A VP can be cryptographically signed, like a VC, but whereas a VC is signed by the issuer of the credentials, the VP is signed by the holder of the credentials contained in the VP, typically to demonstrate 'control' of the contained credentials. The VP is signed with a DID that the holder owns, and usually that DID was recorded inside the Verifiable Credentials - at the time of issuance - as the 'owner' or 'holder' of the credential. So by signing the VP with the private key corresponding to that DID we can prove we 'own' the credentials, or in other words, that the credentials were issued to us (to our DID.)
-
-A VP needn't be signed. It could simply be used as to 'package' together a set of VCs.
-
-A signed VP is also sometimes used for authentication, without any contained VC. Say for the case where when an issuer is issuing a credential to a DID, and the issuer wants to know that the recipient in fact does control that DID. In these cases the VP is typically the response to a request for [DIDAuthentication (DidAuth)](https://w3c-ccg.github.io/vp-request-spec/#did-authentication). This verifier-core library does not, however, provide verification for DidAuthentication, only to verify a presentation containing VCs.
-
-Verifying a VP amounts to verifying the signature on the VP (if the signature exists) and also verifying all of the contained VCs, one by one.
-
-#### arguments
-
-* presentation - The W3C Verifiable Presentation to be verified.
-* reloadIssuerRegistry - Whether or not to refresh the cached copy of the registry.
-* unsignedPresentation - wether the submitted vp has been signed or not
-
-#### result
-
-With a VP we have a result for the vp as well as for all the contained VCs. Each of the VC results follows exactly the format described above for the results of verifying an individual VCs. We may also have an error.
-
-A successful signed VP result with two packaged VCs might look like so:
-
+const result = await verifyPresentation({
+  presentation, // The VP to verify
+  challenge: 'abc123', // Optional: expected challenge
+  unsignedPresentation: false, // Optional: allow unsigned VP
+  registries // Optional: issuer trust registries
+});
 ```
-{
-  "presentationResult": {
-    "signature": "valid"
-  },
-  "credentialResults": [
-    {
-      "log": [
-        {
-          "id": "valid_signature",
-          "valid": true
-        },
-        {
-          "id": "revocation_status",
-          "valid": true
-        },
-        {
-          "id": "expiration",
-          "valid": true
-        },
-        {
-          "id": "registered_issuer",
-          "valid": true,
-          "foundInRegistries": [
-            "DCC Sandbox Registry"
-          ],
-          "registriesNotLoaded": []
-        }
-      ],
-      "credential": {vc omitted for brevity/clarity}
-    },
-    {
-      "log": [
-        {
-          "id": "valid_signature",
-          "valid": true
-        },
-        {
-          "id": "revocation_status",
-          "valid": true
-        },
-        {
-          "id": "expiration",
-          "valid": true
-        },
-        {
-          "id": "registered_issuer",
-          "valid": true,
-          "matchingIssuers": [
-        {
-          "issuer": {
-            "federation_entity": {
-              "organization_name": "DCC did:web test",
-              "homepage_uri": "https://digitalcredentials.mit.edu",
-              "location": "Cambridge, MA, USA"
-            }
-          },
-          "registry": {
-            "name": "DCC Sandbox Registry",
-            "type": "dcc-legacy",
-            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
-          }
-        }
-      ],
-          "uncheckedRegistries": []
-        }
-      ],
-      "credential": {vc omitted for brevity/clarity}
-    }
-  ]
+
+#### Options
+
+```typescript
+interface VerifyPresentationOptions {
+  presentation: unknown;
+  challenge?: string | null;
+  unsignedPresentation?: boolean;
+  registries?: EntityIdentityRegistry[];
+  additionalSuites?: VerificationSuite[];
+
+  // Service overrides (otherwise sensible defaults are used):
+  httpGetService?: HttpGetService;
+  cacheService?: CacheService;
+  cryptoServices?: CryptoService[];
+  registryHandlers?: RegistryHandlerMap;
+  documentLoader?: DocumentLoader;
 }
 ```
 
-A VP that itself verfies (i.e, it's signature), but has one VC that doesn't, might look like so:
+Like `VerifyCredentialOptions`, this is the alias
+`VerifierConfig & VerifyPresentationCall`. The same `cryptoServices` that verify
+the presentation also verify each embedded credential and any status list
+credentials those credentials name.
 
-```
-{
-  "presentationResult": {
-    "signature": "signed"
-  },
-  "credentialResults": [
-    {
-      "credential": {
-        "@context": [
-          "https://www.w3.org/ns/credentials/v2",
-          "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json",
-          "https://w3id.org/security/suites/ed25519-2020/v1"
-        ],
-        "id": "0923lksjf",
-        "type": [
-          "VerifiableCredential",
-          "OpenBadgeCredential"
-        ],
-        "issuer": {
-          "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-          "type": [
-            "Profile"
-          ],
-          "name": "Example Corp"
-        },
-        "validFrom": "2010-01-01T00:00:00Z",
-        "name": "Teamwork Badge",
-        "credentialSubject": {
-          "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
-          "type": [
-            "AchievementSubject"
-          ],
-          "achievement": {
-            "id": "https://example.com/achievements/21st-century-skills/teamwork",
-            "type": [
-              "Achievement"
-            ],
-            "criteria": {
-              "narrative": "Team members are nominated for this badge by their peers and recognized upon review by Example Corp management."
-            },
-            "description": "This badge recognizes the development of the capacity to collaborate within a group environment.",
-            "name": "Teamwork"
-          }
-        },
-        "proof": {
-          "type": "Ed25519Signature2020",
-          "created": "2025-01-09T17:58:33Z",
-          "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-          "proofPurpose": "assertionMethod",
-          "proofValue": "z62t6TYCERpTKuWCRhHc2fV7JoMhiFuEcCXGkX9iit8atQPhviN5cZeZfXRnvJWa3Bm6DjagKyrauaSJfp9C9i7q3"
-        }
-      },
-      "errors": [
-        {
-          "name": "invalid_credential_id",
-          "message": "The credential's id uses an invalid format. It may have been issued as part of an early pilot. Please contact the issuer to get a replacement."
-        }
-      ]
-    }
-  ]
+#### Result
+
+```typescript
+interface PresentationVerificationResult {
+  verified: boolean;
+  verifiablePresentation: VerifiablePresentation;
+  presentationResults: CheckResult[];
+  credentialResults: CredentialVerificationResult[];
+  summary: SuiteSummary[];
+  // No allResults — use flattenPresentationResults(result)
 }
 ```
 
-It is important to note in the above example that the validity of the signature of the presentation is different from the validity of each of the contained VCs. A valid presentation signature simply means that nothing in the VP was tampered with.
+`presentationResults` and each embedded `credentialResults[i].results` follow
+the same folded-by-default shape as `verifyCredential`'s `results`. The
+top-level `summary` rolls up the VP envelope's own suites; per-credential
+rollups live on `credentialResults[i].summary`.
 
-An unsigned VP containing a single verified credential:
+Presentation verification does two things:
 
-```
-{
-  "presentationResult": {
-    "signature": "unsigned"
-  },
-  "credentialResults": [
-    {
-      "log": [
-        {
-          "id": "valid_signature",
-          "valid": true
-        },
-        {
-          "id": "revocation_status",
-          "valid": true
-        },
-        {
-          "id": "expiration",
-          "valid": true
-        },
-        {
-          "id": "registered_issuer",
-          "valid": true,
-          "foundInRegistries": [
-            "DCC Sandbox Registry"
-          ],
-          "registriesNotLoaded": []
-        }
-      ],
-      "credential": {vc omitted for brevity/clarity}
-    }
-  ]
+1. **Verifies the VP itself** — checks the presentation's signature (or skips if
+   `unsignedPresentation: true`). Results go in `presentationResults`.
+2. **Verifies each embedded credential** — extracts credentials from the VP and
+   runs `verifyCredential` on each. Results go in `credentialResults`.
+
+`verified` is `true` only if both the presentation and all embedded credentials
+pass.
+
+The parsed VP is returned as `verifiablePresentation`, mirroring the wire-level
+property name so callers (and downstream systems whose templates reach into
+result objects by property path) can reach it without carrying the original
+input separately.
+
+A VP needn't be signed — it can simply package credentials together. Set
+`unsignedPresentation: true` to skip the VP signature check.
+
+#### Flattening results
+
+When you want a single iterable view of every check that ran across the
+presentation and its embedded credentials, use `flattenPresentationResults`:
+
+```typescript
+import { flattenPresentationResults } from '@digitalcredentials/verifier-core';
+
+const result = await verifyPresentation({ presentation });
+for (const entry of flattenPresentationResults(result)) {
+  if (entry.source === 'presentation') {
+    // entry.result is a CheckResult from VP-level verification
+  } else {
+    // entry.source === 'credential'
+    // entry.credentialIndex is the index into result.credentialResults
+    // entry.result is a CheckResult from that embedded VC
+  }
 }
 ```
 
-A VP where we've tampered with one of the packaged credentials (by changing the credential name). Note here that both the VP and the VC don't verify because changing the VC affected the VC's signature and also the VP signature which contains the VC.
+Each entry preserves provenance — you always know whether a check applied to the
+presentation itself or to a specific embedded credential, by index.
 
+### createVerifier (batch / repeated verification)
+
+`verifyCredential` and `verifyPresentation` are convenient one-shot wrappers —
+each call builds a fresh verifier internally. When you'll perform more than one
+verification, construct a `Verifier` with `createVerifier(...)` and reuse it for
+better performance. The instance owns long-lived dependencies (HTTP, cache,
+crypto services, document loader, registries), so issuer DID documents, status
+list credentials, and JSON-LD contexts are fetched once and reused across calls.
+
+Each verifier owns its own `InMemoryCacheService` by default; cache contents are
+isolated from other verifiers in the same process. To share cache state across
+verifiers, construct one cache adapter and pass it to each
+`createVerifier({ cacheService })`.
+
+The `cryptoServices` passed to `createVerifier` are the complete and only set
+that governs proof verification — for presentations, credentials, and the
+BitstringStatusListCredentials fetched during a status check.
+
+```typescript
+import { createVerifier } from '@digitalcredentials/verifier-core';
+
+const verifier = createVerifier({ registries });
+
+for (const credential of batch) {
+  const result = await verifier.verifyCredential({ credential });
+  // ... handle result ...
+}
 ```
-{
-  "presentationResult": {
-    "signature": "invalid",
-    "errors": [
-      {
-        "message": {
-          "name": "VerificationError",
-          "errors": [
-            {
-              "name": "Error",
-              "message": "Invalid signature.",
-              "stack": "Error: Invalid signature.\n    at Ed25519Signature2020.verifyProof (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/suites/LinkedDataSignature.js:189:15)\n    at async /Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:273:53\n    at async Promise.all (index 0)\n    at async _verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:261:3)\n    at async ProofSet.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:195:23)\n    at async Object.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/jsonld-signatures.js:160:18)\n    at async _verifyPresentation (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/vc/dist/index.js:578:30)\n    at async verifyPresentation (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/src/Verify.js:24:24)\n    at async Context.<anonymous> (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/test/Verify.presentation.spec.js:97:28)"
-            }
-          ]
-        },
-        "name": "presentation_error"
+
+The same `Verifier` is also used recursively when verifying a presentation, so
+all credentials embedded in a VP share the verifier's caches automatically:
+
+```typescript
+const result = await verifier.verifyPresentation({ presentation });
+```
+
+## Custom Suites
+
+Extend the default pipeline with custom verification logic:
+
+```typescript
+import {
+  verifyCredential,
+  VerificationSuite
+} from '@digitalcredentials/verifier-core';
+
+const myCustomSuite: VerificationSuite = {
+  id: 'custom.expiry-policy',
+  name: 'Expiry Policy',
+  checks: [
+    {
+      id: 'custom.expiry-policy.grace-period',
+      name: 'Grace Period Check',
+      fatal: false,
+      execute: async (subject, context) => {
+        const credential = subject.verifiableCredential as any;
+        // Custom logic: allow 30-day grace period after expiration
+        return { status: 'success', message: 'Within grace period.' };
       }
-    ]
-  },
-  "credentialResults": [
-    {
-      "credential": {
-        "@context": [
-          "https://www.w3.org/2018/credentials/v1",
-          "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.2.json",
-          "https://w3id.org/security/suites/ed25519-2020/v1"
-        ],
-        "id": "urn:uuid:2fe53dc9-b2ec-4939-9b2c-0d00f6663b6c",
-        "type": [
-          "VerifiableCredential",
-          "OpenBadgeCredential"
-        ],
-        "name": "Tampered Name",
-        "issuer": {
-          "type": [
-            "Profile"
-          ],
-          "id": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-          "name": "Digital Credentials Consortium Test Issuer",
-          "url": "https://dcconsortium.org",
-          "image": "https://user-images.githubusercontent.com/752326/230469660-8f80d264-eccf-4edd-8e50-ea634d407778.png"
-        },
-        "issuanceDate": "2023-08-02T17:43:32.903Z",
-        "credentialSubject": {
-          "type": [
-            "AchievementSubject"
-          ],
-          "achievement": {
-            "id": "urn:uuid:bd6d9316-f7ae-4073-a1e5-2f7f5bd22922",
-            "type": [
-              "Achievement"
-            ],
-            "achievementType": "Diploma",
-            "name": "Badge",
-            "description": "This is a sample credential issued by the Digital Credentials Consortium to demonstrate the functionality of Verifiable Credentials for wallets and verifiers.",
-            "criteria": {
-              "type": "Criteria",
-              "narrative": "This credential was issued to a student that demonstrated proficiency in the Python programming language that occurred from **February 17, 2023** to **June 12, 2023**."
-            },
-            "image": {
-              "id": "https://user-images.githubusercontent.com/752326/214947713-15826a3a-b5ac-4fba-8d4a-884b60cb7157.png",
-              "type": "Image"
-            }
-          },
-          "name": "Jane Doe"
-        },
-        "proof": {
-          "type": "Ed25519Signature2020",
-          "created": "2023-10-05T11:17:41Z",
-          "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
-          "proofPurpose": "assertionMethod",
-          "proofValue": "z5fk6gq9upyZvcFvJdRdeL5KmvHr69jxEkyDEd2HyQdyhk9VnDEonNSmrfLAcLEDT9j4gGdCG24WHhojVHPbRsNER"
-        }
-      },
-      "errors": [
-        {
-          "name": "invalid_signature",
-          "message": "The signature is not valid."
-        }
-      ]
     }
   ]
+};
+
+const result = await verifyCredential({
+  credential,
+  additionalSuites: [myCustomSuite]
+});
+
+// result.results includes checks from both default and custom suites
+```
+
+Custom suites run after the default suites. Each check receives the same
+`VerificationSubject` and `VerificationContext` as built-in checks.
+
+## Verbose mode and folded summaries
+
+Each `CredentialVerificationResult` and `PresentationVerificationResult` carries
+a `summary: SuiteSummary[]` rollup of per-suite outcomes. By default (since
+v2.0.0), `results[]` carries only failures and explicit `<suite>.applies` skips;
+pass `verbose: true` to keep every check in `results[]`.
+
+```ts
+const result = await verifier.verifyCredential({ credential });
+// result.summary[i] = { id, phase, suite, status, verified, message, counts, ... }
+// result.results[]  = failures + explicit skips only
+
+const verbose = await verifier.verifyCredential({ credential, verbose: true });
+// verbose.results[] carries every check that ran, with .id populated.
+```
+
+`verbose` is also accepted on `createVerifier(...)` as an instance default;
+per-call values win when both are set.
+
+See [`docs/api/verification-results.md`](./docs/api/verification-results.md) for
+the full reference (phase model, `SuiteSummary` fields, `id` namespace, UI
+rendering recipe, and a prompt-ready appendix for downstream UIs).
+
+## Capturing timing data
+
+Every result can carry per-check, per-suite, and per-call `TaskTiming` data
+(wall-clock `startedAt` / `endedAt` plus a monotonic `durationMs`). Off by
+default; opt in via `timing: true` on `createVerifier(...)` or per-call. Mirrors
+`verbose`'s plumbing — per-call wins, and `verifyPresentation` propagates the
+flag into embedded `verifyCredential` calls so the top-level `result.timing` is
+an inclusive wrapper.
+
+```ts
+const verifier = createVerifier({ timing: true });
+const result = await verifier.verifyCredential({ credential });
+console.log(result.timing!.durationMs);
+console.log(result.summary[0].timing!.durationMs);
+```
+
+In `verbose: false` mode (the default), individual `CheckResult.timing` entries
+fold away in `results[]`, but the per-suite `SuiteSummary.timing` survives in
+`summary[]` so suite-grain timing is never lost. See
+[`docs/api/timing.md`](./docs/api/timing.md) for the full reference, granularity
+table, recipes, and a prompt-ready appendix.
+
+## Pluggable clock (`TimeService`)
+
+`verifier-core` reads wall-clock and monotonic time through a small
+`TimeService` interface. The default is `RealTimeService` (`Date.now` /
+`performance.now`); pass `{ timeService: FakeTimeService() }` on
+`createVerifier(...)` in tests to make every `TaskTiming` field
+exact-value-assertable. Both factories are exported from the package barrel. The
+same abstraction will back upcoming work on credential expiration, signature
+clock-skew windows, key rotation, and status-list freshness — see
+[`docs/api/timing.md`](./docs/api/timing.md) for the reference.
+
+## Open Badges 3.0 verification (opt-in submodule)
+
+Open Badges 3.0 verification ships in
+`@digitalcredentials/verifier-core/openbadges` as an opt-in submodule. It is not
+part of the default suite list; consumers that want OB checks pass
+`openBadgesSuite` (or one of the bundled variants) via `additionalSuites` on a
+verify call.
+
+> [!IMPORTANT] If you were on `1.0.0-beta.x` and relied on `obv3SchemaSuite`
+> running by default, you now need to opt in explicitly. The simplest migration
+> is to add `openBadgesSuite` to your verify call.
+
+### Enabling OB verification
+
+```ts
+import { createVerifier } from '@digitalcredentials/verifier-core';
+import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
+
+const verifier = createVerifier();
+const result = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite]
+});
+```
+
+### Bundle variants
+
+| Bundle                    | Contents                                                           | Network?                                      |
+| ------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
+| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch on first use; cached after) |
+| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                                            |
+| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes                                           |
+
+Pick `openBadgesSemanticSuite` when you want the OB-specific semantic checks
+(`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
+`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`) but cannot afford a
+network fetch on the first OB credential of a process.
+
+### Problem types
+
+OB-specific problem URIs live on `OpenBadgesProblemTypes` (also exported as
+`Obv3ProblemTypes` for symmetry with internal naming):
+
+```ts
+import {
+  openBadgesSuite,
+  OpenBadgesProblemTypes,
+  type OpenBadgesProblemType
+} from '@digitalcredentials/verifier-core/openbadges';
+
+// In a result-handling callback...
+switch (problem.type as OpenBadgesProblemType) {
+  case OpenBadgesProblemTypes.OB_INVALID_RESULT_REFERENCE:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_INVALID_ACHIEVED_LEVEL:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_MISSING_RESULT_STATUS:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_UNKNOWN_ACHIEVEMENT_TYPE:
+    // ...
+    break;
 }
 ```
 
-And here is a VP where just the VP has been tampered with, and not the embedded VC, and so the VC returns as valid, but not the presentation signature:
+The wire URIs follow the `…#OB_*` shape (e.g.
+`https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL`). Callers
+upgrading from `1.0.0-beta.x` who literal-matched
+`OBV3_INVALID_RESULT_REFERENCE` need to update those literals to
+`OB_INVALID_RESULT_REFERENCE` (or — preferred — switch to the
+`OpenBadgesProblemTypes` constants).
 
+### Caller-augmented `AchievementType` vocabulary
+
+The default `obv3UnknownAchievementTypeCheck` validates against the OB 3.0
+§B.1.1 enumeration plus the spec-sanctioned `ext:` prefix. Issuers that mint
+additional vocabulary tokens (without an `ext:` prefix) can compose a custom
+check that adds those tokens to the accepted set:
+
+```ts
+import {
+  openBadgesSemanticSuite,
+  createObv3UnknownAchievementTypeCheck
+} from '@digitalcredentials/verifier-core/openbadges';
+
+const customCheck = createObv3UnknownAchievementTypeCheck({
+  additionalKnownTypes: ['MyOrgInternalAchievementType']
+});
+
+const customSuite = {
+  ...openBadgesSemanticSuite,
+  checks: openBadgesSemanticSuite.checks.map(c =>
+    c.id === 'schema.obv3.unknown-achievement-type' ? customCheck : c
+  )
+};
+
+const result = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [customSuite]
+});
 ```
+
+For version-pinned behavior, the `OB_3_0_ACHIEVEMENT_TYPES` set is exported
+directly so callers can build their own check against an explicit OB version
+rather than tracking the moving `KNOWN_ACHIEVEMENT_TYPES` alias.
+
+## Advanced: Credential recognition + two-pass verification
+
+`verifier-core` ships a **pluggable recognition pipeline**. Recognizers (e.g.,
+`obv3p0Recognizer`, `obv3p0EndorsementRecognizer`) parse a credential's
+profile-specific shape and return a normalized form. The default
+`recognitionSuite` runs them in registration order and surfaces the first
+applies-true match on `CredentialVerificationResult` as
+`normalizedVerifiableCredential` + `recognizedProfile` — so consumers can branch
+on the recognized profile and reach a typed view of the credential without
+re-parsing.
+
+### End-to-end Open Badges wiring
+
+```ts
+import { createVerifier } from '@digitalcredentials/verifier-core';
+import {
+  obv3p0Recognizer,
+  obv3p0EndorsementRecognizer,
+  openBadgesSuite
+} from '@digitalcredentials/verifier-core/openbadges';
+import type { Obv3p0OpenBadgeCredential } from '@digitalcredentials/verifier-core/openbadges';
+
+const verifier = createVerifier({
+  recognizers: [obv3p0Recognizer, obv3p0EndorsementRecognizer]
+});
+
+// One pass: full crypto + recognition + OB semantic checks.
+const presResult = await verifier.verifyPresentation({
+  presentation: vp,
+  additionalSuites: [openBadgesSuite]
+});
+
+for (const credResult of presResult.credentialResults) {
+  if (credResult.recognizedProfile === 'obv3p0.openbadge') {
+    const ob =
+      credResult.normalizedVerifiableCredential as Obv3p0OpenBadgeCredential;
+    console.log('Achievement:', ob.credentialSubject);
+  }
+}
+```
+
+This is the recommended advanced integration shape for services like
+`dcc-transaction-service` that verify a presentation up front and then inspect
+each embedded credential's profile to drive downstream business logic. If
+performance matters, you're verifying high volumes of credentials, you want to
+show partial results to a user for verification in progress, or you have
+specific requirements for the verification process, this advanced integration
+pattern may be for you.
+
+### Two-pass verification
+
+When a credential has already been cryptographically verified — e.g.
+re-rendering a previously-verified credential, or running deeper semantic
+analysis on demand — the `phases:` filter lets you re-run only the work you
+need. Phases are `'cryptographic' | 'trust' | 'recognition' | 'semantic'`;
+requesting `'semantic'` automatically includes `'recognition'` so semantic
+checks can consume the normalized form.
+
+```ts
+// Pass 1 (default — every phase runs): full crypto + trust + recognition + semantic.
+const fullResult = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite]
+});
+
+// Pass 2: re-run only the semantic checks (recognition is auto-included).
+const semanticOnly = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite],
+  phases: ['semantic']
+});
+// semanticOnly.partial === true
+// semanticOnly.results contains only the recognition.profile + OB semantic check entries
+```
+
+`partial: true` is set on the result whenever the consumer passed an explicit
+`phases:` value, so downstream code can tell that the result covers only a
+subset of the pipeline. The default (no `phases:`) leaves `partial` unset —
+existing consumers see no change in result shape.
+
+### `applies` predicate contract
+
+A `VerificationSuite` may declare an `applies(subject, context)` predicate. The
+orchestrator uses it as follows:
+
+- **Implicit (default suite list):** if `applies` returns false, the suite is
+  silently skipped — no entries in `results`.
+- **Explicit (suite passed via `additionalSuites`):** if `applies` returns
+  false, a synthetic `<suite-id>.applies` `'skipped'` `CheckResult` is emitted
+  so the consumer sees their explicit request was acknowledged but not
+  actionable.
+
+This is what lets you queue `openBadgesSuite` against an arbitrary credential
+and still get a clear signal in the result when the credential isn't an Open
+Badge.
+
+### `ProblemDetail.instance` attribution
+
+Failure-outcome `ProblemDetail` entries from semantic and envelope checks carry
+an [RFC 6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) on
+`instance`, locating the offending portion of the credential — aligned with
+[RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457). For example, an OB
+credential that names a `result.achievedLevel` not declared on the referenced
+`ResultDescription` produces:
+
+```ts
 {
-  "presentationResult": {
-    "signature": "invalid",
-    "errors": [
-      {
-        "name": "presentation_error",
-        "message": {
-          "name": "VerificationError",
-          "errors": [
-            {
-              "name": "Error",
-              "message": "Invalid signature.",
-              "stack": "Error: Invalid signature.\n    at Ed25519Signature2020.verifyProof (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/suites/LinkedDataSignature.js:189:15)\n    at async /Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:273:53\n    at async Promise.all (index 0)\n    at async _verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:261:3)\n    at async ProofSet.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/ProofSet.js:195:23)\n    at async Object.verify (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/jsonld-signatures/lib/jsonld-signatures.js:160:18)\n    at async _verifyPresentation (/Users/jameschartrand/Documents/github/dcc/verifier-core/node_modules/@digitalcredentials/vc/dist/index.js:578:30)\n    at async verifyPresentation (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/src/Verify.js:24:24)\n    at async Context.<anonymous> (file:///Users/jameschartrand/Documents/github/dcc/verifier-core/dist/test/Verify.presentation.spec.js:101:28)"
-            }
-          ]
-        }
-      }
-    ]
-  },
-  "credentialResults": [
-    {
-      "log": [
-        {
-          "id": "valid_signature",
-          "valid": true
-        },
-        {
-          "id": "expiration",
-          "valid": true
-        },
-        {
-          "id": "registered_issuer",
-          "valid": true,
-          "foundInRegistries": [
-            "DCC Sandbox Registry"
-          ],
-          "registriesNotLoaded": []
-        }
-      ],
-      "credential": {vc ommitted for clarity/brevity}
-    }
-  ]
+  type: 'https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL',
+  title: 'Invalid Achieved Level',
+  detail: 'Result entry at index 0 claims achievedLevel "urn:lvl:NOT_REAL", ...',
+  instance: '/credentialSubject/result/0/achievedLevel',
 }
 ```
+
+UI surfaces can highlight the exact field by walking the pointer.
+
+## Architecture
+
+For internal architecture details — verification pipeline, suite model, type
+system, dependencies, and architectural direction — see
+[`docs/architecture.md`](docs/architecture.md).
+
+## Migration from earlier 1.0.0-beta.x
+
+This release tightens the public API surface. The following changes may require
+small migrations:
+
+- **Demoted from `index.ts`** — these symbols remain reachable via their module
+  paths (`@digitalcredentials/verifier-core/dist/...`) but are no longer part of
+  the published 1.0 surface: `runSuites`, `createRegistryLookup`,
+  `DEFAULT_TTL_MS`, `parseCacheControlMaxAge`, `resolveTtl`,
+  `ttlFromValidUntil`, `documentLoaderFromHttpGet`, `fetchJsonFromHttpGet`,
+  `extractCredentialsFrom`, `registryKeyHash`. Most callers should build
+  verifiers via `createVerifier(...)` rather than reach for these directly.
+
+- **Result-shape changes:**
+  - `CredentialVerificationResult.credential` → `verifiableCredential`
+    (`s/\.credential\b/.verifiableCredential/` on accessor sites).
+  - `PresentationVerificationResult.allResults` removed — replace with
+    `flattenPresentationResults(result)`.
+  - `PresentationVerificationResult.verifiablePresentation` added — new field
+    carrying the parsed VP.
+
+- **Default cache isolation:** two `createVerifier()` calls without an explicit
+  `cacheService` no longer share a process-wide cache. To preserve the previous
+  "shared" behavior, construct one `InMemoryCacheService` and pass it to each
+  verifier explicitly.
+
+- **Legacy result types removed:** `VerificationResponse`,
+  `PresentationVerificationResponse`, and friends were already removed from
+  `index.ts` in `1.0.0-beta.11`; the type definitions are now gone too. Anyone
+  who needed the old shape can pin `1.0.0-beta.11` or earlier.
+
+- **`ProblemTypes` const map added:** built-in problem URIs are now importable
+  as `ProblemTypes.INVALID_SIGNATURE` etc. Existing literal-string comparisons
+  against `ProblemDetail.type` continue to work unchanged.
+
+- **OBv3 verification is opt-in** — the OBv3 schema suite no longer runs by
+  default. Add `openBadgesSuite` (or one of its variants) via `additionalSuites`
+  on the verify call to restore previous behavior. See the
+  [Open Badges 3.0 verification](#open-badges-30-verification-opt-in-submodule)
+  section for details.
+
+- **OBv3 problem-type rename** — `OBV3_INVALID_RESULT_REFERENCE` (and other OB
+  problems mirrored on `ProblemTypes`) moved out of the core catalog into
+  `OpenBadgesProblemTypes` in the `/openbadges` submodule, and the wire URIs
+  shifted from `…#OBV3_*` to `…#OB_*`. Callers comparing literal strings against
+  `ProblemDetail.type` need to update the affected literals; callers using the
+  constants should switch to the new module.
 
 ## Install
 
-- Node.js 20+ is recommended.
+Node.js 24+ is required.
 
 ### NPM
-
-To install via NPM:
 
 ```
 npm install @digitalcredentials/verifier-core
@@ -1184,12 +848,14 @@ npm install @digitalcredentials/verifier-core
 
 ### Development
 
-To install locally (for development):
+This repo uses [pnpm](https://pnpm.io/).
 
 ```
 git clone https://github.com/digitalcredentials/verifier-core.git
 cd verifier-core
-npm install
+pnpm install
+pnpm test            # lint + node tests (vitest)
+pnpm run test:browser # playwright (run `pnpm exec playwright install chromium` first)
 ```
 
 ## Contribute

@@ -1,93 +1,90 @@
 {
   "name": "@digitalcredentials/verifier-core",
   "description": "For verifying Verifiable Credentials in the browser, Node.js, and React Native.",
-  "version": "1.0.0-beta.11",
+  "version": "2.0.0",
   "scripts": {
-    "build-esm": "tsc -p tsconfig.esm.json",
-    "build-types": "tsc -p tsconfig.types.json",
-    "build-test": "tsc -p tsconfig.test.json",
-    "build": "npm run clear && npm run build-types && npm run build-esm",
+    "build": "pnpm run clear && tsc",
     "clear": "rimraf dist/*",
-    "lint": "eslint .",
-    "lint:fix": "eslint --fix .",
-    "prepare": "npm run build",
-    "prettier": "prettier src --write",
-    "rebuild": "npm run clear && npm run build",
-    "test": "npm run lint && npm run test-node",
-    "test-karma": "karma start karma.conf.cjs",
-    "test-node-no-cov": "npm run build-test && mocha --timeout 20000 dist/test/*.spec.js && rimraf dist/test",
-    "test-node": "npm run build-test && npx c8 --exclude 'dist/test/**' mocha --timeout 20000 dist/test/*.spec.js && rm -rf dist/test || true",
-    "coveralls": "npm run test; npx c8 --exclude 'dist/test/**' report --reporter=text-lcov > ./coverage/lcov.info"
+    "dev": "vite",
+    "fix": "eslint --fix src test && pnpm run format",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\"",
+    "lint": "eslint src test",
+    "prepare": "pnpm run build",
+    "rebuild": "pnpm run clear && pnpm run build",
+    "test": "pnpm run lint && pnpm run test:node",
+    "test:browser": "playwright test",
+    "test:node": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts"
   },
   "type": "module",
   "module": "./dist/index.js",
+  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "react-native": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./openbadges": {
+      "types": "./dist/openbadges/index.d.ts",
+      "react-native": "./dist/openbadges/index.js",
+      "import": "./dist/openbadges/index.js"
     }
   },
   "files": [
     "dist",
     "CHANGELOG.md",
     "README.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "dependencies": {
     "@digitalcredentials/data-integrity": "^2.6.0",
+    "@digitalcredentials/did-io": "^1.0.2",
+    "@digitalcredentials/did-method-key": "^3.0.0",
+    "@digitalcredentials/did-method-web": "^1.1.0",
+    "@digitalcredentials/ed25519-multikey": "^1.4.0",
     "@digitalcredentials/ed25519-signature-2020": "^7.0.0",
     "@digitalcredentials/eddsa-rdfc-2022-cryptosuite": "^1.3.0",
-    "@digitalcredentials/issuer-registry-client": "^3.2.0-beta.5",
     "@digitalcredentials/jsonld-signatures": "^12.0.1",
     "@digitalcredentials/security-document-loader": "^8.0.0",
     "@digitalcredentials/vc": "^10.0.0",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0",
+    "@interop/ecdsa-multikey": "^2.3.2",
+    "@interop/ecdsa-signature": "^2.0.4",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "klona": "^2.0.6",
+    "zod": "^3.24.4"
   },
   "devDependencies": {
     "@digitalcredentials/ed25519-verification-key-2020": "^4.0.0",
-    "@types/chai": "^4.3.4",
-    "@types/deep-equal-in-any-order": "^1.0.4",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^18.11.17",
-    "@typescript-eslint/eslint-plugin": "^5.46.1",
-    "@typescript-eslint/parser": "^5.46.1",
-    "c8": "^10.1.3",
-    "chai": "^4.3.7",
-    "coveralls": "^3.1.1",
-    "cross-env": "^7.0.3",
-    "deep-equal-in-any-order": "^2.0.6",
-    "eslint": "^8.30.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-config-standard-with-typescript": "^24.0.0",
-    "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "eslint-plugin-promise": "^6.1.1",
-    "karma": "^6.4.1",
-    "karma-chai": "^0.1.0",
-    "karma-chrome-launcher": "^3.1.1",
-    "karma-mocha": "^2.0.1",
-    "karma-mocha-reporter": "^2.2.5",
-    "karma-sourcemap-loader": "^0.3.8",
-    "karma-typescript": "^5.5.3",
-    "mocha": "^10.2.0",
-    "prettier": "^2.8.1",
-    "rimraf": "^3.0.2",
-    "ts-node": "^10.9.1",
-    "tsx": "^4.19.2",
-    "typescript": "^4.9.4"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.7",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.4",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "keywords": [
     "dcc"
   ],
+  "packageManager": "pnpm@11.3.0",
   "engines": {
-    "node": ">=18.0"
+    "node": ">=24.0"
   },
   "author": {
     "name": "Digital Credentials Consortium",

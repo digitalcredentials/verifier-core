@@ -110,9 +110,19 @@ jspm_packages/
 *~
 *.sw[nop]
 /.vscode
+.cursor
+
+# local development notes
+docs/plans 
 
 # Output
 dist
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
 
 # MacOS
 .DS_Store
