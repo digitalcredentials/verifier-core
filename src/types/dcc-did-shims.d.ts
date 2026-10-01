@@ -39,7 +39,22 @@ declare module '@digitalcredentials/did-method-key' {
 }
 
 declare module '@digitalcredentials/ed25519-multikey' {
+  type Ed25519KeyPair = {
+    signer: () => { sign: (opts: { data: Uint8Array }) => Promise<Uint8Array> };
+    verifier: () => {
+      verify: (opts: {
+        data: Uint8Array;
+        signature: Uint8Array;
+      }) => Promise<boolean>;
+    };
+  };
+
   export const from: (input: unknown) => unknown;
+  export const fromJwk: (opts: { jwk: unknown }) => Promise<Ed25519KeyPair>;
+  export const generate: () => Promise<Ed25519KeyPair>;
+  export const toJwk: (opts: {
+    keyPair: Ed25519KeyPair;
+  }) => Promise<Record<string, string>>;
 }
 
 declare module '@digitalcredentials/did-io' {
