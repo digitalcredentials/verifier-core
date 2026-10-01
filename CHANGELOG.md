@@ -43,6 +43,8 @@ Verifier results now fold per-suite checks into a single
   credential expiration, signature clock-skew, key rotation, and status-list
   freshness work.
 - `domain` on `verifyPresentation`, checked alongside `challenge`.
+- `BuiltinHttpGetService({ timeoutMs, maxBytes })`: the deadline (default 10 s)
+  and body cap (default 5 MB) of the built-in HTTP service.
 
 ### Changed
 
@@ -62,6 +64,10 @@ Verifier results now fold per-suite checks into a single
   prettier 3; package manager is **pnpm**. `engines.node` raised to `>=24`.
   `exports` now declare `react-native` / `import` conditions for `.` and
   `./openbadges`, and the package is marked `sideEffects: false`.
+- `HttpGetResult.body` from the built-in HTTP service is parsed JSON whenever
+  the body is valid JSON, whatever its content type. Previously only JSON
+  content types were parsed, so a `text/plain` status list or DID document
+  arrived as a string.
 
 ### Fixed
 
@@ -95,6 +101,14 @@ Verifier results now fold per-suite checks into a single
   `authentication` VP now verifies on its signature instead of failing against
   the placeholder challenge `meaningless`. The VP proof check no longer
   re-verifies embedded credentials.
+- **Security: the built-in HTTP service no longer fetches whatever a credential
+  names.** It refuses non-https URLs, `localhost` and loopback, private,
+  link-local and unspecified IP literals, on the first URL and on every redirect
+  hop (at most five). Each request has a 10 s deadline and a 5 MB body cap. The
+  body is read once, so a malformed JSON response no longer fails with
+  `Body is unusable`, and errors name only the URL and the reason: response text
+  no longer reaches problem details. This covers the built-in service only; an
+  injected `httpGetService` or `documentLoader` keeps its own policy.
 
 ### Deprecated
 

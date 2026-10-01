@@ -68,16 +68,25 @@ export function documentLoaderFromHttpGet(
         //    itself, so returning one here nests it — callers that unwrap
         //    `.document` get the inner envelope instead of the document.
         //
-        // 2. Parse strings. `BuiltinHttpGetService` only parses when the
-        //    response carries a JSON content type, and status lists are
-        //    routinely served as `text/plain` (raw.githubusercontent.com
-        //    does), so the body arrives as a string. `ContextResolver`
-        //    happens to parse strings itself, which is why remote contexts
-        //    survive; document loads such as `checkStatus` do not.
+        // 2. Parse strings. `BuiltinHttpGetService` already parses any JSON
+        //    body, but an injected service may return text — status lists
+        //    are routinely served as `text/plain` (raw.githubusercontent.com
+        //    does). `ContextResolver` happens to parse strings itself, which
+        //    is why remote contexts survive; document loads such as
+        //    `checkStatus` do not.
         //
         // A body that is a string but not JSON throws inside this try, so it
-        // still surfaces as a wrapped `NotFoundError` for the url.
-        return typeof body === 'string' ? JSON.parse(body) : body;
+        // still surfaces as a wrapped `NotFoundError` for the url. The
+        // parser's own message quotes the body, and this message ends up in
+        // problem details, so it is replaced with fixed text.
+        if (typeof body !== 'string') {
+          return body;
+        }
+        try {
+          return JSON.parse(body);
+        } catch {
+          throw new Error('response is not JSON');
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`NotFoundError loading "${url}": ${msg}`, { cause: e });

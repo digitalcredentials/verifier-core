@@ -11,6 +11,7 @@
   - [verifyCredential](#verifycredential)
   - [verifyPresentation](#verifypresentation)
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
+  - [Network policy of the built-in HTTP service](#network-policy-of-the-built-in-http-service)
 - [Custom Suites](#custom-suites)
 - [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
 - [Capturing timing data](#capturing-timing-data)
@@ -111,7 +112,7 @@ interface VerifyCredentialOptions {
   additionalSuites?: VerificationSuite[];
 
   // Service overrides (otherwise sensible defaults are used):
-  httpGetService?: HttpGetService;
+  httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
@@ -371,7 +372,7 @@ interface VerifyPresentationOptions {
   additionalSuites?: VerificationSuite[];
 
   // Service overrides (otherwise sensible defaults are used):
-  httpGetService?: HttpGetService;
+  httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
@@ -485,6 +486,51 @@ all credentials embedded in a VP share the verifier's caches automatically:
 ```typescript
 const result = await verifier.verifyPresentation({ presentation });
 ```
+
+### Network policy of the built-in HTTP service
+
+Verification fetches URLs the credential chooses: JSON-LD contexts, `did:web`
+documents, status lists, schemas and registries. The built-in
+`BuiltinHttpGetService` is safe to point at them, including on a server:
+
+- **https only, and no local addresses.** It refuses `http:` and other schemes,
+  `localhost` and `*.localhost`, and loopback, private (including carrier-grade
+  NAT), link-local (including `169.254.169.254`) and unspecified IP literals,
+  IPv4 and IPv6.
+- **Redirects are checked hop by hop**, before each is requested, and at most
+  five are followed.
+- **A 10 s deadline and a 5 MB body cap** cover each request. Change them by
+  constructing the service yourself:
+
+  ```typescript
+  import {
+    BuiltinHttpGetService,
+    createVerifier
+  } from '@digitalcredentials/verifier-core';
+
+  const verifier = createVerifier({
+    httpGetService: BuiltinHttpGetService({
+      timeoutMs: 20_000,
+      maxBytes: 1_000_000
+    })
+  });
+  ```
+
+- **The body is read once** and parsed as JSON whatever its content type; a body
+  that is not JSON is returned as text.
+- **Errors never quote the response.** They name the URL and the reason, so
+  nothing fetched leaks into a result's problem details.
+
+JSON-LD contexts that are not bundled are fetched under this same policy. To
+verify against a closed set of contexts instead, pass your own `documentLoader`.
+
+There is no switch to relax the policy. For local testing, use a tunnel or a
+local DNS name with a valid certificate. Hosts are judged by name or literal
+only: there is no portable DNS lookup, so a public name that resolves to a
+private address is not caught.
+
+An injected `httpGetService` or `documentLoader` replaces all of this. If you
+inject one, its network policy is yours.
 
 ## Custom Suites
 

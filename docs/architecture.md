@@ -42,7 +42,8 @@ src/
 │   └── holder.ts                    Holder: a string, or an object with a string id
 ├── services/                        Ports and adapters for injectable dependencies
 │   ├── cache-service/               CacheService port + InMemoryCacheService adapter
-│   ├── http-get-service/            HttpGetService port + BuiltinHttpGetService (fetch-based) adapter
+│   ├── http-get-service/            HttpGetService port + BuiltinHttpGetService (fetch adapter with URL policy, deadline and byte cap)
+│   │   └── url-policy.ts            checkUrl: https only, no localhost / private IP literals (applied per redirect hop)
 │   ├── data-integrity-crypto.ts     Default CryptoService implementation (Data Integrity / Linked Data Proofs)
 │   ├── registry-lookup.ts           createRegistryLookup factory: builds a LookupIssuers from handlers + cache
 │   └── registry-handlers/           Per-type registry handlers behind a port
@@ -248,6 +249,14 @@ remote fetch (JSON-LD contexts, `did:web` documents, status list
 credentials) therefore flows through the verifier's HTTP service,
 giving caller-installed mocks, retries, and (future) caches a single
 chokepoint to observe.
+
+That chokepoint is also where the network policy lives. With the default
+`BuiltinHttpGetService`, every fetch — unbundled contexts included — is
+https-only, refuses `localhost` and private IP literals on every redirect
+hop, has a deadline and a byte cap, and reports failures with fixed text
+that never quotes the response. A caller-supplied `httpGetService` or
+`documentLoader` replaces that policy along with the fetch; see the
+README's "Network policy of the built-in HTTP service".
 
 To avoid re-allocating the loader's `CachedResolver` and DID drivers
 on every call, the per-service loader is memoized via a module-local
