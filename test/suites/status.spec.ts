@@ -215,7 +215,7 @@ describe('Status Suite', () => {
       expect(results[0].outcome.status).toBe('failure');
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].type).toBe(
-          'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED'
+          'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED'
         );
       }
     });
@@ -507,6 +507,330 @@ describe('Status Suite', () => {
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
         expect(results[0].outcome.reason).toContain('UnknownStatusType');
+      }
+    });
+  });
+
+  describe('per-entry handling', () => {
+    const REVOCATION_URL = 'https://factory.test/status/entries-revocation';
+    const SUSPENSION_URL = 'https://factory.test/status/entries-suspension';
+    const SECOND_REVOCATION_URL =
+      'https://factory.test/status/entries-revocation-2';
+    const LEGACY_URL = 'https://factory.test/status/entries-legacy';
+    const REFRESH_URL = 'https://factory.test/status/entries-refresh';
+
+    const legacyEntry = {
+      id: `${LEGACY_URL}#0`,
+      type: 'StatusList2021Entry',
+      statusPurpose: 'revocation',
+      statusListIndex: '0',
+      statusListCredential: LEGACY_URL
+    };
+
+    async function lists(revoked: Record<string, number[]> = {}) {
+      const make = (id: string, statusPurpose: string) =>
+        StatusListCredentialFactory({
+          id,
+          statusPurpose,
+          revokedIndexes: revoked[id] ?? [],
+          listLength: 32
+        });
+      return {
+        [REVOCATION_URL]: await make(REVOCATION_URL, 'revocation'),
+        [SECOND_REVOCATION_URL]: await make(
+          SECOND_REVOCATION_URL,
+          'revocation'
+        ),
+        [SUSPENSION_URL]: await make(SUSPENSION_URL, 'suspension'),
+        [REFRESH_URL]: await make(REFRESH_URL, 'refresh')
+      };
+    }
+
+    async function run(
+      credentialStatus: unknown,
+      revoked: Record<string, number[]> = {}
+    ) {
+      const { loader, counts } = countingDocumentLoader(
+        FakeDocumentLoader(await lists(revoked))
+      );
+      const context = buildTestContext({
+        documentLoader: loader,
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: { credentialStatus }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+      return { outcome: results[0].outcome, counts };
+    }
+
+    const entry = (statusListCredential: string, statusPurpose: string) =>
+      BitstringStatusEntry({
+        statusListCredential,
+        statusPurpose,
+        statusListIndex: '1'
+      });
+
+    it('checks a BitstringStatusListEntry behind a legacy entry, without fetching the legacy list', async () => {
+      const { outcome, counts } = await run([
+        legacyEntry,
+        entry(REVOCATION_URL, 'revocation')
+      ]);
+
+      expect(outcome.status).toBe('success');
+      if (outcome.status === 'success') {
+        expect(outcome.message).toContain('not revoked');
+        expect(outcome.message).toContain(
+          'Ignored: legacy status type "StatusList2021Entry".'
+        );
+      }
+      expect(counts.get(REVOCATION_URL)).toBe(1);
+      expect(counts.get(LEGACY_URL)).toBeUndefined();
+    });
+
+    it('gives the same result whatever the entry order', async () => {
+      const { outcome, counts } = await run([
+        entry(REVOCATION_URL, 'revocation'),
+        legacyEntry
+      ]);
+
+      expect(outcome.status).toBe('success');
+      expect(counts.get(LEGACY_URL)).toBeUndefined();
+    });
+
+    it('skips a BitstringStatusListEntry for a purpose it does not check, without fetching it', async () => {
+      const { outcome, counts } = await run(entry(REFRESH_URL, 'refresh'));
+
+      expect(outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'BitstringStatusListEntry with statusPurpose "refresh" is not checked.'
+      });
+      expect(counts.get(REFRESH_URL)).toBeUndefined();
+    });
+
+    it('names every ignored entry when none is checked', async () => {
+      const { outcome } = await run([
+        legacyEntry,
+        { ...legacyEntry, type: '1EdTechRevocationList' }
+      ]);
+
+      expect(outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'No revocation or suspension BitstringStatusListEntry to check; ignored: legacy status type "StatusList2021Entry", legacy status type "1EdTechRevocationList".'
+      });
+    });
+
+    it('reports a suspension alone when only the suspension bit is set', async () => {
+      const { outcome } = await run(
+        [
+          entry(REVOCATION_URL, 'revocation'),
+          entry(SUSPENSION_URL, 'suspension')
+        ],
+        { [SUSPENSION_URL]: [1] }
+      );
+
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems).toHaveLength(1);
+        expect(outcome.problems[0].type).toBe(
+          ProblemTypes.CREDENTIAL_SUSPENDED
+        );
+        expect(outcome.problems[0].title).toBe('Credential Suspended');
+        expect(outcome.problems[0].detail).toContain(SUSPENSION_URL);
+      }
+    });
+
+    it('reports revoked and suspended separately when both bits are set', async () => {
+      const { outcome } = await run(
+        [
+          entry(REVOCATION_URL, 'revocation'),
+          entry(SUSPENSION_URL, 'suspension')
+        ],
+        { [REVOCATION_URL]: [1], [SUSPENSION_URL]: [1] }
+      );
+
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems.map(p => p.type)).toEqual([
+          ProblemTypes.CREDENTIAL_REVOKED,
+          ProblemTypes.CREDENTIAL_SUSPENDED
+        ]);
+        expect(outcome.problems[0].detail).toContain(REVOCATION_URL);
+        expect(outcome.problems[1].detail).toContain(SUSPENSION_URL);
+      }
+    });
+
+    it('fails when one revocation list is set and another is clear', async () => {
+      const { outcome } = await run(
+        [
+          entry(REVOCATION_URL, 'revocation'),
+          entry(SECOND_REVOCATION_URL, 'revocation')
+        ],
+        { [REVOCATION_URL]: [1] }
+      );
+
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems).toHaveLength(1);
+        expect(outcome.problems[0].type).toBe(ProblemTypes.CREDENTIAL_REVOKED);
+        expect(outcome.problems[0].detail).toContain(REVOCATION_URL);
+      }
+    });
+
+    it('does not read a set refresh bit as revoked', async () => {
+      const { outcome, counts } = await run(
+        [entry(REVOCATION_URL, 'revocation'), entry(REFRESH_URL, 'refresh')],
+        { [REFRESH_URL]: [1] }
+      );
+
+      expect(outcome.status).toBe('success');
+      if (outcome.status === 'success') {
+        expect(outcome.message).toContain(
+          'Ignored: BitstringStatusListEntry with statusPurpose "refresh".'
+        );
+      }
+      expect(counts.get(REFRESH_URL)).toBeUndefined();
+    });
+  });
+
+  describe('status list validity dates', () => {
+    async function runRejected(detail: string) {
+      const listUrl = 'https://factory.test/status/list-dated';
+      const list = await StatusListCredentialFactory({ id: listUrl });
+      const context = buildTestContext({
+        documentLoader: FakeDocumentLoader({ [listUrl]: list }),
+        cryptoServices: [
+          FakeCryptoService({
+            verified: false,
+            problems: [
+              {
+                type: ProblemTypes.INVALID_SIGNATURE,
+                title: 'Invalid Signature',
+                detail
+              }
+            ]
+          })
+        ]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl
+          })
+        }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+      return results[0].outcome;
+    }
+
+    it.each([
+      [
+        'The current date time (2026-10-01T00:00:00.000Z) is after "validUntil" (2025-01-01T00:00:00Z).',
+        ProblemTypes.STATUS_LIST_EXPIRED
+      ],
+      ['Credential has expired.', ProblemTypes.STATUS_LIST_EXPIRED],
+      [
+        'The current date time (2026-10-01T00:00:00.000Z) is before "validFrom" (2030-01-01T00:00:00Z).',
+        ProblemTypes.STATUS_LIST_NOT_YET_VALID
+      ],
+      [
+        'The current date time (2026-10-01T00:00:00.000Z) is before the "issuanceDate" (2030-01-01T00:00:00Z).',
+        ProblemTypes.STATUS_LIST_NOT_YET_VALID
+      ],
+      [
+        'Signature verification failed.',
+        ProblemTypes.STATUS_LIST_SIGNATURE_ERROR
+      ]
+    ])('classifies a rejected list with "%s"', async (detail, type) => {
+      const outcome = await runRejected(detail);
+
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems).toHaveLength(1);
+        expect(outcome.problems[0].type).toBe(type);
+        if (type !== ProblemTypes.STATUS_LIST_SIGNATURE_ERROR) {
+          expect(outcome.problems[0].detail).toContain(detail);
+        }
+      }
+    });
+  });
+
+  describe('status list loading and list errors', () => {
+    it('leaves parsing to the loader: a string document is no document', async () => {
+      const listUrl = 'https://factory.test/status/string-body';
+      const list = await StatusListCredentialFactory({ id: listUrl });
+      const context = buildTestContext({
+        documentLoader: async () => ({
+          contextUrl: null,
+          document: JSON.stringify(list),
+          documentUrl: listUrl
+        }),
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl
+          })
+        }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+
+      const outcome = results[0].outcome;
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems[0].type).toBe(ProblemTypes.STATUS_LIST_ERROR);
+        expect(outcome.problems[0].detail).toContain(
+          'loader returned no document'
+        );
+      }
+    });
+
+    it('reports a list that is not a BitstringStatusListCredential as STATUS_LIST_TYPE_ERROR', async () => {
+      const listUrl = 'https://factory.test/status/wrong-type';
+      const list = await StatusListCredentialFactory({ id: listUrl });
+      list.type = ['VerifiableCredential'];
+      const context = buildTestContext({
+        documentLoader: FakeDocumentLoader({ [listUrl]: list }),
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl
+          })
+        }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+
+      const outcome = results[0].outcome;
+      expect(outcome.status).toBe('failure');
+      if (outcome.status === 'failure') {
+        expect(outcome.problems[0].type).toBe(
+          ProblemTypes.STATUS_LIST_TYPE_ERROR
+        );
       }
     });
   });

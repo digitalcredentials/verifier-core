@@ -94,9 +94,11 @@ export const ProblemTypes = {
     'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ISSUER_MISMATCH',
   /** Synthesized — status list check raised an error before reaching a verdict. */
   STATUS_LIST_ERROR: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ERROR',
-  /** Synthesized — status list bit indicates revocation or suspension. */
-  CREDENTIAL_REVOKED_OR_SUSPENDED:
-    'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED'
+  /** Synthesized — a revocation status list marks the credential revoked. */
+  CREDENTIAL_REVOKED: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED',
+  /** Synthesized — a suspension status list marks the credential suspended. */
+  CREDENTIAL_SUSPENDED:
+    'https://www.w3.org/TR/vc-data-model#CREDENTIAL_SUSPENDED'
 } as const;
 
 export type ProblemType = (typeof ProblemTypes)[keyof typeof ProblemTypes];

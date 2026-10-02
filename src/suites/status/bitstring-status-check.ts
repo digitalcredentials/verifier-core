@@ -12,30 +12,90 @@ import {
 } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
 import {
-  getStatusType,
-  hasBitstringStatusList,
-  loadStatusList,
-  statusListCredentialUrls
+  checkedStatusEntries,
+  checkedStatusListUrls,
+  classifyIgnoredStatusEntry,
+  credentialStatusEntries,
+  describeIgnoredStatusEntry,
+  ignoredStatusEntries,
+  loadStatusList
 } from './status-lists.js';
-
-// Legacy status types that are skipped
-const LEGACY_STATUS_TYPES: string[] = [
-  'StatusList2021Entry',
-  '1EdTechRevocationList'
-];
 
 // Error patterns from constants/external.ts
 const NOT_FOUND_ERROR = 'NotFoundError';
-const EXPIRED_ERROR = 'is after "validUntil"';
-const STATUS_SIGNATURE_ERROR = 'Verification error';
 const STATUS_TYPE_ERROR =
   'Status list credential type must include "BitstringStatusListCredential".';
-const STATUS_NOT_YET_VALID_ERROR = 'is before "validFrom"';
+
+// `@digitalcredentials/vc`'s date errors, v2 (`validUntil`/`validFrom`) and
+// v1 (`expirationDate`/`issuanceDate`) forms.
+const LIST_EXPIRED_PATTERNS = [
+  'is after "validUntil"',
+  'Credential has expired.'
+];
+const LIST_NOT_YET_VALID_PATTERNS = [
+  'is before "validFrom"',
+  'is before the "issuanceDate"'
+];
 
 const STATUS_LIST_SIGNATURE_TITLE = 'Status List Signature Error';
 
+type CheckStatusResult = {
+  verified?: boolean;
+  error?: unknown;
+  results?: Array<{
+    verified?: boolean;
+    credentialStatus?: Record<string, unknown>;
+  }>;
+};
+
 /**
- * Map a non-verified dispatch onto `STATUS_LIST_SIGNATURE_ERROR`.
+ * Classify a crypto service's rejection of a status list credential.
+ *
+ * `@digitalcredentials/vc` checks a credential's validity dates only
+ * after its signature has verified, so a date error in the rejection
+ * proves the list is authentic and merely out of date: report it as
+ * expired or not yet valid rather than as a bad signature. The match is
+ * on vc's message text, carried in the problem's `detail`; if the crypto
+ * service reports typed expiry problems, those can replace it.
+ */
+function rejectedListProblems(
+  problems: ProblemDetail[],
+  url: string
+): ProblemDetail[] {
+  for (const problem of problems) {
+    const detail = problem.detail ?? '';
+    if (LIST_EXPIRED_PATTERNS.some(p => detail.includes(p))) {
+      return [
+        {
+          type: ProblemTypes.STATUS_LIST_EXPIRED,
+          title: 'Status List Expired',
+          detail: `The status list credential ${url} has expired: ${detail}`
+        }
+      ];
+    }
+    if (LIST_NOT_YET_VALID_PATTERNS.some(p => detail.includes(p))) {
+      return [
+        {
+          type: ProblemTypes.STATUS_LIST_NOT_YET_VALID,
+          title: 'Status List Not Yet Valid',
+          detail: `The status list credential ${url} is not yet valid: ${detail}`
+        }
+      ];
+    }
+  }
+  return [
+    {
+      type: ProblemTypes.STATUS_LIST_SIGNATURE_ERROR,
+      title: STATUS_LIST_SIGNATURE_TITLE,
+      detail: 'The status list credential signature could not be verified.'
+    }
+  ];
+}
+
+/**
+ * Map a non-verified dispatch of a status list credential's proof onto
+ * problems: an out-of-date list (see {@link rejectedListProblems}), or
+ * `STATUS_LIST_SIGNATURE_ERROR`.
  *
  * `no-service` is a failure, not a skip: `DataIntegrityCryptoService.canVerify`
  * returns false for a document with no proof, so an unsigned status list
@@ -43,7 +103,8 @@ const STATUS_LIST_SIGNATURE_TITLE = 'Status List Signature Error';
  * the previous `vcVerifyCredential` path rejected.
  */
 function statusListProofProblems(
-  dispatched: Exclude<CryptoDispatchResult, { kind: 'verified' }>
+  dispatched: Exclude<CryptoDispatchResult, { kind: 'verified' }>,
+  url: string
 ): ProblemDetail[] {
   switch (dispatched.kind) {
     case 'no-service':
@@ -56,13 +117,7 @@ function statusListProofProblems(
         }
       ];
     case 'rejected':
-      return [
-        {
-          type: ProblemTypes.STATUS_LIST_SIGNATURE_ERROR,
-          title: STATUS_LIST_SIGNATURE_TITLE,
-          detail: 'The status list credential signature could not be verified.'
-        }
-      ];
+      return rejectedListProblems(dispatched.problems, url);
     case 'threw':
       return [
         {
@@ -95,7 +150,9 @@ function preloadedLoader(
 }
 
 /**
- * Classify status check error into ProblemDetail.
+ * Classify an error from loading a status list or from `checkStatus`.
+ * List validity dates never reach here: they are checked with the list's
+ * proof (see {@link rejectedListProblems}).
  */
 function classifyStatusError(error: unknown): ProblemDetail[] {
   const err = error as {
@@ -120,49 +177,16 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
     ];
   }
 
-  // Expired error
+  // Type error. `checkStatus` throws this one directly, without a cause.
   if (
-    causeMessage.includes(EXPIRED_ERROR) ||
-    errorMessage.includes(EXPIRED_ERROR.toLowerCase())
+    errorMessage.startsWith(STATUS_TYPE_ERROR) ||
+    causeMessage.startsWith(STATUS_TYPE_ERROR)
   ) {
-    return [
-      {
-        type: ProblemTypes.STATUS_LIST_EXPIRED,
-        title: 'Status List Expired',
-        detail: 'The status list credential has expired.'
-      }
-    ];
-  }
-
-  // Signature verification error
-  if (causeMessage.startsWith(STATUS_SIGNATURE_ERROR)) {
-    return [
-      {
-        type: ProblemTypes.STATUS_LIST_SIGNATURE_ERROR,
-        title: 'Status List Signature Error',
-        detail: 'The status list credential signature could not be verified.'
-      }
-    ];
-  }
-
-  // Type error
-  if (causeMessage.startsWith(STATUS_TYPE_ERROR)) {
     return [
       {
         type: ProblemTypes.STATUS_LIST_TYPE_ERROR,
         title: 'Status List Type Error',
         detail: STATUS_TYPE_ERROR
-      }
-    ];
-  }
-
-  // Not yet valid error
-  if (causeMessage.includes(STATUS_NOT_YET_VALID_ERROR)) {
-    return [
-      {
-        type: ProblemTypes.STATUS_LIST_NOT_YET_VALID,
-        title: 'Status List Not Yet Valid',
-        detail: 'The status list credential is not yet valid.'
       }
     ];
   }
@@ -178,14 +202,62 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   ];
 }
 
+/** The skip reason when a credential has status entries but none is checked. */
+function noCheckedEntryReason(ignored: Array<Record<string, unknown>>): string {
+  if (ignored.length === 1) {
+    const entry = classifyIgnoredStatusEntry(ignored[0]);
+    switch (entry.kind) {
+      case 'legacy':
+        return `Legacy status type "${entry.statusType}" is not checked.`;
+      case 'unknown-type':
+        return `Status type "${entry.statusType}" is not BitstringStatusListEntry.`;
+      case 'purpose':
+        return `BitstringStatusListEntry with statusPurpose "${entry.statusPurpose}" is not checked.`;
+    }
+  }
+  return `No revocation or suspension BitstringStatusListEntry to check; ignored: ${ignoredList(ignored)}.`;
+}
+
+function ignoredList(ignored: Array<Record<string, unknown>>): string {
+  return ignored.map(describeIgnoredStatusEntry).join(', ');
+}
+
+/** One problem for an entry whose bit is set, typed by its purpose. */
+function setBitProblem(
+  entry: Record<string, unknown> | undefined
+): ProblemDetail {
+  const url = String(entry?.statusListCredential);
+  const index = String(entry?.statusListIndex);
+  if (entry?.statusPurpose === 'suspension') {
+    return {
+      type: ProblemTypes.CREDENTIAL_SUSPENDED,
+      title: 'Credential Suspended',
+      detail: `The status list ${url} marks the credential suspended (index ${index}).`
+    };
+  }
+  return {
+    type: ProblemTypes.CREDENTIAL_REVOKED,
+    title: 'Credential Revoked',
+    detail: `The status list ${url} marks the credential revoked (index ${index}).`
+  };
+}
+
 /**
  * Bitstring status list check for revocation/suspension status.
  *
  * This is a **fatal** check: if the verifier cannot conclude that the
- * credential is currently un-revoked and un-suspended (because the
- * status list is missing, has an invalid signature, is expired, has a
- * wrong type, or actually marks the credential as revoked or
- * suspended), the overall verification result is `verified: false`.
+ * credential is currently un-revoked and un-suspended (because a status
+ * list is missing, has an invalid signature, is expired or not yet
+ * valid, has a wrong type, or actually marks the credential as revoked
+ * or suspended), the overall verification result is `verified: false`.
+ *
+ * Every `BitstringStatusListEntry` with `statusPurpose` `revocation` or
+ * `suspension` is checked, wherever it sits in `credentialStatus`. Each
+ * set bit is its own problem: `CREDENTIAL_REVOKED` or
+ * `CREDENTIAL_SUSPENDED`. Other entries — legacy types
+ * (`StatusList2021Entry`, `1EdTechRevocationList`), unknown types, and
+ * BitstringStatusListEntries for other purposes — are ignored, their
+ * lists are not fetched, and the outcome names them.
  *
  * Proof verification of each named BitstringStatusListCredential goes
  * through {@link dispatchProofVerification} against
@@ -197,12 +269,10 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
  * is reported separately, by the non-fatal `status.list-issuer` check.
  *
  * `statusSuite` is the sole owner of status verification; the proof
- * suite no longer performs an embedded status check (P-E, 2026-04-19).
+ * suite performs no embedded status check.
  *
- * Skipped (and therefore non-failing) when:
- * - Credential has no `credentialStatus`.
- * - Status type is a legacy type (`StatusList2021Entry`,
- *   `1EdTechRevocationList`).
+ * Skipped (and therefore non-failing) when the credential has no
+ * `credentialStatus`, or no entry it checks.
  */
 export const bitstringStatusCheck: VerificationCheck = {
   id: 'status.bitstring',
@@ -226,35 +296,22 @@ export const bitstringStatusCheck: VerificationCheck = {
       };
     }
 
-    // Check if credential has any credentialStatus
-    if (!credential.credentialStatus) {
+    if (credentialStatusEntries(credential).length === 0) {
       return {
         status: 'skipped',
         reason: 'Credential has no credentialStatus.'
       };
     }
 
-    // Check for legacy status types that we skip
-    const statusType = getStatusType(credential);
-    if (statusType && LEGACY_STATUS_TYPES.includes(statusType)) {
-      return {
-        status: 'skipped',
-        reason: `Legacy status type "${statusType}" is not checked.`
-      };
-    }
-
-    // Check if it's a BitstringStatusListEntry
-    if (!hasBitstringStatusList(credential)) {
-      return {
-        status: 'skipped',
-        reason: `Status type "${String(statusType)}" is not BitstringStatusListEntry.`
-      };
+    const checked = checkedStatusEntries(credential);
+    const ignored = ignoredStatusEntries(credential);
+    if (checked.length === 0) {
+      return { status: 'skipped', reason: noCheckedEntryReason(ignored) };
     }
 
     try {
-      const urls = statusListCredentialUrls(credential);
       const loaded = new Map<string, unknown>();
-      for (const url of urls) {
+      for (const url of checkedStatusListUrls(credential)) {
         const document = await loadStatusList(url, context);
         const dispatched = await dispatchProofVerification({
           services: context.cryptoServices,
@@ -264,14 +321,17 @@ export const bitstringStatusCheck: VerificationCheck = {
         if (dispatched.kind !== 'verified') {
           return {
             status: 'failure',
-            problems: statusListProofProblems(dispatched)
+            problems: statusListProofProblems(dispatched, url)
           };
         }
         loaded.set(url, document);
       }
 
+      // Only the checked entries go to `checkStatus`, which would otherwise
+      // treat a set bit of any purpose as "not verified". Verification is
+      // off in this call, so nothing re-reads the copy's signed bytes.
       const statusResult = (await checkStatus({
-        credential,
+        credential: { ...credential, credentialStatus: checked },
         documentLoader: preloadedLoader(loaded, context.documentLoader),
         verifyBitstringStatusListCredential: false,
         // Issuer binding is reported by the non-fatal `status.list-issuer`
@@ -279,7 +339,7 @@ export const bitstringStatusCheck: VerificationCheck = {
         // signed by a separate status-service DID fatal, and real deployments
         // sign lists that way.
         verifyMatchingIssuers: false
-      })) as { verified?: boolean; error?: unknown };
+      })) as CheckStatusResult;
 
       if (statusResult.error !== undefined) {
         return {
@@ -289,22 +349,32 @@ export const bitstringStatusCheck: VerificationCheck = {
       }
 
       if (statusResult.verified === true) {
+        const message =
+          'Credential status is valid (not revoked or suspended).';
         return {
           status: 'success',
-          message: 'Credential status is valid (not revoked or suspended).'
+          message:
+            ignored.length > 0
+              ? `${message} Ignored: ${ignoredList(ignored)}.`
+              : message
         };
       }
 
+      const problems = (statusResult.results ?? [])
+        .filter(result => result.verified !== true)
+        .map(result => setBitProblem(result.credentialStatus));
       return {
         status: 'failure',
-        problems: [
-          {
-            type: ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED,
-            title: 'Credential Revoked or Suspended',
-            detail:
-              'The credential has been revoked or suspended according to the status list.'
-          }
-        ]
+        problems:
+          problems.length > 0
+            ? problems
+            : [
+                {
+                  type: ProblemTypes.STATUS_LIST_ERROR,
+                  title: 'Status List Error',
+                  detail: 'The status check failed without naming an entry.'
+                }
+              ]
       };
     } catch (error) {
       const problems = classifyStatusError(error);

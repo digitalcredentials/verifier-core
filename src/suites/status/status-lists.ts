@@ -36,49 +36,95 @@ export function credentialStatusEntries(
     : [credentialStatus];
 }
 
-/**
- * Check if the credential has a valid status type that we can check.
- */
-export function hasBitstringStatusList(
-  credential: Record<string, unknown>
-): boolean {
-  const statuses = credentialStatusEntries(credential);
+// Legacy status types, never checked.
+const LEGACY_STATUS_TYPES: readonly string[] = [
+  'StatusList2021Entry',
+  '1EdTechRevocationList'
+];
 
-  if (statuses.length === 0) {
+// The purposes whose set bit means the credential is not currently valid.
+const CHECKED_STATUS_PURPOSES: readonly string[] = ['revocation', 'suspension'];
+
+/**
+ * Whether `status.bitstring` checks this `credentialStatus` entry: a
+ * `BitstringStatusListEntry` (compared exactly, as the status-list library
+ * does) for revocation or suspension. Every other entry is ignored.
+ */
+export function isCheckedStatusEntry(entry: unknown): boolean {
+  if (entry === null || typeof entry !== 'object') {
     return false;
   }
-
-  const [firstStatus] = statuses;
-  const statusType = statusTypeString(firstStatus?.type);
-
-  return statusType === 'BitstringStatusListEntry';
+  const { type, statusPurpose } = entry as Record<string, unknown>;
+  return (
+    type === 'BitstringStatusListEntry' &&
+    typeof statusPurpose === 'string' &&
+    CHECKED_STATUS_PURPOSES.includes(statusPurpose)
+  );
 }
 
-/**
- * Get the status type for skip reason messages.
- */
-export function getStatusType(
+export function checkedStatusEntries(
   credential: Record<string, unknown>
-): string | undefined {
-  const statuses = credentialStatusEntries(credential);
-  if (statuses.length === 0) {
-    return undefined;
-  }
+): Array<Record<string, unknown>> {
+  return credentialStatusEntries(credential).filter(isCheckedStatusEntry);
+}
 
-  return statusTypeString(statuses[0]?.type);
+export function ignoredStatusEntries(
+  credential: Record<string, unknown>
+): Array<Record<string, unknown>> {
+  return credentialStatusEntries(credential).filter(
+    entry => !isCheckedStatusEntry(entry)
+  );
+}
+
+export type IgnoredStatusEntry =
+  | { kind: 'legacy'; statusType: string }
+  | { kind: 'unknown-type'; statusType: string }
+  | { kind: 'purpose'; statusPurpose: string };
+
+/**
+ * Why `status.bitstring` ignores an entry: a legacy status type, another
+ * status type, or a BitstringStatusListEntry for a purpose it does not
+ * check. `statusType` / `statusPurpose` are `String(...)` of the value.
+ */
+export function classifyIgnoredStatusEntry(entry: unknown): IgnoredStatusEntry {
+  const record =
+    entry !== null && typeof entry === 'object'
+      ? (entry as Record<string, unknown>)
+      : {};
+  if (record.type === 'BitstringStatusListEntry') {
+    return { kind: 'purpose', statusPurpose: String(record.statusPurpose) };
+  }
+  const statusType = String(statusTypeString(record.type));
+  return LEGACY_STATUS_TYPES.includes(statusType)
+    ? { kind: 'legacy', statusType }
+    : { kind: 'unknown-type', statusType };
+}
+
+/** Name an ignored entry in a message. */
+export function describeIgnoredStatusEntry(entry: unknown): string {
+  const ignored = classifyIgnoredStatusEntry(entry);
+  switch (ignored.kind) {
+    case 'legacy':
+      return `legacy status type "${ignored.statusType}"`;
+    case 'unknown-type':
+      return `status type "${ignored.statusType}"`;
+    case 'purpose':
+      return `BitstringStatusListEntry with statusPurpose "${ignored.statusPurpose}"`;
+  }
 }
 
 /**
- * Distinct `statusListCredential` URLs named by the credential, in first-seen
- * order. Entries without a non-empty string URL are ignored so `checkStatus`
- * can reject that input itself.
+ * Distinct `statusListCredential` URLs of the entries `status.bitstring`
+ * checks, in first-seen order; `[]` when it skips. A checked entry without
+ * a non-empty string URL contributes none, so `checkStatus` can reject that
+ * entry itself.
  */
-export function statusListCredentialUrls(
+export function checkedStatusListUrls(
   credential: Record<string, unknown>
 ): string[] {
   const urls: string[] = [];
   const seen = new Set<string>();
-  for (const entry of credentialStatusEntries(credential)) {
+  for (const entry of checkedStatusEntries(credential)) {
     const url = entry.statusListCredential;
     if (typeof url !== 'string' || url.length === 0) {
       continue;
@@ -93,19 +139,6 @@ export function statusListCredentialUrls(
 }
 
 /**
- * The status list URLs `status.bitstring` checks for this credential, or
- * `[]` when it skips.
- */
-export function checkedStatusListUrls(
-  credential: Record<string, unknown>
-): string[] {
-  if (!hasBitstringStatusList(credential)) {
-    return [];
-  }
-  return statusListCredentialUrls(credential);
-}
-
-/**
  * Load a status list credential through the JSON-LD document loader.
  *
  * Load failures are wrapped with the same message/`cause` shape the
@@ -113,6 +146,10 @@ export function checkedStatusListUrls(
  * classification still maps unreachable lists to `STATUS_LIST_NOT_FOUND`
  * (or the generic status error, when the loader's own message is what the
  * tests match).
+ *
+ * The loader owns unwrapping its `{ document }` envelope and parsing the
+ * response body; this only rejects a result that carries no document
+ * object.
  */
 export async function loadStatusListCredential(
   url: string,
@@ -129,63 +166,17 @@ export async function loadStatusListCredential(
     );
   }
 
-  if (result === null || typeof result !== 'object') {
+  const document =
+    result !== null && typeof result === 'object'
+      ? (result as { document?: unknown }).document
+      : undefined;
+  if (document === null || typeof document !== 'object') {
     throw new Error(
       `Could not load "BitstringStatusListCredential"; reason: loader returned no document for ${url}`
     );
   }
 
-  const document = coerceStatusListDocument(
-    (result as { document?: unknown }).document,
-    url
-  );
   return { document };
-}
-
-/**
- * Turn a JSON-LD loader's `document` field into a credential object.
- *
- * `JsonLdDocumentLoader` already wraps the protocol-handler return value
- * in `{ document }`. If a handler also returned an envelope, or if the
- * HTTP body was a JSON string (`text/plain`), the credential is nested
- * or unparsed. Unwrap/parse so `cryptoServices` and `checkStatus` see
- * the BitstringStatusListCredential, not the envelope.
- */
-export function coerceStatusListDocument(raw: unknown, url: string): unknown {
-  let document = raw;
-
-  if (
-    document !== null &&
-    typeof document === 'object' &&
-    'document' in document &&
-    !('@context' in document) &&
-    !('type' in document)
-  ) {
-    document = (document as { document: unknown }).document;
-  }
-
-  if (typeof document === 'string') {
-    try {
-      document = JSON.parse(document);
-    } catch (error) {
-      throw new Error(
-        `Could not load "BitstringStatusListCredential"; reason: loader returned non-JSON for ${url}`,
-        { cause: error }
-      );
-    }
-  }
-
-  if (
-    document === undefined ||
-    document === null ||
-    typeof document !== 'object'
-  ) {
-    throw new Error(
-      `Could not load "BitstringStatusListCredential"; reason: loader returned no document for ${url}`
-    );
-  }
-
-  return document;
 }
 
 /**

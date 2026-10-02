@@ -344,7 +344,7 @@ break when the flag is left at its default (`false`). See
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
 | Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's; each list is fetched once per verification. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
@@ -726,7 +726,9 @@ without network dependencies, and composable — consumers wire in exactly the b
   internals. The default crypto service verifies signatures only — credential status checking
   is the sole responsibility of the status suite (P-E, 2026-04-19).
 - **Status suite** still consumes `@digitalcredentials/vc-bitstring-status-list` for purpose
-  matching, validity dates, bitstring decoding, and index reading. The status list credential's
+  matching, list type, bitstring decoding, and index reading. The list's validity dates are
+  checked by `@digitalcredentials/vc` inside the crypto service, with its proof, and issuer
+  binding by `status.list-issuer` rather than the library's throwing comparison. The status list credential's
   proof is verified through the injected `CryptoService`s via `src/crypto-dispatch.ts` — the
   same dispatch presentations and credentials use. Recursively calling `Verifier.verifyCredential`
   on the status list credential is deferred (it needs a recursion guard the status suite cannot

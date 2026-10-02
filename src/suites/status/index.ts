@@ -10,10 +10,9 @@ import { statusListIssuerCheck } from './list-issuer-check.js';
  * {@link bitstringStatusCheck}, then reports a status list not issued by
  * the credential's issuer with the non-fatal {@link statusListIssuerCheck}.
  *
- * Skipped when:
- * - Credential has no `credentialStatus`.
- * - Status type is a legacy type (`StatusList2021Entry`,
- *   `1EdTechRevocationList`).
+ * Every `BitstringStatusListEntry` for `revocation` or `suspension` is
+ * checked; other entries are ignored. Skipped when the credential has no
+ * `credentialStatus`, or no entry that is checked.
  */
 export const statusSuite: VerificationSuite = {
   id: 'status',

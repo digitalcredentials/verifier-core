@@ -42,13 +42,13 @@ cryptosuite.
 Verification runs an ordered pipeline of **suites**, each containing one or more
 **checks**:
 
-| Suite           | Phase           | What it checks                                                                                                                                                  | Fatal? |
-| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                   | Yes    |
-| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                          | No     |
-| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                            | Yes    |
-| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. The list credential's proof is checked with the configured `cryptoServices`. | Yes    |
-| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                     | No     |
+| Suite           | Phase           | What it checks                                                                                                                                                                                                                                                                                                                         | Fatal?                         |
+| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                                                                                                                                                                                          | Yes                            |
+| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                             |
+| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                                                                                                                                                                                                   | Yes                            |
+| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No) |
+| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                                                                                                                                                                                            | No                             |
 
 The **Phase** column drives the optional `phases:` filter on `VerifierConfig`
 and per-call args, used for
@@ -189,6 +189,7 @@ interface ProblemDetail {
     { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
     { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
+    { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
     { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } }
   ]
 }
@@ -238,6 +239,14 @@ halted. With `verbose: true`, each check that would have run appears as
       }
     },
     {
+      "suite": "status",
+      "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
+    },
+    {
       "suite": "registry",
       "check": "registry.issuer",
       "outcome": {
@@ -252,9 +261,16 @@ halted. With `verbose: true`, each check that would have run appears as
 #### Example: Revoked credential (fatal, sourced from status)
 
 When a credential's status list marks it revoked or suspended — or the verifier
-can't confidently evaluate the list (missing, expired, wrong type, signature
-invalid) — the status suite fails the credential. The proof check still passes
-on its own merits.
+can't confidently evaluate the list (missing, expired or not yet valid, wrong
+type, signature invalid) — the status suite fails the credential. The proof
+check still passes on its own merits.
+
+Every `BitstringStatusListEntry` whose `statusPurpose` is `revocation` or
+`suspension` is checked, and each set bit is its own problem:
+`CREDENTIAL_REVOKED` or `CREDENTIAL_SUSPENDED`. Other `credentialStatus` entries
+— legacy types such as `StatusList2021Entry`, unknown types, and
+`BitstringStatusListEntry`s for other purposes — are ignored, their lists are
+not fetched, and the check's message or skip reason names them.
 
 ```json
 {
@@ -280,16 +296,56 @@ on its own merits.
         "status": "failure",
         "problems": [
           {
-            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED",
-            "title": "Credential Revoked or Suspended",
-            "detail": "The credential has been revoked or suspended according to the status list."
+            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED",
+            "title": "Credential Revoked",
+            "detail": "The status list https://example.edu/status/1 marks the credential revoked (index 42)."
           }
         ]
+      }
+    },
+    {
+      "suite": "status",
+      "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: status.bitstring failed"
       }
     }
   ]
 }
 ```
+
+#### Example: Status list from another issuer (non-fatal)
+
+`status.list-issuer` compares each status list's `issuer` id with the
+credential's (a string issuer, or an issuer object's `id`, compared exactly).
+The list's proof has already been verified by `status.bitstring`, which binds
+the list's signing key to its claimed issuer. When they differ, the check fails
+with `STATUS_LIST_ISSUER_MISMATCH`:
+
+```json
+{
+  "suite": "status",
+  "check": "status.list-issuer",
+  "fatal": false,
+  "outcome": {
+    "status": "failure",
+    "problems": [
+      {
+        "type": "https://www.w3.org/TR/vc-data-model#STATUS_LIST_ISSUER_MISMATCH",
+        "title": "Status List Issuer Mismatch",
+        "detail": "The status list https://status.example.edu/lists/1 is issued by did:key:z6Mk…, not by the credential's issuer did:web:example.edu."
+      }
+    ]
+  }
+}
+```
+
+This is a warning, so `verified` is unchanged. Some status services sign every
+list with a DID of their own rather than the issuer's, so a mismatch is normal
+in those deployments. It does mean that whoever signed the list decided the
+credential's status; a consumer that needs the list bound to the issuer should
+treat `STATUS_LIST_ISSUER_MISMATCH` as decisive.
 
 #### Example: Check skipped
 
@@ -311,18 +367,21 @@ with no `credentialStatus` skips the status check:
 
 All failures use `ProblemDetail` with a `type` URI. Common error types:
 
-| Type URI                              | Title                                                                                                                                                          | When                                        |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `...#PARSING_ERROR`                   | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems |
-| `...#INVALID_SIGNATURE`               | Invalid Signature                                                                                                                                              | Signature doesn't match content             |
-| `...#DID_WEB_UNRESOLVED`              | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched      |
-| `...#HTTP_ERROR`                      | HTTP Error                                                                                                                                                     | Network error during signature check        |
-| `...#CREDENTIAL_REVOKED_OR_SUSPENDED` | Credential Revoked or Suspended                                                                                                                                | Status list indicates revocation            |
-| `...#STATUS_LIST_NOT_FOUND`           | Status List Not Found                                                                                                                                          | Status list URL unreachable                 |
-| `...#STATUS_LIST_EXPIRED`             | Status List Expired                                                                                                                                            | Status list VC has expired                  |
-| `...#STATUS_LIST_SIGNATURE_ERROR`     | Status List Signature Error                                                                                                                                    | Status list VC signature invalid            |
-| `...#ISSUER_NOT_REGISTERED`           | Issuer Not Registered                                                                                                                                          | Issuer DID not in any registry              |
-| `...#REGISTRY_UNCHECKED`              | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached         |
+| Type URI                          | Title                                                                                                                                                          | When                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                   |
+| `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                               |
+| `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                        |
+| `...#HTTP_ERROR`                  | HTTP Error                                                                                                                                                     | Network error during signature check                          |
+| `...#CREDENTIAL_REVOKED`          | Credential Revoked                                                                                                                                             | A revocation status list marks the credential revoked         |
+| `...#CREDENTIAL_SUSPENDED`        | Credential Suspended                                                                                                                                           | A suspension status list marks the credential suspended       |
+| `...#STATUS_LIST_NOT_FOUND`       | Status List Not Found                                                                                                                                          | Status list URL unreachable                                   |
+| `...#STATUS_LIST_EXPIRED`         | Status List Expired                                                                                                                                            | Status list VC has expired                                    |
+| `...#STATUS_LIST_NOT_YET_VALID`   | Status List Not Yet Valid                                                                                                                                      | Status list VC is not valid yet                               |
+| `...#STATUS_LIST_SIGNATURE_ERROR` | Status List Signature Error                                                                                                                                    | Status list VC signature invalid                              |
+| `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal) |
+| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not in any registry                                |
+| `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
 
 #### Problem types
 
@@ -339,7 +398,7 @@ switch (problem.type as ProblemType) {
   case ProblemTypes.INVALID_SIGNATURE:
     // ...
     break;
-  case ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED:
+  case ProblemTypes.CREDENTIAL_REVOKED:
     // ...
     break;
   case ProblemTypes.STATUS_LIST_NOT_FOUND:

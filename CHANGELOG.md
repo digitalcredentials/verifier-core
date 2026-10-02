@@ -141,7 +141,17 @@ Verifier results now fold per-suite checks into a single
   Consumers that need the binding enforced should treat
   `STATUS_LIST_ISSUER_MISMATCH` as decisive. Each status list is still fetched
   once per verification. The crypto service no longer passes
-  `verifyMatchingIssuers` to `@digitalcredentials/vc`, which never read it.
+  `verifyMatchingIssuers` to `@digitalcredentials/vc`, which never read it. The
+  status check also now checks every `BitstringStatusListEntry` for `revocation`
+  or `suspension`, not only the first `credentialStatus` entry, and ignores
+  other entries (legacy types, unknown types, other purposes) without fetching
+  their lists; a set `refresh` or `message` bit no longer reads as revoked. Each
+  set bit is its own problem, `CREDENTIAL_REVOKED` or `CREDENTIAL_SUSPENDED`,
+  which replace `CREDENTIAL_REVOKED_OR_SUSPENDED`. An expired or not-yet-valid
+  status list is reported as `STATUS_LIST_EXPIRED` or
+  `STATUS_LIST_NOT_YET_VALID` instead of as a bad signature, and a list that is
+  not a `BitstringStatusListCredential` as `STATUS_LIST_TYPE_ERROR`; neither
+  classification could fire before.
 
 ### Deprecated
 

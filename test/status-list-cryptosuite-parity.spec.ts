@@ -36,6 +36,7 @@ import { BitstringStatusEntry } from './factories/data/index.js';
 
 const STATUS_LIST_URL = 'https://factory.test/status/parity-list';
 const FOREIGN_STATUS_LIST_URL = 'https://factory.test/status/foreign-list';
+const EXPIRED_STATUS_LIST_URL = 'https://factory.test/status/expired-list';
 
 const offlineHttpGetService: HttpGetService = {
   async get(url: string): Promise<HttpGetResult> {
@@ -73,6 +74,7 @@ describe('status list cryptosuite parity', () => {
   let signedForeignStatusList: Record<string, unknown>;
   let signedSubjectWithForeignList: Record<string, unknown>;
   let foreignDid: string;
+  let signedSubjectWithExpiredList: Record<string, unknown>;
   let documentLoader: DocumentLoader;
 
   beforeAll(async () => {
@@ -148,9 +150,35 @@ describe('status list cryptosuite parity', () => {
       documentLoader: bundledLoader
     })) as Record<string, unknown>;
 
+    // A list from the subject's issuer whose validity has ended. vc's
+    // `issue` does not check dates, so it signs without complaint.
+    const signedExpiredStatusList = (await issue({
+      credential: {
+        ...unsignedList,
+        id: EXPIRED_STATUS_LIST_URL,
+        validUntil: '2021-01-01T00:00:00Z',
+        credentialSubject: {
+          ...(unsignedList.credentialSubject as Record<string, unknown>),
+          id: `${EXPIRED_STATUS_LIST_URL}#list`
+        }
+      },
+      suite: new Ed25519Signature2020({ key }),
+      documentLoader: bundledLoader
+    })) as Record<string, unknown>;
+
+    signedSubjectWithExpiredList = (await issue({
+      credential: subjectTemplate(issuerDid, EXPIRED_STATUS_LIST_URL),
+      suite: new DataIntegrityProof({
+        signer: multiKey.signer(),
+        cryptosuite: eddsaRdfc2022CryptoSuite
+      }),
+      documentLoader: bundledLoader
+    })) as Record<string, unknown>;
+
     const lists: Record<string, Record<string, unknown>> = {
       [STATUS_LIST_URL]: signedStatusList,
-      [FOREIGN_STATUS_LIST_URL]: signedForeignStatusList
+      [FOREIGN_STATUS_LIST_URL]: signedForeignStatusList,
+      [EXPIRED_STATUS_LIST_URL]: signedExpiredStatusList
     };
     documentLoader = async (url: string) => {
       if (url in lists) {
@@ -249,6 +277,27 @@ describe('status list cryptosuite parity', () => {
         ProblemTypes.STATUS_LIST_ISSUER_MISMATCH
       );
       expect(issuerResult.outcome.problems[0].detail).toContain(foreignDid);
+    }
+  });
+
+  it('(d) reports an authentic but expired list as STATUS_LIST_EXPIRED, not as a bad signature', async () => {
+    const result = await verifierWith([eddsaAndEd25519()]).verifyCredential({
+      credential: signedSubjectWithExpiredList,
+      phases: ['cryptographic']
+    });
+
+    expect(result.verified).toBe(false);
+    const statusResult = result.results.find(
+      r => r.check === 'status.bitstring'
+    );
+    expect(statusResult?.outcome.status).toBe('failure');
+    if (statusResult?.outcome.status === 'failure') {
+      expect(statusResult.outcome.problems[0].type).toBe(
+        ProblemTypes.STATUS_LIST_EXPIRED
+      );
+      expect(statusResult.outcome.problems[0].detail).toContain(
+        EXPIRED_STATUS_LIST_URL
+      );
     }
   });
 });
