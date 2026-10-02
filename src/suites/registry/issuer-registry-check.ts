@@ -39,8 +39,9 @@ function getIssuerDid(credential: Record<string, unknown>): string | undefined {
  * - Issuer found in at least one registry
  *
  * Failure when:
- * - Issuer not found in any registry (`ISSUER_NOT_REGISTERED`, plus
- *   `REGISTRY_UNCHECKED` if some registries could not be checked)
+ * - Issuer not found in any registry (`ISSUER_NOT_REGISTERED`). If some
+ *   registries could not be checked, its detail says how many answered,
+ *   and a `REGISTRY_UNCHECKED` problem follows naming the rest
  * - Every registry could not be checked (`REGISTRY_UNCHECKED` only, since
  *   no registry answered and "not registered" was never established)
  */
@@ -121,8 +122,9 @@ export const issuerRegistryCheck: VerificationCheck = {
       const uncheckedSummary = `${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`;
 
       // Every registry is queried when nothing is found, so equal counts
-      // mean no registry answered at all.
-      if (result.uncheckedRegistries.length === context.registries.length) {
+      // mean no registry answered at all (an injected lookup reporting more
+      // is treated the same).
+      if (result.uncheckedRegistries.length >= context.registries.length) {
         return {
           status: 'failure',
           problems: [
@@ -135,12 +137,18 @@ export const issuerRegistryCheck: VerificationCheck = {
         };
       }
 
-      // Issuer not found
+      // Issuer not found. Only the registries that answered establish that;
+      // the REGISTRY_UNCHECKED problem below names the rest.
+      const uncheckedCount = result.uncheckedRegistries.length;
+      const checkedCount = context.registries.length - uncheckedCount;
       const problems: ProblemDetail[] = [
         {
           type: ProblemTypes.ISSUER_NOT_REGISTERED,
           title: 'Issuer Not Registered',
-          detail: `Issuer ${issuerDid} was not found in any known DID registry.`
+          detail:
+            uncheckedCount === 0
+              ? `Issuer ${issuerDid} was not found in any known DID registry.`
+              : `Issuer ${issuerDid} was not found in the ${checkedCount} ${checkedCount === 1 ? 'registry' : 'registries'} that could be checked; ${uncheckedCount} could not be checked.`
         }
       ];
 

@@ -92,8 +92,10 @@ the HTTPS fetch of the configured `trustAnchorEC`: there are no pinned anchor
 keys. A registry that cannot be checked — unreachable, or serving a statement
 that does not verify — is reported as "could not be determined"
 (`REGISTRY_UNCHECKED`), not as "not registered", and a lookup that included one
-is retried after a minute rather than cached for an hour. Pass `registries: []`
-to skip the registry check.
+is retried after a minute rather than cached for an hour. When some registries
+answered and others could not be checked, `ISSUER_NOT_REGISTERED` says how many
+answered, and a `REGISTRY_UNCHECKED` problem names the rest. Pass
+`registries: []` to skip the registry check.
 
 > [!CAUTION] The DCC registry list does not make claims about the registries it
 > contains. It is a list of registries that the DCC knows about — it says
@@ -380,7 +382,7 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | `...#STATUS_LIST_NOT_YET_VALID`   | Status List Not Yet Valid                                                                                                                                      | Status list VC is not valid yet                               |
 | `...#STATUS_LIST_SIGNATURE_ERROR` | Status List Signature Error                                                                                                                                    | Status list VC signature invalid                              |
 | `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal) |
-| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not in any registry                                |
+| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked    |
 | `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
 
 #### Problem types

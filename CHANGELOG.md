@@ -152,6 +152,14 @@ Verifier results now fold per-suite checks into a single
   `STATUS_LIST_NOT_YET_VALID` instead of as a bad signature, and a list that is
   not a `BitstringStatusListCredential` as `STATUS_LIST_TYPE_ERROR`; neither
   classification could fire before.
+- **"Issuer not registered" no longer claims every registry was checked.** When
+  an issuer was not found but some registries could not be reached (for example,
+  a registry that sends no CORS headers, read from a browser),
+  `ISSUER_NOT_REGISTERED` said the issuer "was not found in any known DID
+  registry". It now says how many registries answered — "was not found in the 5
+  registries that could be checked; 4 could not be checked." The
+  `REGISTRY_UNCHECKED` problem that names the unreachable registries, and the
+  success message, are unchanged.
 
 ### Deprecated
 
