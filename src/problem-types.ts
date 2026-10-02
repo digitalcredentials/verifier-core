@@ -89,6 +89,9 @@ export const ProblemTypes = {
   /** Synthesized — status list VC `validFrom` is in the future. */
   STATUS_LIST_NOT_YET_VALID:
     'https://www.w3.org/TR/vc-data-model#STATUS_LIST_NOT_YET_VALID',
+  /** Synthesized — a status list is not issued by the credential's issuer (non-fatal). */
+  STATUS_LIST_ISSUER_MISMATCH:
+    'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ISSUER_MISMATCH',
   /** Synthesized — status list check raised an error before reaching a verdict. */
   STATUS_LIST_ERROR: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ERROR',
   /** Synthesized — status list bit indicates revocation or suspension. */

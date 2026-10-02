@@ -209,7 +209,6 @@ export function DataIntegrityCryptoService(
           credential,
           suite: suites,
           documentLoader: options.documentLoader,
-          verifyMatchingIssuers: false,
           checkStatus: noopCheckStatus
         });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { runSuites } from '../../src/run-suites.js';
 import { statusSuite } from '../../src/suites/status/index.js';
 import { bitstringStatusCheck } from '../../src/suites/status/bitstring-status-check.js';
+import { statusListIssuerCheck } from '../../src/suites/status/list-issuer-check.js';
 import { ProblemTypes } from '../../src/problem-types.js';
 import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
@@ -57,6 +58,19 @@ describe('bitstringStatusCheck contract', () => {
   });
 });
 
+describe('statusListIssuerCheck contract', () => {
+  it('is non-fatal — a mismatch is a warning, not a verification failure', () => {
+    expect(statusListIssuerCheck.fatal).toBe(false);
+  });
+
+  it('runs after the bitstring check', () => {
+    expect(statusSuite.checks.map(c => c.id)).toEqual([
+      'status.bitstring',
+      'status.list-issuer'
+    ]);
+  });
+});
+
 describe('Status Suite', () => {
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential
@@ -70,7 +84,7 @@ describe('Status Suite', () => {
       );
       const results = await runSuites([statusSuite], subject, context);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].check).toBe('status.bitstring');
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
@@ -100,7 +114,7 @@ describe('Status Suite', () => {
         buildTestContext()
       );
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
         expect(results[0].outcome.reason).toContain('Legacy status type');
@@ -127,7 +141,7 @@ describe('Status Suite', () => {
         buildTestContext()
       );
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].outcome.status).toBe('skipped');
     });
   });
@@ -162,7 +176,7 @@ describe('Status Suite', () => {
         context
       );
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].outcome.status).toBe('success');
       if (results[0].outcome.status === 'success') {
         expect(results[0].outcome.message).toContain('not revoked');
@@ -489,11 +503,268 @@ describe('Status Suite', () => {
         buildTestContext()
       );
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
         expect(results[0].outcome.reason).toContain('UnknownStatusType');
       }
+    });
+  });
+
+  describe('status.list-issuer', () => {
+    const OTHER_DID = 'did:key:z6MkhOtherStatusServiceSignerDid000000000000000';
+
+    async function runWithList(
+      list: Record<string, unknown>,
+      credentialOverrides: Record<string, unknown> = {},
+      statusListIndex = '0'
+    ) {
+      const listUrl = list.id as string;
+      const context = buildTestContext({
+        documentLoader: FakeDocumentLoader({ [listUrl]: list }),
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          ...credentialOverrides,
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl,
+            statusListIndex
+          })
+        }
+      });
+      return runSuites([statusSuite], createSubject(cred), context);
+    }
+
+    function listIssuerResult(results: Awaited<ReturnType<typeof runSuites>>) {
+      const result = results.find(r => r.check === 'status.list-issuer');
+      expect(result, 'status.list-issuer result present').toBeDefined();
+      return result!;
+    }
+
+    it('succeeds when the list and the credential share an issuer', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/same-issuer',
+        issuer: DEFAULT_TEST_ISSUER_DID
+      });
+      const results = await runWithList(list, {
+        issuer: DEFAULT_TEST_ISSUER_DID
+      });
+
+      expect(results[0].outcome.status).toBe('success');
+      expect(listIssuerResult(results).outcome.status).toBe('success');
+    });
+
+    it('compares an issuer object by its id', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/object-issuer',
+        issuer: DEFAULT_TEST_ISSUER_DID
+      });
+      const results = await runWithList(list, {
+        issuer: { id: DEFAULT_TEST_ISSUER_DID, name: 'Example Issuer' }
+      });
+
+      expect(listIssuerResult(results).outcome.status).toBe('success');
+    });
+
+    it('warns, without failing the bitstring check, when the list has a different issuer', async () => {
+      const listUrl = 'https://factory.test/status/other-issuer';
+      const list = await StatusListCredentialFactory({
+        id: listUrl,
+        issuer: OTHER_DID
+      });
+      const results = await runWithList(list, {
+        issuer: DEFAULT_TEST_ISSUER_DID
+      });
+
+      expect(results[0].outcome.status).toBe('success');
+      const result = listIssuerResult(results);
+      expect(result.fatal).toBe(false);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems).toHaveLength(1);
+        const [problem] = result.outcome.problems;
+        expect(problem.type).toBe(ProblemTypes.STATUS_LIST_ISSUER_MISMATCH);
+        expect(problem.detail).toContain(listUrl);
+        expect(problem.detail).toContain(OTHER_DID);
+        expect(problem.detail).toContain(DEFAULT_TEST_ISSUER_DID);
+      }
+    });
+
+    it('treats a list with no issuer as a mismatch', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/no-issuer'
+      });
+      delete list.issuer;
+      const results = await runWithList(list);
+
+      const result = listIssuerResult(results);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems[0].detail).toContain('(no issuer)');
+      }
+    });
+
+    it('reports one problem per mismatching list', async () => {
+      const ownUrl = 'https://factory.test/status/own';
+      const foreignUrl = 'https://factory.test/status/foreign';
+      const ownList = await StatusListCredentialFactory({
+        id: ownUrl,
+        issuer: DEFAULT_TEST_ISSUER_DID,
+        statusPurpose: 'revocation'
+      });
+      const foreignList = await StatusListCredentialFactory({
+        id: foreignUrl,
+        issuer: OTHER_DID,
+        statusPurpose: 'suspension'
+      });
+      const context = buildTestContext({
+        documentLoader: FakeDocumentLoader({
+          [ownUrl]: ownList,
+          [foreignUrl]: foreignList
+        }),
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          issuer: DEFAULT_TEST_ISSUER_DID,
+          credentialStatus: [
+            BitstringStatusEntry({
+              statusListCredential: ownUrl,
+              statusPurpose: 'revocation'
+            }),
+            BitstringStatusEntry({
+              statusListCredential: foreignUrl,
+              statusPurpose: 'suspension'
+            })
+          ]
+        }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+
+      const result = listIssuerResult(results);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems).toHaveLength(1);
+        expect(result.outcome.problems[0].detail).toContain(foreignUrl);
+        expect(result.outcome.problems[0].detail).not.toContain(ownUrl);
+      }
+    });
+
+    it('is not run when the bitstring check fails', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/revoked-other-issuer',
+        issuer: OTHER_DID,
+        revokedIndexes: [3]
+      });
+      const results = await runWithList(list, {}, '3');
+
+      expect(results[0].outcome.status).toBe('failure');
+      const result = listIssuerResult(results);
+      expect(result.outcome.status).toBe('skipped');
+      if (result.outcome.status === 'skipped') {
+        expect(result.outcome.reason).toMatch(/^Not run/);
+      }
+    });
+
+    it('skips when the credential has no credentialStatus', async () => {
+      const cred = CredentialFactory({ version: 'v2' });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        buildTestContext()
+      );
+
+      const result = listIssuerResult(results);
+      expect(result.outcome).toEqual({
+        status: 'skipped',
+        reason: 'No status list was checked.'
+      });
+    });
+
+    it('loads each list once although both checks read it', async () => {
+      const revocationUrl = 'https://factory.test/status/once-revocation';
+      const suspensionUrl = 'https://factory.test/status/once-suspension';
+      const { loader, counts } = countingDocumentLoader(
+        FakeDocumentLoader({
+          [revocationUrl]: await StatusListCredentialFactory({
+            id: revocationUrl,
+            statusPurpose: 'revocation'
+          }),
+          [suspensionUrl]: await StatusListCredentialFactory({
+            id: suspensionUrl,
+            statusPurpose: 'suspension'
+          })
+        })
+      );
+      const context = buildTestContext({
+        documentLoader: loader,
+        cryptoServices: [FakeCryptoService()]
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          issuer: DEFAULT_TEST_ISSUER_DID,
+          credentialStatus: [
+            BitstringStatusEntry({
+              statusListCredential: revocationUrl,
+              statusPurpose: 'revocation'
+            }),
+            BitstringStatusEntry({
+              statusListCredential: suspensionUrl,
+              statusPurpose: 'suspension'
+            })
+          ]
+        }
+      });
+      const results = await runSuites(
+        [statusSuite],
+        createSubject(cred),
+        context
+      );
+
+      expect(listIssuerResult(results).outcome.status).toBe('success');
+      expect(counts.get(revocationUrl)).toBe(1);
+      expect(counts.get(suspensionUrl)).toBe(1);
+    });
+
+    it('skips rather than throws when run alone and the list cannot be loaded', async () => {
+      const context = buildTestContext({
+        documentLoader: async () => {
+          throw new Error('NotFoundError: no such list');
+        }
+      });
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: 'https://factory.test/status/missing'
+          })
+        }
+      });
+      const results = await runSuites(
+        [
+          {
+            id: 'status',
+            name: 'Issuer binding only',
+            checks: [statusListIssuerCheck]
+          }
+        ],
+        createSubject(cred),
+        context
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0].outcome).toEqual({
+        status: 'skipped',
+        reason: 'Status list could not be loaded; status.bitstring reports why.'
+      });
     });
   });
 });

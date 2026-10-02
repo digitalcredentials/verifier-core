@@ -130,6 +130,18 @@ Verifier results now fold per-suite checks into a single
   is still fetched and compiled on every verification, so an issuer cannot grow
   the cache. The docs previously claimed the schema was cached after first use;
   it was not.
+- **Security: a status list signed by someone other than the credential's issuer
+  is now reported.** Previously a validly signed status list from any DID
+  decided revocation without any signal, so whoever controlled the list's host
+  could un-revoke a credential by serving a list signed with their own key. A
+  new non-fatal check, `status.list-issuer`, runs after `status.bitstring` and
+  reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` id differs from
+  the credential's. It is a warning, so `verified` is unchanged: some status
+  services sign every list with a DID of their own rather than the issuer's.
+  Consumers that need the binding enforced should treat
+  `STATUS_LIST_ISSUER_MISMATCH` as decisive. Each status list is still fetched
+  once per verification. The crypto service no longer passes
+  `verifyMatchingIssuers` to `@digitalcredentials/vc`, which never read it.
 
 ### Deprecated
 
