@@ -687,12 +687,19 @@ their own URIs without requiring an entry in any catalog.
 
 ### Test
 
-Mocha + Chai for tests, c8 for coverage, Karma + Chrome for browser testing.
+| Package               | Role                                                   |
+| --------------------- | ------------------------------------------------------ |
+| `vitest`              | Test runner and assertions for the Node run            |
+| `@vitest/coverage-v8` | Coverage                                               |
+| `@playwright/test`    | Browser run (Chromium) against a Vite dev server       |
+| `vite`                | Dev server backing the browser run (`test/index.html`) |
 
 ## Testing
 
-**Runner.** Mocha with Chai assertions, compiled via `tsconfig.test.json` into `dist/test/`.
-Run with `npm test` (lint + coverage via c8). Browser tests available via `npm run test-karma`.
+**Runner.** Vitest, running the TypeScript specs directly — no separate test compile step.
+Run with `pnpm test` (lint + `vitest run`). `pnpm run test:coverage` adds V8 coverage, and
+`pnpm run test:smoke` runs the network-touching smoke specs under their own config. Browser
+tests run on Playwright via `pnpm run test:browser`.
 
 **Structure.** Top-level specs test the public API end-to-end (`verify-credential.spec.ts`,
 `verify-presentation.spec.ts`, `verifier-cache-sharing.spec.ts`). Suite-focused specs in
@@ -760,8 +767,12 @@ without network dependencies, and composable — consumers wire in exactly the b
   in a different validator or share a single validator across calls. (The check itself was
   already lifted into the opt-in `/openbadges` submodule's `openBadgesSchemaSuite` bundle, so
   consumers who don't care about Open Badges already pay zero cost for it.)
-- **No `Clock` port.** TTL math reads from `new Date()` / `Date.now()` directly, which makes
-  time-dependent behavior awkward to test.
+- **Cache TTL math bypasses the clock seam.** `TimeService` is the clock seam for verification
+  decisions (see above), but the caching layer does not route through it: the registry handlers'
+  TTL math (`services/registry-handlers/cache-ttl.ts`, `oidf-handler.ts`) and the in-memory cache's
+  expiry comparison (`services/cache-service/in-memory-cache-service.ts`) all read `Date.now()`
+  directly. That makes TTL and cache-expiry behavior awkward to test, and means a verifier built on
+  a `FakeTimeService` still ages its cache entries against the real system clock.
 
 ### Direction
 
@@ -770,7 +781,8 @@ the remaining hexagonal work is:
 
 1. Wrap AJV behind a `JsonSchemaValidator` port. (The "lift the OBv3 schema check into a
    separate vertical" half of this item is done — see the `/openbadges` submodule.)
-2. Introduce a `Clock` port for testable TTL behavior.
+2. Thread the existing `TimeService` seam through the caching layer so TTL and cache-expiry
+   behavior is testable on the same clock as verification.
 
 This is a direction, not a mandate. Progress is incremental — each change that moves a concrete
 dependency behind an interface moves the library closer to the target architecture.
