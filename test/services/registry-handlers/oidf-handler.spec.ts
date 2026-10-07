@@ -50,7 +50,16 @@ const oidfRegistry: EntityIdentityRegistry = {
   trustAnchorEC: ecUrl
 };
 
-const found = { status: 'found', registryName: 'OIDF Test' };
+/** The entity the default subordinate statement's metadata describes. */
+const foundEntity = {
+  name: 'Issuer',
+  raw: { federation_entity: { organization_name: 'Issuer' } }
+};
+const found = {
+  status: 'found',
+  registryName: 'OIDF Test',
+  entity: foundEntity
+};
 const unchecked = { status: 'unchecked', registryName: 'OIDF Test' };
 
 /** A 200 serving a JWT, as `BuiltinHttpGetService` returns entity statements. */
@@ -164,6 +173,84 @@ describe('lookupOidf', () => {
       buildCtx({ httpGetService })
     );
     expect(result).toEqual(found);
+  });
+
+  describe('entity from the subordinate statement', () => {
+    // A `data:` logo, as a live registry may sign, truncated for the test.
+    const metadata = {
+      federation_entity: {
+        organization_name: 'Example University',
+        homepage_uri: 'https://example.edu',
+        logo_uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=='
+      }
+    };
+    const expectedEntity = {
+      name: 'Example University',
+      url: 'https://example.edu',
+      logo: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==',
+      raw: metadata
+    };
+
+    it('carries the verified metadata as the match entity', async () => {
+      const httpGetService = await registryServing(
+        jwtResult(await subordinateJwt({ payload: { metadata } }))
+      );
+      const result = await lookupOidf(
+        did,
+        oidfRegistry,
+        buildCtx({ httpGetService })
+      );
+      expect(result).toEqual({
+        status: 'found',
+        registryName: 'OIDF Test',
+        entity: expectedEntity
+      });
+    });
+
+    it('carries the same entity on a cache hit', async () => {
+      const httpGetService = await registryServing(
+        jwtResult(await subordinateJwt({ payload: { metadata } }))
+      );
+      const cache = FakeCacheService();
+      const ctx = buildCtx({ httpGetService, cacheService: cache });
+      const first = await lookupOidf(did, oidfRegistry, ctx);
+      const second = await lookupOidf(did, oidfRegistry, ctx);
+      expect(second).toEqual(first);
+      expect(second).toMatchObject({ entity: expectedEntity });
+      expect(httpGetService.callsTo(lookupUrl)).toBe(1);
+    });
+
+    it('carries no entity when the statement does not verify', async () => {
+      const httpGetService = await registryServing(
+        jwtResult(
+          await subordinateJwt({ payload: { metadata }, key: otherKey })
+        )
+      );
+      const result = await lookupOidf(
+        did,
+        oidfRegistry,
+        buildCtx({ httpGetService })
+      );
+      expect(result).toEqual(unchecked);
+      expect(result).not.toHaveProperty('entity');
+    });
+
+    it('names only the members the statement gives as strings', async () => {
+      const sparse = { federation_entity: { homepage_uri: 42 } };
+      const httpGetService = await registryServing(
+        jwtResult(await subordinateJwt({ payload: { metadata: sparse } }))
+      );
+      const result = await lookupOidf(
+        did,
+        oidfRegistry,
+        buildCtx({ httpGetService })
+      );
+      expect(result).toEqual({
+        status: 'found',
+        registryName: 'OIDF Test',
+        entity: { raw: sparse }
+      });
+    });
   });
 
   it('returns not-found on 404 and does not cache lookup', async () => {

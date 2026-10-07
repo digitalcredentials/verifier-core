@@ -115,6 +115,16 @@ own name contains `, ` cannot be recovered from it. `entity` is the
 registry's description of the issuer rather than the credential's
 description of itself, which makes it the display name to prefer.
 
+`dcc-legacy` and `oidf` matches carry an `entity`; `vc-recognition`
+matches do not yet. For `oidf` it is the `metadata` of the trust anchor's
+subordinate statement — `name` from `federation_entity.organization_name`,
+`url` from `homepage_uri`, `logo` from `logo_uri`, and the whole verified
+`metadata` under `raw` — read only from a statement that has just
+verified, on a cache hit as well as on a fresh fetch. Note that an OIDF
+`logo_uri` may be a `data:` URI carrying the image itself rather than a
+link to it, so `entity.logo` can be large, and it is cached along with the
+rest of the lookup.
+
 Because folding drops successes from `results`, a consumer that wants the
 payload of a check that *passed* needs `verbose: true`. A failing
 `registry.issuer` appears in the folded `results` with its payload either
