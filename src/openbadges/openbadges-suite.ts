@@ -8,9 +8,10 @@
  *   cross-field semantic checks. **No network access required.**
  *   Safe to enable in latency-sensitive contexts.
  * - {@link openBadgesSchemaSuite} — AJV-backed JSON Schema validation
- *   against the published OBv3 schemas. Requires fetching the schema
- *   document at first use; subsequent runs reuse the AJV instance's
- *   in-memory cache.
+ *   against the published OBv3 schemas. The four published OB 3.0
+ *   schemas are fetched once per `cacheService` and compiled once per
+ *   verifier; any other `credentialSchema` URL is fetched on every
+ *   verification.
  * - {@link openBadgesSuite} — the union of the two above. Convenience
  *   for consumers who want full OB coverage and accept the schema
  *   suite's network cost.

@@ -35,6 +35,7 @@ export async function verifyPresentation(
   const {
     presentation,
     challenge,
+    domain,
     unsignedPresentation,
     additionalSuites,
     registries,
@@ -43,6 +44,7 @@ export async function verifyPresentation(
   return createVerifier(config).verifyPresentation({
     presentation,
     challenge,
+    domain,
     unsignedPresentation,
     additionalSuites,
     registries

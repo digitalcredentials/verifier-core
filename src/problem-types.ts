@@ -41,6 +41,9 @@ export const ProblemTypes = {
   /** Spec — input could not be parsed. (W3C VC Data Model 2.0 §7.1) */
   PARSING_ERROR: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
 
+  /** Synthesized — a check threw instead of returning an outcome. */
+  CHECK_ERROR: 'https://www.w3.org/TR/vc-data-model#CHECK_ERROR',
+
   /** Synthesized — cryptographic signature did not verify. */
   INVALID_SIGNATURE: 'https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE',
   /** Synthesized — proof verification raised an error before reaching a verdict. */
@@ -86,11 +89,16 @@ export const ProblemTypes = {
   /** Synthesized — status list VC `validFrom` is in the future. */
   STATUS_LIST_NOT_YET_VALID:
     'https://www.w3.org/TR/vc-data-model#STATUS_LIST_NOT_YET_VALID',
+  /** Synthesized — a status list is not issued by the credential's issuer (non-fatal). */
+  STATUS_LIST_ISSUER_MISMATCH:
+    'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ISSUER_MISMATCH',
   /** Synthesized — status list check raised an error before reaching a verdict. */
   STATUS_LIST_ERROR: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ERROR',
-  /** Synthesized — status list bit indicates revocation or suspension. */
-  CREDENTIAL_REVOKED_OR_SUSPENDED:
-    'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED'
+  /** Synthesized — a revocation status list marks the credential revoked. */
+  CREDENTIAL_REVOKED: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED',
+  /** Synthesized — a suspension status list marks the credential suspended. */
+  CREDENTIAL_SUSPENDED:
+    'https://www.w3.org/TR/vc-data-model#CREDENTIAL_SUSPENDED'
 } as const;
 
 export type ProblemType = (typeof ProblemTypes)[keyof typeof ProblemTypes];

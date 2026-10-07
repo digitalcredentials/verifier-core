@@ -22,6 +22,13 @@ import type {
 import { registryKeyHash } from '../util/registry-key-hash.js';
 import { DEFAULT_TTL_MS } from './registry-handlers/cache-ttl.js';
 
+/**
+ * A result missing some registries is retried soon, not trusted for an hour.
+ * It is still cached briefly so that, while a registry is down, every
+ * verification does not wait out the HTTP timeout again.
+ */
+const PARTIAL_RESULT_TTL_MS = 60 * 1000;
+
 const defaultHandlers: RegistryHandlerMap = {
   'dcc-legacy': lookupDccLegacy,
   oidf: lookupOidf,
@@ -47,8 +54,10 @@ const defaultHandlers: RegistryHandlerMap = {
  * work fine without one.
  *
  * The returned function caches lookup results at the DID level, using a
- * cache key that incorporates the DID and a canonicalized hash of the
- * registries array.
+ * cache key that incorporates the DID and a canonical key for the
+ * registries array. A complete result is cached for an hour; a result with
+ * any unchecked registry is cached for only a minute, so a transient outage
+ * is retried soon.
  *
  * Options:
  * - `fresh: true` — bypass the DID-level result cache (but underlying data caches still apply)
@@ -111,7 +120,11 @@ export function createRegistryLookup(
       uncheckedRegistries
     };
 
-    await cacheService.set(cacheKey, result, DEFAULT_TTL_MS);
+    const ttl =
+      result.uncheckedRegistries.length > 0
+        ? PARTIAL_RESULT_TTL_MS
+        : DEFAULT_TTL_MS;
+    await cacheService.set(cacheKey, result, ttl);
 
     return result;
   };

@@ -34,31 +34,35 @@ src/
 ├── flatten-presentation-results.ts  flattenPresentationResults helper + FlattenedCheckResult provenance-tagged union
 ├── problem-types.ts                 ProblemTypes const map + ProblemType union (catalog of built-in ProblemDetail.type URIs)
 ├── declarations.d.ts                Ambient type declarations for untyped DCC packages
-├── schemas/                         Zod parsing schemas
+├── schemas/                         Minimal Zod envelope gates (structure is judged by the core suite)
 │   ├── index.ts                     Re-exports parseCredential, parsePresentation
-│   ├── credential.ts                VC schema (v1 + v2 union)
-│   ├── presentation.ts              VP schema
-│   ├── issuer.ts                    Issuer field schema
-│   ├── proof.ts                     Proof field schema
-│   └── jsonld-field.ts              @context field schema
+│   ├── credential.ts                VC gate: @context, type, issuer, credentialSubject; rejects enveloped credentials
+│   ├── presentation.ts              VP gate: @context, type, holder
+│   ├── issuer.ts                    Issuer: a string, or an object with a string id
+│   └── holder.ts                    Holder: a string, or an object with a string id
 ├── services/                        Ports and adapters for injectable dependencies
 │   ├── cache-service/               CacheService port + InMemoryCacheService adapter
-│   ├── http-get-service/            HttpGetService port + BuiltinHttpGetService (fetch-based) adapter
+│   ├── http-get-service/            HttpGetService port + BuiltinHttpGetService (fetch adapter with URL policy, deadline and byte cap)
+│   │   └── url-policy.ts            checkUrl: https only, no localhost / private IP literals (applied per redirect hop)
 │   ├── data-integrity-crypto.ts     Default CryptoService implementation (Data Integrity / Linked Data Proofs)
 │   ├── registry-lookup.ts           createRegistryLookup factory: builds a LookupIssuers from handlers + cache
 │   └── registry-handlers/           Per-type registry handlers behind a port
 │       ├── types.ts                 RegistryHandler, RegistryHandlerMap, RegistryHandlerContext
 │       ├── dcc-legacy-handler.ts    DCC legacy DID-list registry
-│       ├── oidf-handler.ts          OpenID Federation entity-statement registry
+│       ├── oidf-handler.ts          OpenID Federation registry: verifies the entity configuration and subordinate statement (ES256/EdDSA), `iss` / `sub` / `exp`
+│       ├── jws-verify.ts            Compact JWS verification against a JWK Set with the shipped key libraries
+│       ├── jwt-payload-decode.ts    Portable base64url / JWT payload decoding (no Buffer)
 │       ├── vc-recognition-handler.ts Recognition VC registry (recursively verified via the parent Verifier)
 │       └── cache-ttl.ts             TTL helpers (Cache-Control, validUntil)
 ├── suites/                          Verification suite implementations (default suites only)
-│   ├── core/                        Structure checks (context, VC context, credential id, proof exists)
+│   ├── core/                        Structure checks (context, VC context, VC structure, VP structure, credential id, proof exists)
 │   ├── recognition/                 Pluggable recognizer dispatch; produces normalized credential form
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
 │   ├── registry/                    Issuer DID lookup via context.lookupIssuers
-│   └── schema/obv3/                 AJV-backed OBv3 JSON Schema check; consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
+│   └── schema/
+│       ├── schema-loader.ts         Cached AJV loadSchema: schema JSON in cacheService under schema:<url>, for allow-listed URLs only
+│       └── obv3/                    AJV-backed OBv3 JSON Schema check (validators compiled once per verifier); consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
 ├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`)
 │   ├── index.ts                     Curated barrel — suites, individual checks, factory, recognition helpers, problem-type catalog, vocabulary
 │   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite (all phase: 'semantic')
@@ -93,9 +97,8 @@ src/
     ├── document-loader-from-http-get.ts  Build a JSON-LD loader backed by an HttpGetService
     ├── did-web-driver-with-http-get.ts   did:web resolution via HttpGetService (cache-sharing)
     ├── fetch-json-from-http-get.ts       Wrap an HttpGetService as a FetchJson
-    ├── registry-key-hash.ts              Stable hash of a registry list for cache keys
-    ├── json-pointer.ts                   formatJsonPointer (RFC 6901) for ProblemDetail.instance values
-    └── jwt-payload-decode.ts             Minimal JWT payload decoder (OIDF handler)
+    ├── registry-key-hash.ts              Stable cache key for a registry list (the sorted ids, JSON-encoded)
+    └── json-pointer.ts                   formatJsonPointer (RFC 6901) for ProblemDetail.instance values
 ```
 
 ```
@@ -107,7 +110,8 @@ test/
 ├── smoke.spec.ts                        Networked interop regression (npm run test:smoke)
 ├── run-suites.spec.ts                   Suite orchestration tests
 ├── types.spec.ts                        Type validation tests
-├── schemas.spec.ts                      Zod schema tests
+├── schemas.spec.ts                      Zod envelope gate tests
+├── spec-legal-inputs.spec.ts            Offline real-crypto: spec-legal inputs verify; structure failures halt
 ├── factories/
 │   ├── data/                            CredentialFactory + helpers for synthesizing test VCs
 │   └── services/                        Service test doubles (FakeCryptoService, FakeHttpGetService, …)
@@ -137,7 +141,7 @@ test/
                   │ verifier.verifyCredential(call)
                   ▼
             ┌──────────┐
-            │  Parse   │  Zod schema → VerifiableCredential | parse error
+            │  Parse   │  minimal Zod envelope gate → pass | parse error
             └────┬─────┘
                  │
                  ▼
@@ -165,14 +169,21 @@ per-type `registryHandlers` — falling back to internal lazy-memoized factories
 `default-services.ts` when the caller omits them. It then builds a single `lookupIssuers` keyed
 to those services, and returns a `Verifier` whose methods share all of the above.
 
-**Parse.** Zod schemas (`schemas/credential.ts`) validate the input. A parse failure produces a
-synthetic `parsing.envelope` check result with a `ProblemDetail` describing what went wrong.
+**Parse.** A minimal Zod gate (`schemas/credential.ts`) checks only what the pipeline needs to
+run safely: that `@context`, `type`, `issuer` and `credentialSubject` are present and readable
+(for a presentation, `schemas/presentation.ts` checks `@context`, `type` and, when present,
+`holder`). It also rejects enveloped credentials (`EnvelopedVerifiableCredential`, i.e.
+VC-JOSE-COSE), which this verifier does not support. A parse failure produces a synthetic
+`parsing.envelope` check result with a `ProblemDetail` describing what went wrong. The gate is
+not a VC Data Model validator: structure is judged by `core.vc-structure` / `core.vp-structure`,
+and a fatal failure there halts every check after it. The gate's output is discarded; the
+caller's original object is what the suites verify (see the invariant in `src/verifier.ts`).
 The credential is `unknown` on entry — callers don't need to pre-validate.
 
 **Context.** Each `verifyCredential` / `verifyPresentation` call builds an internal
 `VerificationContext` from the verifier's long-lived services plus per-call inputs (the parsed
 credential or presentation, optional `additionalSuites`, optional `registries` override, optional
-`challenge` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
+`challenge` / `domain` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
 not a public composition point. Because `documentLoader` and `cacheService` live on the verifier,
 they're shared across every call on the same instance — this is what makes batch verification
 reuse fetches.
@@ -195,13 +206,16 @@ in the array, so the report is always complete.
 
 `verifyPresentation` follows the same pipeline with two additions:
 
-1. The VP itself is verified for its signature (proof suite with presentation-specific proof purpose).
+1. The VP itself runs the `core` suite, where only `core.vp-structure` applies to a presentation,
+   and then the proof suite, which verifies its signature with a presentation-specific proof purpose.
 2. Each embedded credential is extracted (`extractCredentialsFrom`) and verified individually by
    recursing into the **same `Verifier` instance** (`this.verifyCredential(...)`), so the cache,
    document loader, crypto services, and registries are automatically shared across every embedded
-   VC.
+   VC. The presentation's own gate does not look inside `verifiableCredential`: each embedded
+   credential passes or fails its own gate, so one malformed or enveloped credential yields its own
+   `parsing.envelope` failure in `credentialResults` rather than rejecting the whole VP.
 
-The result is a `PresentationVerificationResult` with `verifiablePresentation` (the parsed VP),
+The result is a `PresentationVerificationResult` with `verifiablePresentation` (the VP as given),
 `presentationResults` (VP-level check results), and `credentialResults` (one
 `CredentialVerificationResult` per embedded VC). The `flattenPresentationResults` helper in
 `src/flatten-presentation-results.ts` returns a single provenance-tagged
@@ -216,7 +230,7 @@ and per-call inputs is the core of the design:
 | Lives on the verifier (`VerifierConfig`)         | Per call (`VerifyCredentialCall` / `VerifyPresentationCall`)              |
 |--------------------------------------------------|---------------------------------------------------------------------------|
 | `httpGetService`, `cacheService`, `cryptoServices` | `credential` (or `presentation`)                                        |
-| `documentLoader`, `registries`, `registryHandlers` | `additionalSuites`, `registries` (per-call override), `challenge`, `unsignedPresentation` |
+| `documentLoader`, `registries`, `registryHandlers` | `additionalSuites`, `registries` (per-call override), `challenge`, `domain`, `unsignedPresentation` |
 
 Hold a `Verifier` whenever you'll perform more than one verification. The cache reuse covers
 issuer DID documents (via the `CachedResolver` baked into the document loader), DCC-legacy
@@ -238,6 +252,14 @@ remote fetch (JSON-LD contexts, `did:web` documents, status list
 credentials) therefore flows through the verifier's HTTP service,
 giving caller-installed mocks, retries, and (future) caches a single
 chokepoint to observe.
+
+That chokepoint is also where the network policy lives. With the default
+`BuiltinHttpGetService`, every fetch — unbundled contexts included — is
+https-only, refuses `localhost` and private IP literals on every redirect
+hop, has a deadline and a byte cap, and reports failures with fixed text
+that never quotes the response. A caller-supplied `httpGetService` or
+`documentLoader` replaces that policy along with the fetch; see the
+README's "Network policy of the built-in HTTP service".
 
 To avoid re-allocating the loader's `CachedResolver` and DID drivers
 on every call, the per-service loader is memoized via a module-local
@@ -301,8 +323,16 @@ break when the flag is left at its default (`false`). See
 
 - **`appliesTo`** limits a check to credential-only or presentation-only subjects. If unset, the
   check runs for both.
-- **`fatal`** on a check means a failure stops remaining checks *in that suite only*. Later suites
-  still run. This ensures the report is always complete.
+- **`fatal`** on a check means a failure halts every remaining check for the subject, in that
+  suite and in all later suites: once the subject is known to be invalid, later checks would
+  only report misleading follow-on failures or do needless network I/O. Each check that would
+  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`
+  (visible with `verbose: true`), so the report stays complete. Suites that would not have run
+  anyway (phase filter, `applies` false) stay silent.
+- **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
+  `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
+  yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
+  Verification never rejects because a check threw.
 - **Failures** carry `ProblemDetail[]` — RFC 9457-inspired structured errors with `type` (URI),
   `title`, and `detail`.
 - **Skips** carry a `reason` string explaining why (e.g. "Credential has no credentialStatus").
@@ -311,10 +341,10 @@ break when the flag is left at its default (`false`). See
 
 | Suite              | ID            | Phase           | Checks                                                                         | Fatal | Purpose                                                          |
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
-| Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
+| Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
 | Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's; each list is fetched once per verification. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
@@ -633,7 +663,7 @@ their own URIs without requiring an entry in any catalog.
 | `@digitalcredentials/security-document-loader`       | Bundled JSON-LD context resolution + `CachedResolver`                |
 | `@digitalcredentials/did-method-key`, `did-method-web` | DID resolution drivers used by the document loader                  |
 | `@digitalcredentials/vc-bitstring-status-list`       | BitstringStatusList status checking                                   |
-| `zod`                                                | Input parsing and structural validation                              |
+| `zod`                                                | Minimal input envelope gate; strict OB 3.0 envelopes (recognition)   |
 | `ajv` / `ajv-formats`                                | JSON Schema validation for OBv3 schema checks                        |
 
 ### Test
@@ -696,7 +726,9 @@ without network dependencies, and composable — consumers wire in exactly the b
   internals. The default crypto service verifies signatures only — credential status checking
   is the sole responsibility of the status suite (P-E, 2026-04-19).
 - **Status suite** still consumes `@digitalcredentials/vc-bitstring-status-list` for purpose
-  matching, validity dates, bitstring decoding, and index reading. The status list credential's
+  matching, list type, bitstring decoding, and index reading. The list's validity dates are
+  checked by `@digitalcredentials/vc` inside the crypto service, with its proof, and issuer
+  binding by `status.list-issuer` rather than the library's throwing comparison. The status list credential's
   proof is verified through the injected `CryptoService`s via `src/crypto-dispatch.ts` — the
   same dispatch presentations and credentials use. Recursively calling `Verifier.verifyCredential`
   on the status list credential is deferred (it needs a recursion guard the status suite cannot

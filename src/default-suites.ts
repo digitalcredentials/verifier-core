@@ -5,7 +5,7 @@
  * shown in parentheses (the tag drives the two-pass `phases:`
  * filter on `VerifierConfig`; see {@link SuitePhase}):
  *
- * 1. **core** (cryptographic) — structure validation (context, VC context URI, credential id, proof exists)
+ * 1. **core** (cryptographic) — structure validation (context, VC context URI, VC Data Model structure, credential id, proof exists). `verifyPresentation` also runs `core` against the VP, where only `core.vp-structure` applies
  * 2. **recognition** (recognition) — pluggable credential-profile recognition (no-op when no recognizers configured)
  * 3. **proof** (cryptographic) — cryptographic signature verification
  * 4. **status** (cryptographic) — revocation/suspension via BitstringStatusList

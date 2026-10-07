@@ -47,7 +47,11 @@ async function lookupDccLegacyForRegistry(
     await cacheService.set(key, body, loaded.ttlMs);
   }
 
-  const entry = body.registry[did];
+  // Own keys only, so a DID such as `__proto__` or `constructor` cannot
+  // match a property inherited from Object.prototype.
+  const entry = Object.hasOwn(body.registry, did)
+    ? body.registry[did]
+    : undefined;
   if (entry === undefined || entry === null) {
     return { status: 'not-found' };
   }

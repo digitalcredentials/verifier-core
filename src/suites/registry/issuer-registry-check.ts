@@ -32,14 +32,18 @@ function getIssuerDid(credential: Record<string, unknown>): string | undefined {
  * it cause this check to skip.
  *
  * Skipped when:
- * - No registries provided in VerificationContext
+ * - No registries provided in VerificationContext (`undefined` or `[]`)
  * - No `lookupIssuers` in VerificationContext
  *
  * Success when:
  * - Issuer found in at least one registry
  *
  * Failure when:
- * - Issuer not found in any registry
+ * - Issuer not found in any registry (`ISSUER_NOT_REGISTERED`). If some
+ *   registries could not be checked, its detail says how many answered,
+ *   and a `REGISTRY_UNCHECKED` problem follows naming the rest
+ * - Every registry could not be checked (`REGISTRY_UNCHECKED` only, since
+ *   no registry answered and "not registered" was never established)
  */
 export const issuerRegistryCheck: VerificationCheck = {
   id: 'registry.issuer',
@@ -62,8 +66,9 @@ export const issuerRegistryCheck: VerificationCheck = {
       };
     }
 
-    // Skip if no registries in context
-    if (!context.registries) {
+    // An empty list means "skip", as the recognition handler's nested
+    // verification relies on.
+    if (!context.registries || context.registries.length === 0) {
       return {
         status: 'skipped',
         reason: 'No registries configured in verification context.'
@@ -114,12 +119,36 @@ export const issuerRegistryCheck: VerificationCheck = {
         };
       }
 
-      // Issuer not found
+      const uncheckedSummary = `${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`;
+
+      // Every registry is queried when nothing is found, so equal counts
+      // mean no registry answered at all (an injected lookup reporting more
+      // is treated the same).
+      if (result.uncheckedRegistries.length >= context.registries.length) {
+        return {
+          status: 'failure',
+          problems: [
+            {
+              type: ProblemTypes.REGISTRY_UNCHECKED,
+              title: 'Registry Unchecked',
+              detail: `Issuer registration could not be determined: ${uncheckedSummary}`
+            }
+          ]
+        };
+      }
+
+      // Issuer not found. Only the registries that answered establish that;
+      // the REGISTRY_UNCHECKED problem below names the rest.
+      const uncheckedCount = result.uncheckedRegistries.length;
+      const checkedCount = context.registries.length - uncheckedCount;
       const problems: ProblemDetail[] = [
         {
           type: ProblemTypes.ISSUER_NOT_REGISTERED,
           title: 'Issuer Not Registered',
-          detail: `Issuer ${issuerDid} was not found in any known DID registry.`
+          detail:
+            uncheckedCount === 0
+              ? `Issuer ${issuerDid} was not found in any known DID registry.`
+              : `Issuer ${issuerDid} was not found in the ${checkedCount} ${checkedCount === 1 ? 'registry' : 'registries'} that could be checked; ${uncheckedCount} could not be checked.`
         }
       ];
 
@@ -128,7 +157,7 @@ export const issuerRegistryCheck: VerificationCheck = {
         problems.push({
           type: ProblemTypes.REGISTRY_UNCHECKED,
           title: 'Registry Unchecked',
-          detail: `${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`
+          detail: uncheckedSummary
         });
       }
 

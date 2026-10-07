@@ -184,10 +184,24 @@ export interface VerifyPresentationCall {
   /** The presentation to verify (parsed internally via Zod). */
   presentation: unknown;
 
-  /** Expected challenge for authentication proof purpose. */
+  /**
+   * Expected challenge on the presentation's proof. When set, the proof must
+   * use the `authentication` purpose and carry this challenge, whatever the
+   * presentation claims. When unset, only the signature is checked.
+   */
   challenge?: string | null;
 
-  /** Whether to allow unsigned presentations (skip VP signature check). */
+  /**
+   * Expected `domain` on the presentation's authentication proof. Requires
+   * `challenge`.
+   */
+  domain?: string;
+
+  /**
+   * Accept a presentation that has no proof. Default `false`: an unsigned
+   * presentation fails `proof.signature`. A proof that is present is always
+   * verified, whatever this is set to.
+   */
   unsignedPresentation?: boolean;
 
   /** Additional verification suites to run after the defaults. */

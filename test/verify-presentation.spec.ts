@@ -93,6 +93,21 @@ describe('verifyPresentation', () => {
       expect(result.credentialResults).toHaveLength(0);
     });
 
+    it('runs core.vp-structure ahead of the proof suite', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({
+        presentation,
+        ...fakeVerified
+      });
+
+      const structure = result.presentationResults.find(
+        r => r.id === 'cryptographic.core.vp-structure'
+      );
+      expect(structure?.outcome.status).toBe('success');
+      expect(result.presentationResults[0]).toBe(structure);
+      expect(result.presentationResults.map(r => r.suite)).toContain('proof');
+    });
+
     it('accepts a holder object with an id', async () => {
       const presentation = PresentationFactory({
         holder: { id: DEFAULT_TEST_ISSUER_DID }
@@ -246,7 +261,16 @@ describe('verifyPresentation', () => {
       });
 
       expect(result.verified).toBe(false);
-      expect(result.presentationResults[0]?.outcome.status).toBe('failure');
+      // The bad credential fails its own gate; the presentation's does not.
+      expect(
+        result.presentationResults.some(r => r.check === 'parsing.envelope')
+      ).toBe(false);
+      expect(result.credentialResults).toHaveLength(2);
+      expect(result.credentialResults[0].verified).toBe(true);
+      expect(result.credentialResults[1].verified).toBe(false);
+      expect(result.credentialResults[1].results[0]?.check).toBe(
+        'parsing.envelope'
+      );
     });
 
     it('separates credential results correctly', async () => {
@@ -341,7 +365,15 @@ describe('verifyPresentation', () => {
         ...fakeVerified
       });
 
-      expect(result.presentationResults).toBeInstanceOf(Array);
+      expect(result.verified).toBe(true);
+      const signature = result.presentationResults.find(
+        r => r.check === 'proof.signature'
+      );
+      expect(signature?.outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'Presentation is unsigned; accepted because unsignedPresentation is set.'
+      });
     });
   });
 

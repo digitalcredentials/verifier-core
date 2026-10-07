@@ -11,6 +11,7 @@ import {
   okJsonBody
 } from '../../factories/services/fake-http-get-service.js';
 import { FakeVerifier } from '../../factories/services/fake-verifier.js';
+import { DEFAULT_TTL_MS } from '../../../src/services/registry-handlers/cache-ttl.js';
 
 const dccRegistry: EntityIdentityRegistry = {
   name: 'Test Legacy',
@@ -86,6 +87,67 @@ describe('createRegistryLookup', () => {
   });
 
   describe('caching', () => {
+    function cacheWithSetSpy() {
+      const base = FakeCacheService();
+      const sets: Array<{ key: string; ttl?: number }> = [];
+      return {
+        cache: {
+          get: base.get.bind(base),
+          set: async (key: string, value: unknown, ttl?: number) => {
+            sets.push({ key, ttl });
+            return base.set(key, value, ttl);
+          }
+        },
+        sets
+      };
+    }
+
+    const oidfRegistry: EntityIdentityRegistry = {
+      name: 'Test OIDF',
+      type: 'oidf',
+      trustAnchorEC: 'https://ta.example/.well-known/openid-federation'
+    };
+
+    it('caches a result with an unchecked registry for 60 s', async () => {
+      const handlers: RegistryHandlerMap = {
+        'dcc-legacy': async () => ({ status: 'not-found' }),
+        oidf: async (_did, registry) => ({
+          status: 'unchecked',
+          registryName: registry.name
+        }),
+        'vc-recognition': async () => ({ status: 'not-found' })
+      };
+      const { cache, sets } = cacheWithSetSpy();
+      const lookup = createRegistryLookup(
+        FakeHttpGetService({}),
+        cache,
+        handlers
+      );
+      const result = await lookup('did:key:a', [dccRegistry, oidfRegistry]);
+      expect(result.uncheckedRegistries).toEqual(['Test OIDF']);
+      expect(sets).toEqual([
+        { key: expect.stringMatching(/^reg-result:/), ttl: 60_000 }
+      ]);
+    });
+
+    it('caches a complete result for the default TTL', async () => {
+      const handlers: RegistryHandlerMap = {
+        'dcc-legacy': async () => ({ status: 'not-found' }),
+        oidf: async () => ({ status: 'not-found' }),
+        'vc-recognition': async () => ({ status: 'not-found' })
+      };
+      const { cache, sets } = cacheWithSetSpy();
+      const lookup = createRegistryLookup(
+        FakeHttpGetService({}),
+        cache,
+        handlers
+      );
+      await lookup('did:key:a', [dccRegistry, oidfRegistry]);
+      expect(sets).toEqual([
+        { key: expect.stringMatching(/^reg-result:/), ttl: DEFAULT_TTL_MS }
+      ]);
+    });
+
     it('caches result for same DID and registries', async () => {
       let handlerCallCount = 0;
       const handlers: RegistryHandlerMap = {

@@ -3,9 +3,9 @@
  *
  * Returns an array of credentials, or null if no credentials are present.
  */
-export function extractCredentialsFrom(vp: {
-  verifiableCredential?: unknown | unknown[];
-}): unknown[] | null {
+export function extractCredentialsFrom(
+  vp: Record<string, unknown>
+): unknown[] | null {
   const { verifiableCredential } = vp;
   if (!verifiableCredential) {
     return null;

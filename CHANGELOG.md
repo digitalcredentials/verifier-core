@@ -42,6 +42,9 @@ Verifier results now fold per-suite checks into a single
   any future check that needs to ask "what time is it?" — useful groundwork for
   credential expiration, signature clock-skew, key rotation, and status-list
   freshness work.
+- `domain` on `verifyPresentation`, checked alongside `challenge`.
+- `BuiltinHttpGetService({ timeoutMs, maxBytes })`: the deadline (default 10 s)
+  and body cap (default 5 MB) of the built-in HTTP service.
 
 ### Changed
 
@@ -61,6 +64,10 @@ Verifier results now fold per-suite checks into a single
   prettier 3; package manager is **pnpm**. `engines.node` raised to `>=24`.
   `exports` now declare `react-native` / `import` conditions for `.` and
   `./openbadges`, and the package is marked `sideEffects: false`.
+- `HttpGetResult.body` from the built-in HTTP service is parsed JSON whenever
+  the body is valid JSON, whatever its content type. Previously only JSON
+  content types were parsed, so a `text/plain` status list or DID document
+  arrived as a string.
 
 ### Fixed
 
@@ -78,6 +85,81 @@ Verifier results now fold per-suite checks into a single
   previous string-only union failed the entire credential parse.
 - Verifiable presentation `holder` now accepts an object with an `id` as well as
   a URL string, per VCDM 2.0 (supersedes upstream #22).
+- **Security: `unsignedPresentation: true` no longer skips a presentation proof
+  that is present.** The flag was forwarded to `@digitalcredentials/vc`, which
+  reads it as "skip the presentation proof", so a VP with a tampered holder
+  signature verified whenever the caller set it. A proof that is present is now
+  always verified. The flag only accepts a VP that has no proof, and that VP's
+  `proof.signature` is `skipped` rather than failing with "No Applicable Crypto
+  Service". Without the flag, a VP with no proof fails `proof.signature` as
+  `Presentation Not Signed`. `CryptoVerifyOptions` no longer carries
+  `unsignedPresentation`, because a `CryptoService` is only asked to verify
+  proofs that exist.
+- **Security: a supplied `challenge` is now always enforced.** Previously a VP
+  whose proof claimed `assertionMethod` was verified without checking it, so a
+  replayed presentation verified. With no challenge supplied, an
+  `authentication` VP now verifies on its signature instead of failing against
+  the placeholder challenge `meaningless`. The VP proof check no longer
+  re-verifies embedded credentials.
+- **Security: the built-in HTTP service no longer fetches whatever a credential
+  names.** It refuses non-https URLs, `localhost` and loopback, private,
+  link-local and unspecified IP literals, on the first URL and on every redirect
+  hop (at most five). Each request has a 10 s deadline and a 5 MB body cap. The
+  body is read once, so a malformed JSON response no longer fails with
+  `Body is unusable`, and errors name only the URL and the reason: response text
+  no longer reaches problem details. This covers the built-in service only; an
+  injected `httpGetService` or `documentLoader` keeps its own policy.
+- **Security: OIDF registry membership is now verified.** Previously both entity
+  statements were payload-decoded without checking their signatures, and any
+  statement with a `metadata` object counted as registered. The trust anchor's
+  entity configuration and the issuer's subordinate statement are now
+  signature-verified (ES256 or EdDSA), with `iss`, `sub` and `exp` checked; a
+  statement that does not verify reports the registry as unchecked. OIDF lookups
+  now work in browsers and React Native (no `Buffer`). A lookup that included an
+  unreachable registry is cached for 60 s instead of 1 h, and a recognition
+  credential for at most 1 h instead of until its `validUntil`. `registries: []`
+  skips the registry check instead of reporting the issuer as not registered.
+  When every registry is unchecked, the result says registration could not be
+  determined (`REGISTRY_UNCHECKED` only). dcc-legacy lookups ignore prototype
+  keys such as `__proto__`, and registry cache keys can no longer collide.
+- **The OBv3 schema check no longer fetches and compiles its schema on every
+  verification.** The four published OB 3.0 schemas are now fetched once per
+  `cacheService` (cached for 24 h under `schema:<url>`) and compiled once per
+  verifier, so verifiers that share a `cacheService` share the fetch. Only a
+  successfully fetched JSON object is cached. Any other `credentialSchema` URL
+  is still fetched and compiled on every verification, so an issuer cannot grow
+  the cache. The docs previously claimed the schema was cached after first use;
+  it was not.
+- **Security: a status list signed by someone other than the credential's issuer
+  is now reported.** Previously a validly signed status list from any DID
+  decided revocation without any signal, so whoever controlled the list's host
+  could un-revoke a credential by serving a list signed with their own key. A
+  new non-fatal check, `status.list-issuer`, runs after `status.bitstring` and
+  reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` id differs from
+  the credential's. It is a warning, so `verified` is unchanged: some status
+  services sign every list with a DID of their own rather than the issuer's.
+  Consumers that need the binding enforced should treat
+  `STATUS_LIST_ISSUER_MISMATCH` as decisive. Each status list is still fetched
+  once per verification. The crypto service no longer passes
+  `verifyMatchingIssuers` to `@digitalcredentials/vc`, which never read it. The
+  status check also now checks every `BitstringStatusListEntry` for `revocation`
+  or `suspension`, not only the first `credentialStatus` entry, and ignores
+  other entries (legacy types, unknown types, other purposes) without fetching
+  their lists; a set `refresh` or `message` bit no longer reads as revoked. Each
+  set bit is its own problem, `CREDENTIAL_REVOKED` or `CREDENTIAL_SUSPENDED`,
+  which replace `CREDENTIAL_REVOKED_OR_SUSPENDED`. An expired or not-yet-valid
+  status list is reported as `STATUS_LIST_EXPIRED` or
+  `STATUS_LIST_NOT_YET_VALID` instead of as a bad signature, and a list that is
+  not a `BitstringStatusListCredential` as `STATUS_LIST_TYPE_ERROR`; neither
+  classification could fire before.
+- **"Issuer not registered" no longer claims every registry was checked.** When
+  an issuer was not found but some registries could not be reached (for example,
+  a registry that sends no CORS headers, read from a browser),
+  `ISSUER_NOT_REGISTERED` said the issuer "was not found in any known DID
+  registry". It now says how many registries answered — "was not found in the 5
+  registries that could be checked; 4 could not be checked." The
+  `REGISTRY_UNCHECKED` problem that names the unreachable registries, and the
+  success message, are unchanged.
 
 ### Deprecated
 

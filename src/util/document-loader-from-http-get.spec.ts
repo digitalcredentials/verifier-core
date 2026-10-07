@@ -17,14 +17,15 @@ const STATUS_LIST = {
     id: `${STATUS_LIST_URL}#list`,
     type: 'BitstringStatusList',
     statusPurpose: 'revocation',
-    encodedList: 'uH4sIAAAAAAAAA-3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAIC3AYbSVKsAQAAA'
+    encodedList:
+      'uH4sIAAAAAAAAA-3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAIC3AYbSVKsAQAAA'
   }
 };
 
 /**
- * `BuiltinHttpGetService` parses the body only when the response carries a
- * JSON content type, and returns raw text otherwise. Both are reproduced here
- * because the two cases fail for different reasons.
+ * `BuiltinHttpGetService` returns any JSON body parsed, but an injected
+ * service may return either a parsed body or the raw text. Both are
+ * reproduced here because the two cases fail for different reasons.
  */
 const jsonService: HttpGetService = {
   get: async () => ({
@@ -101,5 +102,13 @@ describe('documentLoaderFromHttpGet', () => {
     // has to surface as this loader failing to find the document, with the
     // url in the message, rather than as a destructuring error further down.
     await expect(loader(STATUS_LIST_URL)).rejects.toThrow(STATUS_LIST_URL);
+
+    // The parser's message quotes the body, and loader messages reach
+    // problem details, so the body must not appear in the error.
+    const error = await loader(STATUS_LIST_URL).catch((e: unknown) => e);
+    const message = (error as Error).message;
+    expect(message).toContain('response is not JSON');
+    expect(message).not.toContain('DOCTYPE');
+    expect(message).not.toContain('<title>');
   });
 });

@@ -1,12 +1,10 @@
 /**
- * Default {@link CryptoService} for Linked Data Proofs and Data Integrity proofs
- * via `@digitalcredentials/vc`.
+ * Default {@link CryptoService} for Linked Data Proofs and Data Integrity proofs:
+ * credentials via `@digitalcredentials/vc`, a presentation's own proof via
+ * `@digitalcredentials/jsonld-signatures`.
  */
 
-import {
-  verifyCredential as vcVerifyCredential,
-  verify as vcVerifyPresentation
-} from '@digitalcredentials/vc';
+import { verifyCredential as vcVerifyCredential } from '@digitalcredentials/vc';
 import jsonLdSignatures from '@digitalcredentials/jsonld-signatures';
 import type {
   CryptoResult,
@@ -17,6 +15,7 @@ import type { CryptoSuite, ProofPurpose } from '../types/crypto-suite.js';
 import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
+import { documentHasProof } from '../util/document-has-proof.js';
 
 /**
  * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
@@ -147,47 +146,26 @@ function classifySignatureError(
 
 function getPresentationPurpose(
   presentation: Record<string, unknown>,
-  challenge: string | null | undefined
+  challenge: string | null | undefined,
+  domain: string | undefined
 ): ProofPurpose {
-  const proof = presentation.proof as
-    | Record<string, unknown>
-    | Array<Record<string, unknown>>
-    | undefined;
-
-  let proofPurpose: string | undefined;
-  if (Array.isArray(proof)) {
-    proofPurpose = proof[0]?.proofPurpose as string | undefined;
-  } else if (proof && typeof proof === 'object') {
-    proofPurpose = proof.proofPurpose as string | undefined;
+  // A supplied challenge is the caller asking for replay protection, so it
+  // decides the purpose; the document's own proofPurpose cannot opt out.
+  if (typeof challenge === 'string') {
+    return new purposes.AuthenticationProofPurpose({ challenge, domain });
   }
 
-  const useAuthenticationPurpose =
-    proofPurpose === 'authentication' ||
-    proofPurpose === 'authenticationMethod';
-
-  if (useAuthenticationPurpose) {
+  // No challenge supplied: verify the signature only. An authentication
+  // proof is checked against its own challenge, since none was expected.
+  const proof = Array.isArray(presentation.proof)
+    ? (presentation.proof[0] as Record<string, unknown> | undefined)
+    : (presentation.proof as Record<string, unknown> | undefined);
+  if (proof?.proofPurpose === 'authentication') {
     return new purposes.AuthenticationProofPurpose({
-      challenge: challenge ?? 'meaningless'
+      challenge: typeof proof.challenge === 'string' ? proof.challenge : ''
     });
   }
-
   return new purposes.AssertionProofPurpose();
-}
-
-function documentHasProof(doc: Record<string, unknown> | undefined): boolean {
-  if (!doc) {
-    return false;
-  }
-  const proof = doc.proof;
-  if (proof === undefined || proof === null) {
-    return false;
-  }
-  if (Array.isArray(proof)) {
-    return (
-      proof.length > 0 && typeof proof[0] === 'object' && proof[0] !== null
-    );
-  }
-  return typeof proof === 'object';
 }
 
 export interface DataIntegrityCryptoConfig {
@@ -195,8 +173,8 @@ export interface DataIntegrityCryptoConfig {
 }
 
 /**
- * Builds a {@link CryptoService} that verifies via `@digitalcredentials/vc` using the
- * given proof suites (e.g. Ed25519Signature2020 + DataIntegrityProof).
+ * Builds a {@link CryptoService} that verifies with the given proof suites
+ * (e.g. Ed25519Signature2020 + DataIntegrityProof).
  *
  * Signature verification only — credential status is the responsibility
  * of `statusSuite` (see `src/suites/status/`). This adapter does not
@@ -231,7 +209,6 @@ export function DataIntegrityCryptoService(
           credential,
           suite: suites,
           documentLoader: options.documentLoader,
-          verifyMatchingIssuers: false,
           checkStatus: noopCheckStatus
         });
 
@@ -274,42 +251,28 @@ export function DataIntegrityCryptoService(
       try {
         const purpose = getPresentationPurpose(
           presentation as Record<string, unknown>,
-          options.challenge
+          options.challenge,
+          options.domain
         );
 
-        const result = await vcVerifyPresentation({
-          presentation,
-          presentationPurpose: purpose,
+        // Only the VP's own proof is verified here; embedded credentials get
+        // their own `verifyCredential` run and result.
+        const result = (await jsonLdSignatures.verify(presentation, {
           suite: suites,
-          documentLoader: options.documentLoader,
-          unsignedPresentation: options.unsignedPresentation ?? false,
-          challenge: options.challenge ?? 'meaningless',
-          verifyMatchingIssuers: false,
-          checkStatus: noopCheckStatus
-        });
+          purpose,
+          documentLoader: options.documentLoader
+        })) as { verified: boolean; error?: unknown };
 
-        const verified = result.verified ?? false;
-        if (verified) {
+        if (result.verified) {
           return {
             verified: true,
             message: 'Signature verified successfully.'
           };
         }
 
-        let error: unknown = result.error;
-        if (!error && result.credentialResults) {
-          const failedCredential = result.credentialResults.find(
-            (r: { verified?: boolean; error?: unknown }) =>
-              !r.verified && r.error
-          );
-          if (failedCredential?.error) {
-            error = failedCredential.error;
-          }
-        }
-
         return {
           verified: false,
-          problems: classifySignatureError(error, undefined)
+          problems: classifySignatureError(result.error, undefined)
         };
       } catch (e) {
         return {

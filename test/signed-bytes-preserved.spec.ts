@@ -146,8 +146,8 @@ describe('signed bytes survive verification', () => {
   });
 
   it('does not rewrite string-valued @context and type into arrays', async () => {
-    // `JsonLdField` normalizes scalars to arrays. That is fine for internal
-    // reasoning but must not reach what gets canonicalized.
+    // A Zod transform that normalizes scalars to arrays would be fine for
+    // internal reasoning, but must never reach what gets canonicalized.
     const scalarShaped = {
       '@context': 'https://www.w3.org/ns/credentials/v2',
       type: 'VerifiableCredential',

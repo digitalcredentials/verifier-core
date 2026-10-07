@@ -71,6 +71,7 @@ The same verification with `verbose: true`:
       "outcome": { "status": "success", "message": "..." },
       "fatal": true },
     { "id": "cryptographic.core.vc-context",      /* ... */ },
+    { "id": "cryptographic.core.vc-structure",    /* ... */ },
     { "id": "cryptographic.core.credential-id",   /* ... */ },
     { "id": "cryptographic.core.proof-exists",    /* ... */ },
     { "id": "recognition.profile",                /* skipped: no recognizers configured */ },
@@ -86,7 +87,7 @@ The same verification with `verbose: true`:
 
 `verifyPresentation` returns **both** a `presentationResults` array and a
 `credentialResults` array. `presentationResults` holds **VP-level**
-checks (the presentation envelope’s proof/signature and any suite whose
+checks (the presentation envelope’s structure and proof/signature, and any suite whose
 `applies` accepts a `verifiablePresentation`). `credentialResults` has
 **one entry per embedded verifiable credential**, each with its own
 `results` and `summary` for per-credential phases (structural/core,
@@ -100,7 +101,7 @@ tampered with" and "one of the embedded credentials was revoked".
 
 | Scope | Lives on | Suites that contribute | How `verified` aggregates |
 |-------|----------|------------------------|---------------------------|
-| Presentation-only | `result.presentationResults`, `result.summary` | `proofSuite` (run **once** against the VP envelope itself) plus any `additionalSuites` whose `applies` accepts a `verifiablePresentation` subject | — (see top-level row) |
+| Presentation-only | `result.presentationResults`, `result.summary` | `coreSuite` (only `core.vp-structure` applies to a VP) and `proofSuite`, each run **once** against the VP envelope itself, plus any `additionalSuites` whose `applies` accepts a `verifiablePresentation` subject | — (see top-level row) |
 | Per credential | `result.credentialResults[i].results`, `result.credentialResults[i].summary` | `core`, `recognition`, `proof`, `status`, `registry` (defaults) plus any `additionalSuites` whose `applies` accepts the VC subject | `credentialResults[i].verified === no fatal failures across the per-credential checks` |
 | Top-level | `result.verified` | derived | `presentationResults` has no fatal failures **AND** every `credentialResults[i].verified` is true |
 
@@ -205,7 +206,13 @@ interface SuiteSummary {
 | Failures only | `"<n> of <m> checks failed"` |
 | Mixed | `"<n> of <m> checks failed (<k> passed)"` |
 | Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero) |
+| Halted by an earlier suite's fatal failure | `"<suite-id> not run: <check-id> failed"` |
 | Explicit `applies` skip | `"<suite-id> not applicable: <reason>"` |
+
+> "Not run" rows are the `skipped` results `runSuites` emits, with reason
+> `"Not run: <check-id> failed"`, for checks halted by a fatal failure. They
+> count toward `counts.skipped` but not toward the "skipped" wording: the
+> message reports them as "not run after fatal" instead.
 
 > Singular `check` is used when `n === 1`.
 
@@ -232,6 +239,8 @@ Every `CheckResult` has an `id` of the form
 cryptographic.core
   cryptographic.core.context-exists
   cryptographic.core.vc-context
+  cryptographic.core.vc-structure
+  cryptographic.core.vp-structure                (presentations only)
   cryptographic.core.credential-id
   cryptographic.core.proof-exists
 cryptographic.proof

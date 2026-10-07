@@ -8,9 +8,10 @@ import { signatureCheck } from './signature-check.js';
  * `canVerify(subject)` is true runs verification. The default stack is built in
  * `default-services.ts` as `[DataIntegrityCryptoService({ suites: defaultCryptoSuites() })]`.
  *
- * The Data Integrity adapter wraps `@digitalcredentials/vc`, handles
- * AuthenticationProofPurpose vs AssertionProofPurpose for presentations, and maps
- * library errors to `ProblemDetail` entries.
+ * The Data Integrity adapter wraps `@digitalcredentials/vc` and
+ * `@digitalcredentials/jsonld-signatures`, handles AuthenticationProofPurpose vs
+ * AssertionProofPurpose for presentations, and maps library errors to
+ * `ProblemDetail` entries.
  */
 export const proofSuite: VerificationSuite = {
   id: 'proof',

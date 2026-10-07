@@ -62,6 +62,34 @@ describe('registryKeyHash', () => {
     expect(hash.length).toBeGreaterThan(0);
   });
 
+  it('uses the registry ids themselves, not a 32-bit hash', () => {
+    const key = registryKeyHash([dccLegacy, oidf, vcRecognition]);
+    expect(key).toContain(dccLegacy.url);
+    expect(key).toContain(oidf.trustAnchorEC);
+    expect(key).toContain(vcRecognition.url);
+  });
+
+  it('keeps lists apart even when a name contains separator characters', () => {
+    // With plain `type:name:url` ids joined by `|`, these two lists would
+    // produce the same string.
+    const a: EntityIdentityRegistry = {
+      ...dccLegacy,
+      name: 'A',
+      url: 'https://a.example|dcc-legacy:B:https://b.example'
+    };
+    const b1: EntityIdentityRegistry = {
+      ...dccLegacy,
+      name: 'A',
+      url: 'https://a.example'
+    };
+    const b2: EntityIdentityRegistry = {
+      ...dccLegacy,
+      name: 'B',
+      url: 'https://b.example'
+    };
+    expect(registryKeyHash([a])).not.toBe(registryKeyHash([b1, b2]));
+  });
+
   it('handles empty array', () => {
     const hash1 = registryKeyHash([]);
     const hash2 = registryKeyHash([]);

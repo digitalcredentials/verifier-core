@@ -1,0 +1,26 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj",
+    "type": [
+        "VerifiableCredential",
+        "BitstringStatusListCredential"
+    ],
+    "credentialSubject": {
+        "id": "https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj#list",
+        "type": "BitstringStatusList",
+        "encodedList": "uH4sIAAAAAAAAA-3BMQEAAAwCoGUx6aLbwgvIHwAAAAAAAAAAAAAAwFwBZnztF9QwAAA",
+        "statusPurpose": "revocation"
+    },
+    "issuer": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+    "validFrom": "2025-01-09T15:20:02.183Z",
+    "proof": {
+        "type": "Ed25519Signature2020",
+        "created": "2025-01-09T15:20:02Z",
+        "verificationMethod": "did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4WFodWdHXGieqNtWYK2448A7qZdhMkxyqjVuMqifdanFYXXAqPT8xatjncxjDsXT6fskz8pC8TLBmEhnd7BC7Tqb"
+    }
+}

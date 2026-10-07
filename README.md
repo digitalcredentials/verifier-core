@@ -11,6 +11,7 @@
   - [verifyCredential](#verifycredential)
   - [verifyPresentation](#verifypresentation)
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
+  - [Network policy of the built-in HTTP service](#network-policy-of-the-built-in-http-service)
 - [Custom Suites](#custom-suites)
 - [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
 - [Capturing timing data](#capturing-timing-data)
@@ -41,13 +42,13 @@ cryptosuite.
 Verification runs an ordered pipeline of **suites**, each containing one or more
 **checks**:
 
-| Suite           | Phase           | What it checks                                                                                                                                                  | Fatal? |
-| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                   | Yes    |
-| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                          | No     |
-| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                            | Yes    |
-| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. The list credential's proof is checked with the configured `cryptoServices`. | Yes    |
-| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                     | No     |
+| Suite           | Phase           | What it checks                                                                                                                                                                                                                                                                                                                         | Fatal?                         |
+| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                                                                                                                                                                                          | Yes                            |
+| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                             |
+| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                                                                                                                                                                                                   | Yes                            |
+| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No) |
+| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                                                                                                                                                                                            | No                             |
 
 The **Phase** column drives the optional `phases:` filter on `VerifierConfig`
 and per-call args, used for
@@ -84,6 +85,18 @@ const registries = await response.json();
 const result = await verifyCredential({ credential, registries });
 ```
 
+For OpenID Federation (`oidf`) registries, both the trust anchor's entity
+configuration and the issuer's subordinate statement are signature-verified
+(ES256 or EdDSA), with their `iss`, `sub` and `exp` checked. Trust is rooted in
+the HTTPS fetch of the configured `trustAnchorEC`: there are no pinned anchor
+keys. A registry that cannot be checked — unreachable, or serving a statement
+that does not verify — is reported as "could not be determined"
+(`REGISTRY_UNCHECKED`), not as "not registered", and a lookup that included one
+is retried after a minute rather than cached for an hour. When some registries
+answered and others could not be checked, `ISSUER_NOT_REGISTERED` says how many
+answered, and a `REGISTRY_UNCHECKED` problem names the rest. Pass
+`registries: []` to skip the registry check.
+
 > [!CAUTION] The DCC registry list does not make claims about the registries it
 > contains. It is a list of registries that the DCC knows about — it says
 > nothing about the quality, meaning, or value of credentials issued by anyone
@@ -111,7 +124,7 @@ interface VerifyCredentialOptions {
   additionalSuites?: VerificationSuite[];
 
   // Service overrides (otherwise sensible defaults are used):
-  httpGetService?: HttpGetService;
+  httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
@@ -173,10 +186,12 @@ interface ProblemDetail {
   "results": [
     { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
     { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
+    { "suite": "core",   "check": "core.vc-structure",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
     { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
+    { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
     { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } }
   ]
 }
@@ -185,8 +200,9 @@ interface ProblemDetail {
 #### Example: Invalid signature (fatal)
 
 An invalid signature is fatal — it means any part of the credential could have
-been tampered with, so subsequent checks within the proof suite stop. Other
-suites still run.
+been tampered with, so every later check for the credential, in any suite, is
+halted. With `verbose: true`, each check that would have run appears as
+`skipped` with reason `Not run: <check-id> failed`.
 
 ```json
 {
@@ -219,7 +235,26 @@ suites still run.
     {
       "suite": "status",
       "check": "status.bitstring",
-      "outcome": { "status": "skipped", "reason": "..." }
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
+    },
+    {
+      "suite": "status",
+      "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
+    },
+    {
+      "suite": "registry",
+      "check": "registry.issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
     }
   ]
 }
@@ -228,9 +263,16 @@ suites still run.
 #### Example: Revoked credential (fatal, sourced from status)
 
 When a credential's status list marks it revoked or suspended — or the verifier
-can't confidently evaluate the list (missing, expired, wrong type, signature
-invalid) — the status suite fails the credential. The proof check still passes
-on its own merits.
+can't confidently evaluate the list (missing, expired or not yet valid, wrong
+type, signature invalid) — the status suite fails the credential. The proof
+check still passes on its own merits.
+
+Every `BitstringStatusListEntry` whose `statusPurpose` is `revocation` or
+`suspension` is checked, and each set bit is its own problem:
+`CREDENTIAL_REVOKED` or `CREDENTIAL_SUSPENDED`. Other `credentialStatus` entries
+— legacy types such as `StatusList2021Entry`, unknown types, and
+`BitstringStatusListEntry`s for other purposes — are ignored, their lists are
+not fetched, and the check's message or skip reason names them.
 
 ```json
 {
@@ -256,16 +298,56 @@ on its own merits.
         "status": "failure",
         "problems": [
           {
-            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED",
-            "title": "Credential Revoked or Suspended",
-            "detail": "The credential has been revoked or suspended according to the status list."
+            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED",
+            "title": "Credential Revoked",
+            "detail": "The status list https://example.edu/status/1 marks the credential revoked (index 42)."
           }
         ]
+      }
+    },
+    {
+      "suite": "status",
+      "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: status.bitstring failed"
       }
     }
   ]
 }
 ```
+
+#### Example: Status list from another issuer (non-fatal)
+
+`status.list-issuer` compares each status list's `issuer` id with the
+credential's (a string issuer, or an issuer object's `id`, compared exactly).
+The list's proof has already been verified by `status.bitstring`, which binds
+the list's signing key to its claimed issuer. When they differ, the check fails
+with `STATUS_LIST_ISSUER_MISMATCH`:
+
+```json
+{
+  "suite": "status",
+  "check": "status.list-issuer",
+  "fatal": false,
+  "outcome": {
+    "status": "failure",
+    "problems": [
+      {
+        "type": "https://www.w3.org/TR/vc-data-model#STATUS_LIST_ISSUER_MISMATCH",
+        "title": "Status List Issuer Mismatch",
+        "detail": "The status list https://status.example.edu/lists/1 is issued by did:key:z6Mk…, not by the credential's issuer did:web:example.edu."
+      }
+    ]
+  }
+}
+```
+
+This is a warning, so `verified` is unchanged. Some status services sign every
+list with a DID of their own rather than the issuer's, so a mismatch is normal
+in those deployments. It does mean that whoever signed the list decided the
+credential's status; a consumer that needs the list bound to the issuer should
+treat `STATUS_LIST_ISSUER_MISMATCH` as decisive.
 
 #### Example: Check skipped
 
@@ -287,18 +369,21 @@ with no `credentialStatus` skips the status check:
 
 All failures use `ProblemDetail` with a `type` URI. Common error types:
 
-| Type URI                              | Title                                                              | When                                   |
-| ------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
-| `...#PARSING_ERROR`                   | Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Structural problems                    |
-| `...#INVALID_SIGNATURE`               | Invalid Signature                                                  | Signature doesn't match content        |
-| `...#DID_WEB_UNRESOLVED`              | DID Web Unresolved                                                 | `did:web` document couldn't be fetched |
-| `...#HTTP_ERROR`                      | HTTP Error                                                         | Network error during signature check   |
-| `...#CREDENTIAL_REVOKED_OR_SUSPENDED` | Credential Revoked or Suspended                                    | Status list indicates revocation       |
-| `...#STATUS_LIST_NOT_FOUND`           | Status List Not Found                                              | Status list URL unreachable            |
-| `...#STATUS_LIST_EXPIRED`             | Status List Expired                                                | Status list VC has expired             |
-| `...#STATUS_LIST_SIGNATURE_ERROR`     | Status List Signature Error                                        | Status list VC signature invalid       |
-| `...#ISSUER_NOT_REGISTERED`           | Issuer Not Registered                                              | Issuer DID not in any registry         |
-| `...#REGISTRY_UNCHECKED`              | Registry Unchecked                                                 | Some registries couldn't be reached    |
+| Type URI                          | Title                                                                                                                                                          | When                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                   |
+| `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                               |
+| `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                        |
+| `...#HTTP_ERROR`                  | HTTP Error                                                                                                                                                     | Network error during signature check                          |
+| `...#CREDENTIAL_REVOKED`          | Credential Revoked                                                                                                                                             | A revocation status list marks the credential revoked         |
+| `...#CREDENTIAL_SUSPENDED`        | Credential Suspended                                                                                                                                           | A suspension status list marks the credential suspended       |
+| `...#STATUS_LIST_NOT_FOUND`       | Status List Not Found                                                                                                                                          | Status list URL unreachable                                   |
+| `...#STATUS_LIST_EXPIRED`         | Status List Expired                                                                                                                                            | Status list VC has expired                                    |
+| `...#STATUS_LIST_NOT_YET_VALID`   | Status List Not Yet Valid                                                                                                                                      | Status list VC is not valid yet                               |
+| `...#STATUS_LIST_SIGNATURE_ERROR` | Status List Signature Error                                                                                                                                    | Status list VC signature invalid                              |
+| `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal) |
+| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked    |
+| `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
 
 #### Problem types
 
@@ -315,7 +400,7 @@ switch (problem.type as ProblemType) {
   case ProblemTypes.INVALID_SIGNATURE:
     // ...
     break;
-  case ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED:
+  case ProblemTypes.CREDENTIAL_REVOKED:
     // ...
     break;
   case ProblemTypes.STATUS_LIST_NOT_FOUND:
@@ -340,7 +425,8 @@ import { verifyPresentation } from '@digitalcredentials/verifier-core';
 const result = await verifyPresentation({
   presentation, // The VP to verify
   challenge: 'abc123', // Optional: expected challenge
-  unsignedPresentation: false, // Optional: allow unsigned VP
+  domain: 'verifier.example', // Optional: expected domain (requires challenge)
+  unsignedPresentation: false, // Optional: accept a VP with no proof
   registries // Optional: issuer trust registries
 });
 ```
@@ -351,12 +437,13 @@ const result = await verifyPresentation({
 interface VerifyPresentationOptions {
   presentation: unknown;
   challenge?: string | null;
+  domain?: string;
   unsignedPresentation?: boolean;
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
 
   // Service overrides (otherwise sensible defaults are used):
-  httpGetService?: HttpGetService;
+  httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
@@ -389,8 +476,13 @@ rollups live on `credentialResults[i].summary`.
 
 Presentation verification does two things:
 
-1. **Verifies the VP itself** — checks the presentation's signature (or skips if
-   `unsignedPresentation: true`). Results go in `presentationResults`.
+1. **Verifies the VP itself** — checks the presentation's structure
+   (`core.vp-structure`), then its signature. A VP with no proof fails unless
+   `unsignedPresentation: true`, in which case the check is skipped. A proof
+   that is present is always verified. When `challenge` is passed, the
+   presentation's proof must use the `authentication` purpose and carry that
+   challenge (and `domain`, if passed). Without it only the signature is
+   checked. Results go in `presentationResults`.
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.
 
@@ -403,7 +495,9 @@ result objects by property path) can reach it without carrying the original
 input separately.
 
 A VP needn't be signed — it can simply package credentials together. Set
-`unsignedPresentation: true` to skip the VP signature check.
+`unsignedPresentation: true` to accept a VP that has no proof; its
+`proof.signature` check is then skipped. The flag never turns off verification
+of a proof that is present.
 
 #### Flattening results
 
@@ -463,6 +557,51 @@ all credentials embedded in a VP share the verifier's caches automatically:
 ```typescript
 const result = await verifier.verifyPresentation({ presentation });
 ```
+
+### Network policy of the built-in HTTP service
+
+Verification fetches URLs the credential chooses: JSON-LD contexts, `did:web`
+documents, status lists, schemas and registries. The built-in
+`BuiltinHttpGetService` is safe to point at them, including on a server:
+
+- **https only, and no local addresses.** It refuses `http:` and other schemes,
+  `localhost` and `*.localhost`, and loopback, private (including carrier-grade
+  NAT), link-local (including `169.254.169.254`) and unspecified IP literals,
+  IPv4 and IPv6.
+- **Redirects are checked hop by hop**, before each is requested, and at most
+  five are followed.
+- **A 10 s deadline and a 5 MB body cap** cover each request. Change them by
+  constructing the service yourself:
+
+  ```typescript
+  import {
+    BuiltinHttpGetService,
+    createVerifier
+  } from '@digitalcredentials/verifier-core';
+
+  const verifier = createVerifier({
+    httpGetService: BuiltinHttpGetService({
+      timeoutMs: 20_000,
+      maxBytes: 1_000_000
+    })
+  });
+  ```
+
+- **The body is read once** and parsed as JSON whatever its content type; a body
+  that is not JSON is returned as text.
+- **Errors never quote the response.** They name the URL and the reason, so
+  nothing fetched leaks into a result's problem details.
+
+JSON-LD contexts that are not bundled are fetched under this same policy. To
+verify against a closed set of contexts instead, pass your own `documentLoader`.
+
+There is no switch to relax the policy. For local testing, use a tunnel or a
+local DNS name with a valid certificate. Hosts are judged by name or literal
+only: there is no portable DNS lookup, so a public name that resolves to a
+private address is not caught.
+
+An injected `httpGetService` or `documentLoader` replaces all of this. If you
+inject one, its network policy is yours.
 
 ## Custom Suites
 
@@ -585,11 +724,17 @@ const result = await verifier.verifyCredential({
 
 ### Bundle variants
 
-| Bundle                    | Contents                                                           | Network?                                      |
-| ------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
-| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch on first use; cached after) |
-| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                                            |
-| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes                                           |
+| Bundle                    | Contents                                                           | Network?                      |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------- |
+| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch; see below) |
+| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                            |
+| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes (schema fetch; see below) |
+
+The schema check fetches the four published OB 3.0 schemas once per
+`cacheService`, and compiles them once per verifier, so reuse a verifier for
+repeated work. Verifiers that share a `cacheService` share the fetched schemas.
+A `credentialSchema` URL outside the published four is fetched and compiled on
+every verification and never cached.
 
 Pick `openBadgesSemanticSuite` when you want the OB-specific semantic checks
 (`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,

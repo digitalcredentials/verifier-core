@@ -5,6 +5,14 @@ import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { FakeFetchJson } from '../factories/services/fake-fetch-json.js';
+import {
+  FakeHttpGetService,
+  httpGetResult,
+  okJsonBody
+} from '../factories/services/fake-http-get-service.js';
+import { FakeCacheService } from '../factories/services/fake-cache-service.js';
+import { fetchJsonFromHttpGet } from '../../src/util/fetch-json-from-http-get.js';
+import type { HttpGetResult } from '../../src/types/http.js';
 
 const OBV3_V2_ACHIEVEMENT_SCHEMA_URL =
   'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json';
@@ -196,6 +204,96 @@ describe('OBv3 Schema Suite', () => {
           'No fake response'
         );
       }
+    });
+  });
+
+  describe('schema caching', () => {
+    const schemaCheckStatus = async (
+      cred: unknown,
+      context: ReturnType<typeof buildTestContext>
+    ) => {
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        context
+      );
+      return results.find(r => r.check === 'schema.obv3.json')?.outcome;
+    };
+
+    it('compiles a known schema once per fetchJson, even without a cacheService', async () => {
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      const http = FakeHttpGetService({
+        [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: okJsonBody(
+          minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)
+        )
+      });
+      const fetchJson = fetchJsonFromHttpGet(http);
+
+      for (let i = 0; i < 3; i++) {
+        const context = {
+          ...buildTestContext({ fetchJson }),
+          cacheService: undefined
+        };
+        expect((await schemaCheckStatus(cred, context))?.status).toBe(
+          'success'
+        );
+      }
+
+      expect(http.callsTo(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)).toBe(1);
+    });
+
+    it('fetches an unknown credentialSchema URL on every run and never caches it', async () => {
+      const customUrl = 'https://factory.test/issuer-chosen-schema.json';
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialSchema: { id: customUrl, type: 'JsonSchemaValidator2018' }
+        }
+      });
+      const http = FakeHttpGetService({
+        [customUrl]: okJsonBody(minimalSchema(customUrl))
+      });
+      const fetchJson = fetchJsonFromHttpGet(http);
+      const cacheService = FakeCacheService();
+
+      for (let i = 0; i < 3; i++) {
+        const context = buildTestContext({ fetchJson, cacheService });
+        expect((await schemaCheckStatus(cred, context))?.status).toBe(
+          'success'
+        );
+      }
+
+      expect(http.callsTo(customUrl)).toBe(3);
+      expect(await cacheService.get(`schema:${customUrl}`)).toBeUndefined();
+    });
+
+    it('retries a known schema after a failed fetch instead of keeping the failure', async () => {
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      const urlMap: Record<string, HttpGetResult> = {
+        [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: httpGetResult(404, null)
+      };
+      const fetchJson = fetchJsonFromHttpGet(FakeHttpGetService(urlMap));
+      const cacheService = FakeCacheService();
+
+      const failed = await schemaCheckStatus(
+        cred,
+        buildTestContext({ fetchJson, cacheService })
+      );
+      expect(failed?.status).toBe('failure');
+      if (failed?.status === 'failure') {
+        expect(failed.problems[0].type).toBe(
+          'https://www.w3.org/TR/vc-data-model#SCHEMA_VALIDATION_ERROR'
+        );
+      }
+
+      urlMap[OBV3_V2_ACHIEVEMENT_SCHEMA_URL] = okJsonBody(
+        minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)
+      );
+      const recovered = await schemaCheckStatus(
+        cred,
+        buildTestContext({ fetchJson, cacheService })
+      );
+      expect(recovered?.status).toBe('success');
     });
   });
 

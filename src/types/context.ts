@@ -34,6 +34,10 @@ export type DocumentLoader = (url: string) => Promise<unknown>;
  * future OIDF entity configs, OIDC discovery, JWKS). Kept separate from
  * {@link DocumentLoader} because JSON-LD loaders wrap results in
  * `{ contextUrl, document, documentUrl }` and use different fetch semantics.
+ *
+ * It does not cache. Each caller chooses its own cache policy, since these
+ * resources need different freshness rules; the OBv3 schema check caches
+ * schema documents through `cacheService`.
  */
 export type FetchJson = (url: string) => Promise<unknown>;
 
@@ -51,7 +55,8 @@ export interface VerificationContext {
    */
   httpGetService?: HttpGetService;
   /**
-   * Optional cache service for domain-level storage (registry handlers, etc.).
+   * Optional cache service for domain-level storage (registry handlers,
+   * schema documents, etc.).
    */
   cacheService?: CacheService;
   /**
@@ -68,9 +73,22 @@ export interface VerificationContext {
    * adapter.
    */
   lookupIssuers?: LookupIssuers;
-  /** Expected challenge for VP authentication proof purpose. */
+  /**
+   * Expected challenge on the presentation's proof. When set, the proof must
+   * use the `authentication` purpose and carry this challenge, whatever the
+   * presentation claims. When unset, only the signature is checked.
+   */
   challenge?: string | null;
-  /** Whether to allow unsigned presentations (skip VP signature check). */
+  /**
+   * Expected `domain` on the presentation's authentication proof. Requires
+   * `challenge`.
+   */
+  domain?: string;
+  /**
+   * Accept a presentation that has no proof. Default `false`: an unsigned
+   * presentation fails `proof.signature`. A proof that is present is always
+   * verified, whatever this is set to.
+   */
   unsignedPresentation?: boolean;
   /**
    * Pluggable credential recognizers. Threaded through from

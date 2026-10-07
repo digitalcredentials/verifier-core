@@ -69,6 +69,7 @@ export type { CacheService } from './services/cache-service/cache-service.js';
 export { InMemoryCacheService } from './services/cache-service/in-memory-cache-service.js';
 export type { HttpGetService } from './services/http-get-service/http-get-service.js';
 export { BuiltinHttpGetService } from './services/http-get-service/builtin-http-get-service.js';
+export type { BuiltinHttpGetServiceOptions } from './services/http-get-service/builtin-http-get-service.js';
 export type { TimeService } from './services/time-service/time-service.js';
 export { RealTimeService } from './services/time-service/real-time-service.js';
 export { FakeTimeService } from './services/time-service/fake-time-service.js';

@@ -1,6 +1,6 @@
 import type { VcRecognitionEntityIdentityRegistry } from '../../types/registry.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
-import { resolveTtl, ttlFromValidUntil } from './cache-ttl.js';
+import { DEFAULT_TTL_MS, resolveTtl, ttlFromValidUntil } from './cache-ttl.js';
 import type {
   HandlerResult,
   RegistryHandler,
@@ -10,8 +10,9 @@ import type {
 /**
  * VerifiableRecognitionCredential registry: fetch the recognition VC,
  * verify its issuer + proof using the parent {@link Verifier}
- * (sharing the same cache + crypto stack), cache until `validUntil`,
- * then check `credentialSubject` for `did`.
+ * (sharing the same cache + crypto stack), cache it for at most an hour,
+ * or until `validUntil` if sooner, so revocation of the recognition
+ * credential is re-checked, then check `credentialSubject` for `did`.
  *
  * The recursive call passes `registries: []` to skip the registry suite
  * for the recognition credential itself — that prevents infinite
@@ -67,7 +68,10 @@ async function lookupVcRecognitionForRegistry(
 
     const validUntil =
       typeof loaded.validUntil === 'string' ? loaded.validUntil : undefined;
-    const ttlMs = resolveTtl(ttlFromValidUntil(validUntil ?? ''));
+    const ttlMs = Math.min(
+      resolveTtl(ttlFromValidUntil(validUntil ?? '')),
+      DEFAULT_TTL_MS
+    );
     await cacheService.set(key, loaded, ttlMs);
     credential = loaded;
   }

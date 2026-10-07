@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { JsonLdField } from '../src/schemas/jsonld-field.js';
 import { IssuerSchema } from '../src/schemas/issuer.js';
-import { ProofSchema } from '../src/schemas/proof.js';
 import {
   CredentialSchema,
   parseCredential
@@ -10,23 +8,31 @@ import {
   PresentationSchema,
   parsePresentation
 } from '../src/schemas/presentation.js';
-import { z } from 'zod';
+
+const ENVELOPED_MESSAGE =
+  'Enveloped credentials (VC-JOSE-COSE) are not supported by this verifier.';
+
+/** A v2 credential that passes the gate; override or delete fields per test. */
+const baseCredential = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  '@context': ['https://www.w3.org/ns/credentials/v2'],
+  type: ['VerifiableCredential'],
+  issuer: 'did:example:123',
+  credentialSubject: { id: 'did:example:456' },
+  ...overrides
+});
+
+const without = (
+  credential: Record<string, unknown>,
+  key: string
+): Record<string, unknown> => {
+  const copy = { ...credential };
+  delete copy[key];
+  return copy;
+};
 
 describe('Zod Envelope Schemas', () => {
-  describe('JsonLdField', () => {
-    it('normalizes single value to array', () => {
-      const schema = JsonLdField(z.string());
-      const result = schema.parse('single');
-      expect(result).toEqual(['single']);
-    });
-
-    it('keeps array as array', () => {
-      const schema = JsonLdField(z.string());
-      const result = schema.parse(['a', 'b']);
-      expect(result).toEqual(['a', 'b']);
-    });
-  });
-
   describe('IssuerSchema', () => {
     it('accepts issuer as string', () => {
       const issuer = 'did:example:123';
@@ -42,33 +48,11 @@ describe('Zod Envelope Schemas', () => {
       const result = IssuerSchema.parse(issuer);
       expect(result).toEqual(issuer);
     });
-  });
 
-  describe('ProofSchema', () => {
-    it('parses minimal proof', () => {
-      const proof = {
-        type: 'Ed25519Signature2020',
-        proofPurpose: 'assertionMethod',
-        verificationMethod: 'did:example:123#key-1'
-      };
-      const result = ProofSchema.parse(proof);
-      expect(result.type).toBe('Ed25519Signature2020');
-      expect(result.proofPurpose).toBe('assertionMethod');
-    });
-
-    it('parses proof with optional fields', () => {
-      const proof = {
-        type: 'DataIntegrityProof',
-        proofPurpose: 'authentication',
-        verificationMethod: 'did:example:123#key-1',
-        created: '2024-01-01T00:00:00Z',
-        proofValue: 'z123',
-        cryptosuite: 'eddsa-rdfc-2022',
-        challenge: 'abc123'
-      };
-      const result = ProofSchema.parse(proof);
-      expect(result.cryptosuite).toBe('eddsa-rdfc-2022');
-      expect(result.challenge).toBe('abc123');
+    it('rejects an issuer object without an id', () => {
+      expect(IssuerSchema.safeParse({ name: 'Test Issuer' }).success).toBe(
+        false
+      );
     });
   });
 
@@ -121,7 +105,7 @@ describe('Zod Envelope Schemas', () => {
       expect(result.credentialStatus).toBeTypeOf('object');
     });
 
-    it('parses credential with status as array (normalized)', () => {
+    it('parses credential with an array-valued status type', () => {
       const credential = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential'],
@@ -161,6 +145,218 @@ describe('Zod Envelope Schemas', () => {
     });
   });
 
+  describe('credential gate accepts spec-legal shapes', () => {
+    const accepts = (credential: Record<string, unknown>) =>
+      expect(parseCredential(credential).success).toBe(true);
+
+    it('accepts a 1EdTechRevocationList status entry', () => {
+      accepts(
+        baseCredential({
+          credentialStatus: {
+            id: 'https://example.test/revocations',
+            type: '1EdTechRevocationList'
+          }
+        })
+      );
+    });
+
+    it('accepts a status entry with only a type', () => {
+      accepts(baseCredential({ credentialStatus: { type: 'ExampleStatus' } }));
+    });
+
+    it('accepts a BitstringStatusListEntry with no id', () => {
+      accepts(
+        baseCredential({
+          credentialStatus: {
+            type: 'BitstringStatusListEntry',
+            statusPurpose: 'revocation',
+            statusListIndex: '0',
+            statusListCredential: 'https://example.test/status/1'
+          }
+        })
+      );
+    });
+
+    it('accepts a status entry missing its type (core.vc-structure judges it)', () => {
+      accepts(
+        baseCredential({
+          credentialStatus: { statusListCredential: 'https://example.test/l' }
+        })
+      );
+    });
+
+    it('accepts a language-map name', () => {
+      accepts(
+        baseCredential({
+          name: { '@value': 'Teamwork Badge', '@language': 'en' }
+        })
+      );
+    });
+
+    it('accepts a name with several languages', () => {
+      accepts(
+        baseCredential({
+          name: [
+            { '@value': 'Teamwork Badge', '@language': 'en' },
+            { '@value': 'Insignia de trabajo en equipo', '@language': 'es' }
+          ]
+        })
+      );
+    });
+
+    it('accepts an issuer image with only an id', () => {
+      accepts(
+        baseCredential({
+          issuer: {
+            id: 'did:example:123',
+            type: ['Profile'],
+            name: 'Example',
+            image: { id: 'https://example.test/logo.png' }
+          }
+        })
+      );
+    });
+
+    it('accepts an issuer name as a language value object', () => {
+      accepts(
+        baseCredential({
+          issuer: {
+            id: 'did:example:123',
+            name: { '@value': 'Example', '@language': 'en' }
+          }
+        })
+      );
+    });
+
+    it('accepts a proof of any shape', () => {
+      accepts(baseCredential({ proof: { type: 'ExampleProof' } }));
+    });
+
+    it('accepts string-valued @context and type', () => {
+      accepts(
+        baseCredential({
+          '@context': 'https://www.w3.org/ns/credentials/v2',
+          type: 'VerifiableCredential'
+        })
+      );
+    });
+
+    it('accepts a type that lacks VerifiableCredential (core.vc-structure judges it)', () => {
+      accepts(baseCredential({ type: ['Foo'] }));
+    });
+
+    it('does not rewrite what it parses', () => {
+      const credential = baseCredential({
+        '@context': 'https://www.w3.org/ns/credentials/v2',
+        type: 'VerifiableCredential'
+      });
+      expect(CredentialSchema.parse(credential)).toEqual(credential);
+    });
+  });
+
+  describe('credential gate rejects', () => {
+    const rejectsAt = (
+      input: unknown,
+      path: Array<string | number>,
+      message: string
+    ) => {
+      const result = parseCredential(input);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.errors.map(e => ({ path: e.path, message: e.message }))
+        ).toContainEqual({ path, message });
+      }
+    };
+
+    const ISSUER_MESSAGE =
+      '"issuer" is required and must be a string or an object with a string "id".';
+
+    it('rejects a non-object', () => {
+      expect(parseCredential('not a credential').success).toBe(false);
+      expect(parseCredential(null).success).toBe(false);
+      expect(parseCredential([baseCredential()]).success).toBe(false);
+      rejectsAt(
+        'not a credential',
+        [],
+        'The credential must be a JSON object.'
+      );
+    });
+
+    it('rejects a missing @context', () => {
+      rejectsAt(
+        without(baseCredential(), '@context'),
+        ['@context'],
+        '"@context" is required and must be a string, a context object, or an array of them.'
+      );
+    });
+
+    it('rejects a missing type', () => {
+      rejectsAt(
+        without(baseCredential(), 'type'),
+        ['type'],
+        '"type" is required and must be a string or an array of strings.'
+      );
+    });
+
+    it('rejects a missing issuer', () => {
+      rejectsAt(
+        without(baseCredential(), 'issuer'),
+        ['issuer'],
+        ISSUER_MESSAGE
+      );
+    });
+
+    it('rejects an issuer object with no id', () => {
+      rejectsAt(
+        baseCredential({ issuer: { name: 'Example' } }),
+        ['issuer'],
+        ISSUER_MESSAGE
+      );
+    });
+
+    it('rejects a missing credentialSubject', () => {
+      rejectsAt(
+        without(baseCredential(), 'credentialSubject'),
+        ['credentialSubject'],
+        '"credentialSubject" is required and must be an object or an array of objects.'
+      );
+    });
+  });
+
+  describe('enveloped credentials', () => {
+    const enveloped = (type: unknown) => ({
+      '@context': 'https://www.w3.org/ns/credentials/v2',
+      id: 'data:application/vc+jwt,eyJhbGciOiJFUzI1NiJ9.e30.sig',
+      type
+    });
+
+    it('rejects an EnvelopedVerifiableCredential with a clear message', () => {
+      const result = parseCredential(
+        enveloped('EnvelopedVerifiableCredential')
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors).toEqual([
+          expect.objectContaining({
+            path: ['type'],
+            message: ENVELOPED_MESSAGE
+          })
+        ]);
+      }
+    });
+
+    it('rejects an array-valued enveloped type the same way', () => {
+      const result = parseCredential(
+        enveloped(['EnvelopedVerifiableCredential'])
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toBe(ENVELOPED_MESSAGE);
+      }
+    });
+  });
+
   describe('PresentationSchema', () => {
     it('parses valid presentation', () => {
       const presentation = {
@@ -189,6 +385,38 @@ describe('Zod Envelope Schemas', () => {
       };
       const result = PresentationSchema.parse(presentation);
       expect(result.verifiableCredential).toBeTypeOf('object');
+    });
+
+    it('does not gate embedded credentials', () => {
+      const presentation = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiablePresentation'],
+        verifiableCredential: [
+          { foo: 'bar' },
+          {
+            '@context': 'https://www.w3.org/ns/credentials/v2',
+            id: 'data:application/vc+jwt,eyJhbGciOiJFUzI1NiJ9.e30.sig',
+            type: 'EnvelopedVerifiableCredential'
+          }
+        ]
+      };
+      expect(parsePresentation(presentation).success).toBe(true);
+    });
+
+    it('does not gate the proof', () => {
+      const presentation = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiablePresentation'],
+        proof: { type: 'ExampleProof' }
+      };
+      expect(parsePresentation(presentation).success).toBe(true);
+    });
+
+    it('rejects a missing type', () => {
+      const presentation = {
+        '@context': ['https://www.w3.org/ns/credentials/v2']
+      };
+      expect(parsePresentation(presentation).success).toBe(false);
     });
 
     describe('holder', () => {
@@ -237,6 +465,16 @@ describe('Zod Envelope Schemas', () => {
 
       it('rejects a non-string, non-object holder', () => {
         expect(parsePresentation(withHolder(42)).success).toBe(false);
+      });
+
+      it('explains a rejected holder in plain words', () => {
+        const result = parsePresentation(withHolder(42));
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors.map(e => e.message)).toEqual([
+            '"holder" must be a string or an object with a string "id".'
+          ]);
+        }
       });
     });
 

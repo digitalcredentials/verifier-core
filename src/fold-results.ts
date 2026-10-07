@@ -32,6 +32,7 @@ import type {
 } from './types/check.js';
 import type { SuiteSummary, SuiteSummaryPhase } from './types/suite-summary.js';
 import type { TaskTiming } from './types/timing.js';
+import { NOT_RUN_REASON_PREFIX } from './run-suites.js';
 
 export interface FoldOptions {
   /**
@@ -58,7 +59,7 @@ export function foldCheckResults(
   for (const [suiteId, suiteChecks] of grouped) {
     const suiteDef = suiteIndex.get(suiteId);
     const phase = derivePhase(suiteDef);
-    summaries.push(summarizeSuite(suiteId, phase, suiteDef, suiteChecks));
+    summaries.push(summarizeSuite(suiteId, phase, suiteChecks));
   }
 
   const results = selectResultsForVerbosity(checks, opts.verbose === true);
@@ -142,7 +143,6 @@ function derivePhase(
 function summarizeSuite(
   suiteId: string,
   phase: SuitePhase | undefined,
-  suiteDef: VerificationSuite | undefined,
   suiteChecks: CheckResult[]
 ): SuiteSummary {
   const counts = {
@@ -161,11 +161,10 @@ function summarizeSuite(
   const status = deriveStatus(counts);
   const verified = counts.failed === 0;
 
-  const totalDefined = suiteDef?.checks.length ?? 0;
   const message = formatMessage(
     suiteId,
     counts,
-    totalDefined,
+    notRunReasons(suiteChecks),
     fatalFailureAt !== undefined,
     pickAppliesSkipReason(suiteChecks, suiteId)
   );
@@ -268,13 +267,32 @@ function pickAppliesSkipReason(
 }
 
 /**
+ * The reasons of the `'skipped'` rows `runSuites` emitted for
+ * checks halted by an earlier fatal failure (reason starts with
+ * {@link NOT_RUN_REASON_PREFIX}). These are "not run after fatal",
+ * not ordinary skips, in the rollup message.
+ */
+function notRunReasons(suiteChecks: CheckResult[]): string[] {
+  const reasons: string[] = [];
+  for (const c of suiteChecks) {
+    if (
+      c.outcome.status === 'skipped' &&
+      c.outcome.reason.startsWith(NOT_RUN_REASON_PREFIX)
+    ) {
+      reasons.push(c.outcome.reason);
+    }
+  }
+  return reasons;
+}
+
+/**
  * Build the human-readable `SuiteSummary.message`. See
  * `SuiteSummary.message` TSDoc for the exact wording conventions.
  */
 function formatMessage(
   suiteId: string,
   counts: { passed: number; failed: number; skipped: number },
-  totalDefined: number,
+  notRunReasonsInSuite: string[],
   fatalShortCircuited: boolean,
   appliesSkipReason: string | undefined
 ): string {
@@ -283,6 +301,14 @@ function formatMessage(
   }
 
   const ran = counts.passed + counts.failed;
+  const notRun = notRunReasonsInSuite.length;
+
+  // Every row is a halt skip: an earlier fatal failure stopped the
+  // whole suite. The reason reads `Not run: <check-id> failed`.
+  if (ran === 0 && notRun > 0 && notRun === counts.skipped) {
+    const cause = notRunReasonsInSuite[0].slice(NOT_RUN_REASON_PREFIX.length);
+    return `${suiteId} not run: ${cause}`;
+  }
 
   if (counts.failed === 0) {
     if (counts.passed > 0) {
@@ -294,7 +320,6 @@ function formatMessage(
 
   // counts.failed > 0
   if (fatalShortCircuited) {
-    const notRun = Math.max(0, totalDefined - ran - counts.skipped);
     const total = ran + notRun;
     const tail: string[] = [];
     if (counts.passed > 0) {

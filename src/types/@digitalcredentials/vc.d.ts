@@ -62,7 +62,6 @@ export interface VerifyOptions {
   documentLoader?: AnyDocumentLoader;
   checkStatus?: CheckStatusFunction | null | undefined;
   now?: string | Date;
-  verifyMatchingIssuers?: boolean;
 }
 
 export interface VerifyCredentialOptions {
@@ -73,7 +72,6 @@ export interface VerifyCredentialOptions {
   // TODO: undefined is preferred over null as it matches the JSDoc types
   checkStatus?: CheckStatusFunction | null | undefined;
   now?: string | Date;
-  verifyMatchingIssuers?: boolean;
 }
 
 export interface CreatePresentationOptions {
