@@ -26,6 +26,15 @@ export interface CryptoVerifyOptions {
   documentLoader: DocumentLoader;
   challenge?: string | null;
   domain?: string;
+  /**
+   * The moment to judge validity dates against (`validFrom` /
+   * `validUntil`, `issuanceDate` / `expirationDate`). Supplied by the
+   * calling check from {@link VerificationContext.timeService}, so a
+   * credential's expiry and its status list's freshness are decided by
+   * the same clock. Omitted means "now" as the adapter's library sees
+   * it.
+   */
+  now?: Date;
 }
 
 /**

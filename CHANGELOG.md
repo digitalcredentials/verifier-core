@@ -38,10 +38,18 @@ Verifier results now fold per-suite checks into a single
   future sub-event capture from inside a single check.
 - `TimeService` interface plus `RealTimeService` and `FakeTimeService`
   factories. New optional `timeService` on `VerifierConfig` (defaults to
-  `RealTimeService()`). Now available on `VerificationContext.timeService` for
-  any future check that needs to ask "what time is it?" — useful groundwork for
-  credential expiration, signature clock-skew, key rotation, and status-list
-  freshness work.
+  `RealTimeService()`). Available on `VerificationContext.timeService` to any
+  check that needs to ask "what time is it?": `proof.signature` judges
+  credential validity dates against it and `status.bitstring` judges status-list
+  freshness against it, so a verifier built on a `FakeTimeService` decides both
+  at the pinned moment. Signature clock-skew and key rotation are still ahead.
+- `CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` on `ProblemTypes`, under
+  the same URI namespace as the other synthesized types.
+- Optional `now?: Date` on `CryptoVerifyOptions`, filled by the calling check
+  from the verification context's `TimeService` and passed through to
+  `@digitalcredentials/vc` by `DataIntegrityCryptoService`. Custom
+  `CryptoService` implementations may ignore it; omitting it means "now" as the
+  adapter's own library sees it.
 - `domain` on `verifyPresentation`, checked alongside `challenge`.
 - `BuiltinHttpGetService({ timeoutMs, maxBytes })`: the deadline (default 10 s)
   and body cap (default 5 MB) of the built-in HTTP service.
@@ -71,6 +79,14 @@ Verifier results now fold per-suite checks into a single
 
 ### Fixed
 
+- **An expired or not-yet-valid credential is no longer reported as
+  `INVALID_SIGNATURE` / "Invalid Signature", the same verdict as a forgery.**
+  `@digitalcredentials/vc` reads validity dates only after the proof verifies,
+  so a date failure is positive evidence the credential is authentic.
+  `proof.signature` now reports `CREDENTIAL_EXPIRED` ("Credential Expired") when
+  `validUntil` / `expirationDate` has passed, and `CREDENTIAL_NOT_YET_VALID`
+  ("Credential Not Yet Valid") when `validFrom` / `issuanceDate` is still in the
+  future. Both remain fatal, and expiry remains part of the proof check.
 - **Valid credentials no longer fail as `INVALID_SIGNATURE` because the verifier
   rewrote them.** `verifyCredential` / `verifyPresentation` previously ran the
   suites against the Zod parse output rather than the document the issuer

@@ -11,6 +11,7 @@ import {
   type DocumentLoader
 } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
+import { findVcDateProblem } from '../../util/vc-date-messages.js';
 import {
   checkedStatusEntries,
   checkedStatusListUrls,
@@ -25,17 +26,6 @@ import {
 const NOT_FOUND_ERROR = 'NotFoundError';
 const STATUS_TYPE_ERROR =
   'Status list credential type must include "BitstringStatusListCredential".';
-
-// `@digitalcredentials/vc`'s date errors, v2 (`validUntil`/`validFrom`) and
-// v1 (`expirationDate`/`issuanceDate`) forms.
-const LIST_EXPIRED_PATTERNS = [
-  'is after "validUntil"',
-  'Credential has expired.'
-];
-const LIST_NOT_YET_VALID_PATTERNS = [
-  'is before "validFrom"',
-  'is before the "issuanceDate"'
-];
 
 const STATUS_LIST_SIGNATURE_TITLE = 'Status List Signature Error';
 
@@ -55,33 +45,31 @@ type CheckStatusResult = {
  * after its signature has verified, so a date error in the rejection
  * proves the list is authentic and merely out of date: report it as
  * expired or not yet valid rather than as a bad signature. The match is
- * on vc's message text, carried in the problem's `detail`; if the crypto
+ * on vc's message text, carried in the problem's `detail` and shared
+ * with the proof suite (see {@link findVcDateProblem}); if the crypto
  * service reports typed expiry problems, those can replace it.
  */
 function rejectedListProblems(
   problems: ProblemDetail[],
   url: string
 ): ProblemDetail[] {
-  for (const problem of problems) {
-    const detail = problem.detail ?? '';
-    if (LIST_EXPIRED_PATTERNS.some(p => detail.includes(p))) {
-      return [
-        {
-          type: ProblemTypes.STATUS_LIST_EXPIRED,
-          title: 'Status List Expired',
-          detail: `The status list credential ${url} has expired: ${detail}`
-        }
-      ];
-    }
-    if (LIST_NOT_YET_VALID_PATTERNS.some(p => detail.includes(p))) {
-      return [
-        {
-          type: ProblemTypes.STATUS_LIST_NOT_YET_VALID,
-          title: 'Status List Not Yet Valid',
-          detail: `The status list credential ${url} is not yet valid: ${detail}`
-        }
-      ];
-    }
+  const dated = findVcDateProblem(problems);
+  if (dated !== undefined) {
+    return dated.fault === 'expired'
+      ? [
+          {
+            type: ProblemTypes.STATUS_LIST_EXPIRED,
+            title: 'Status List Expired',
+            detail: `The status list credential ${url} has expired: ${dated.detail}`
+          }
+        ]
+      : [
+          {
+            type: ProblemTypes.STATUS_LIST_NOT_YET_VALID,
+            title: 'Status List Not Yet Valid',
+            detail: `The status list credential ${url} is not yet valid: ${dated.detail}`
+          }
+        ];
   }
   return [
     {
@@ -310,13 +298,17 @@ export const bitstringStatusCheck: VerificationCheck = {
     }
 
     try {
+      // The same clock `proof.signature` judges the credential's own
+      // validity dates with, so list freshness and credential expiry
+      // cannot disagree within one verification.
+      const now = new Date(context.timeService?.dateNowMs() ?? Date.now());
       const loaded = new Map<string, unknown>();
       for (const url of checkedStatusListUrls(credential)) {
         const document = await loadStatusList(url, context);
         const dispatched = await dispatchProofVerification({
           services: context.cryptoServices,
           subject: { verifiableCredential: document },
-          options: { documentLoader: context.documentLoader }
+          options: { documentLoader: context.documentLoader, now }
         });
         if (dispatched.kind !== 'verified') {
           return {

@@ -373,6 +373,8 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                   |
 | `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                               |
+| `...#CREDENTIAL_EXPIRED`          | Credential Expired                                                                                                                                             | `validUntil` / `expirationDate` has passed; authentic         |
+| `...#CREDENTIAL_NOT_YET_VALID`    | Credential Not Yet Valid                                                                                                                                       | `validFrom` / `issuanceDate` in the future; authentic         |
 | `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                        |
 | `...#HTTP_ERROR`                  | HTTP Error                                                                                                                                                     | Network error during signature check                          |
 | `...#CREDENTIAL_REVOKED`          | Credential Revoked                                                                                                                                             | A revocation status list marks the credential revoked         |
@@ -384,6 +386,15 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal) |
 | `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked    |
 | `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
+
+`CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` come from `proof.signature`,
+alongside `INVALID_SIGNATURE`, and are fatal in the same way — but they mean the
+opposite thing about the issuer. Validity dates are read only after the
+signature has verified, so a credential that fails on its dates is authentic and
+merely outside its window; tell your users that, not that the credential may be
+forged. The date is judged against the verifier's `TimeService` (see
+[Pluggable clock](#pluggable-clock-timeservice)), the same clock the status
+check uses for status-list freshness.
 
 #### Problem types
 
@@ -399,6 +410,10 @@ import {
 switch (problem.type as ProblemType) {
   case ProblemTypes.INVALID_SIGNATURE:
     // ...
+    break;
+  case ProblemTypes.CREDENTIAL_EXPIRED:
+  case ProblemTypes.CREDENTIAL_NOT_YET_VALID:
+    // Authentic, outside its validity window — not a forgery.
     break;
   case ProblemTypes.CREDENTIAL_REVOKED:
     // ...
@@ -692,9 +707,14 @@ table, recipes, and a prompt-ready appendix.
 `TimeService` interface. The default is `RealTimeService` (`Date.now` /
 `performance.now`); pass `{ timeService: FakeTimeService() }` on
 `createVerifier(...)` in tests to make every `TaskTiming` field
-exact-value-assertable. Both factories are exported from the package barrel. The
-same abstraction will back upcoming work on credential expiration, signature
-clock-skew windows, key rotation, and status-list freshness — see
+exact-value-assertable. Both factories are exported from the package barrel.
+
+The same clock decides validity dates: `proof.signature` judges a credential's
+`validUntil` / `expirationDate` and `validFrom` / `issuanceDate` against it, and
+`status.bitstring` judges status-list freshness against it, so the two can never
+disagree within a verification. A verifier built on a `FakeTimeService` pinned
+inside a credential's validity window verifies that credential. Signature
+clock-skew windows and key rotation are still ahead — see
 [`docs/api/timing.md`](./docs/api/timing.md) for the reference.
 
 ## Open Badges 3.0 verification (opt-in submodule)

@@ -343,7 +343,7 @@ break when the flag is left at its default (`false`). See
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
-| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
+| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`, plus the credential's validity dates, which the verifying library reads once the signature holds: an authentic but out-of-date credential fails with `CREDENTIAL_EXPIRED` / `CREDENTIAL_NOT_YET_VALID` rather than `INVALID_SIGNATURE`, judged against `VerificationContext.timeService`. Does **not** check credential status — see the status suite. |
 | Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's; each list is fetched once per verification. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
@@ -699,9 +699,10 @@ without network dependencies, and composable — consumers wire in exactly the b
   (`default-services.ts`) and are not exported.
 - **`TimeService` is the clock seam.** Wall-clock and monotonic time both flow through
   `VerificationContext.timeService` (default `RealTimeService`). The orchestrator
-  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; checks may use it
-  for any time-sensitive decision (credential expiration, signature clock-skew window,
-  key rotation, status-list freshness). Tests pass `FakeTimeService` for deterministic
+  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; `proof.signature` and
+  `status.bitstring` read it to judge credential expiry and status-list freshness against the
+  same moment, and any other time-sensitive decision (signature clock-skew window,
+  key rotation) belongs there too. Tests pass `FakeTimeService` for deterministic
   exact-value assertions on every `TaskTiming` field.
 - **Suites are plugins** with a uniform `VerificationCheck` interface. Adding a new check or suite
   requires no changes to the core orchestration; callers append via `additionalSuites`.

@@ -46,6 +46,20 @@ export const ProblemTypes = {
 
   /** Synthesized — cryptographic signature did not verify. */
   INVALID_SIGNATURE: 'https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE',
+  /**
+   * Synthesized — the credential's validity has ended (`validUntil` /
+   * `expirationDate` is in the past). Reported by the signature check,
+   * which is where validity dates are judged: the signature verified,
+   * so the credential is authentic and merely out of date.
+   */
+  CREDENTIAL_EXPIRED: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_EXPIRED',
+  /**
+   * Synthesized — the credential's validity has not begun (`validFrom` /
+   * `issuanceDate` is in the future). Authentic, like
+   * {@link ProblemTypes.CREDENTIAL_EXPIRED}, and not yet usable.
+   */
+  CREDENTIAL_NOT_YET_VALID:
+    'https://www.w3.org/TR/vc-data-model#CREDENTIAL_NOT_YET_VALID',
   /** Synthesized — proof verification raised an error before reaching a verdict. */
   PROOF_VERIFICATION_ERROR:
     'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
