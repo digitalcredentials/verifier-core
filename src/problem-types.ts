@@ -47,6 +47,15 @@ export const ProblemTypes = {
   /** Synthesized — cryptographic signature did not verify. */
   INVALID_SIGNATURE: 'https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE',
   /**
+   * Synthesized — the proof's verification method could not be used: it was
+   * not found, its controller has not authorized it for the proof purpose,
+   * or the credential's issuer is not that controller. The issuer's key
+   * setup is wrong, which is a different accusation from
+   * {@link ProblemTypes.INVALID_SIGNATURE}'s "the content was altered".
+   */
+  VERIFICATION_METHOD_ERROR:
+    'https://www.w3.org/TR/vc-data-model#VERIFICATION_METHOD_ERROR',
+  /**
    * Synthesized — the credential's validity has ended (`validUntil` /
    * `expirationDate` is in the past). Reported by the signature check,
    * which is where validity dates are judged: the signature verified,

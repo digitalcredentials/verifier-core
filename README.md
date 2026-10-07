@@ -227,7 +227,7 @@ halted. With `verbose: true`, each check that would have run appears as
           {
             "type": "https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE",
             "title": "Invalid Signature",
-            "detail": "The signature is not valid."
+            "detail": "Invalid signature."
           }
         ]
       }
@@ -373,6 +373,7 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                   |
 | `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                               |
+| `...#VERIFICATION_METHOD_ERROR`   | Verification Method Error                                                                                                                                      | The proof's verification method is missing or not the issuer's |
 | `...#CREDENTIAL_EXPIRED`          | Credential Expired                                                                                                                                             | `validUntil` / `expirationDate` has passed; authentic         |
 | `...#CREDENTIAL_NOT_YET_VALID`    | Credential Not Yet Valid                                                                                                                                       | `validFrom` / `issuanceDate` in the future; authentic         |
 | `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                        |
@@ -396,6 +397,14 @@ forged. The date is judged against the verifier's `TimeService` (see
 [Pluggable clock](#pluggable-clock-timeservice)), the same clock the status
 check uses for status-list freshness.
 
+`VERIFICATION_METHOD_ERROR` comes from `proof.signature` too, and is fatal in
+the same way, but it is a statement about the issuer's keys rather than about
+the content: the proof names a verification method that cannot be found, that
+its controller has not authorized for the proof purpose, or that belongs to
+someone other than the credential's issuer. Nothing was necessarily altered —
+the issuer's key setup does not back the proof it published. The `detail` is
+the signature library's own message, so it names the method and the fault.
+
 #### Problem types
 
 Every built-in problem URI is also exported as a constant. Branch on the const
@@ -410,6 +419,9 @@ import {
 switch (problem.type as ProblemType) {
   case ProblemTypes.INVALID_SIGNATURE:
     // ...
+    break;
+  case ProblemTypes.VERIFICATION_METHOD_ERROR:
+    // The issuer's key setup is wrong — not evidence of tampering.
     break;
   case ProblemTypes.CREDENTIAL_EXPIRED:
   case ProblemTypes.CREDENTIAL_NOT_YET_VALID:
