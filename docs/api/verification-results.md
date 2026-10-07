@@ -15,6 +15,7 @@
 ## Table of Contents
 
 1. [Overview — folded vs verbose](#overview)
+   - [Check payloads](#check-payloads)
 2. [Presentation vs credential scopes](#presentation-vs-credential-scopes)
 3. [Phase model](#phase-model)
 4. [`SuiteSummary` reference](#suitesummary-reference)
@@ -77,11 +78,47 @@ The same verification with `verbose: true`:
     { "id": "recognition.profile",                /* skipped: no recognizers configured */ },
     { "id": "cryptographic.proof.signature",      /* ... */ },
     { "id": "cryptographic.status.bitstring",     /* skipped: no credentialStatus */ },
-    { "id": "trust.registry.issuer",              /* ... */ }
+    { "id": "trust.registry.issuer",
+      "suite": "registry", "check": "registry.issuer",
+      "outcome": {
+        "status": "success",
+        "message": "Issuer found in registry: DCC Sandbox Registry",
+        "payload": {
+          "matches": [
+            { "registry": { "name": "DCC Sandbox Registry", "type": "dcc-legacy",
+                            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json" },
+              "entity": { "name": "Example University", "url": "https://example.edu",
+                          "raw": { "name": "Example University", "url": "https://example.edu" } } }
+          ],
+          "uncheckedRegistries": []
+        }
+      },
+      "fatal": false }
   ],
   "summary": [ /* identical to the folded summary above */ ]
 }
 ```
+
+### Check payloads
+
+A `success` or `failure` outcome may carry a check-specific `payload` —
+what the check learned, as data. Today only `registry.issuer` emits one,
+a `RegistryCheckPayload`: the registries that listed the issuer (each
+with the registry's `name`, `type` and `url`, and the registry's own
+record of the issuer under `entity`), and the registries that could not
+be checked. It is present on success and on failure alike, whenever the
+lookup ran.
+
+Read the payload rather than parsing the outcome's `message`: the message
+is display text, and joins registry names with `, `, so a registry whose
+own name contains `, ` cannot be recovered from it. `entity` is the
+registry's description of the issuer rather than the credential's
+description of itself, which makes it the display name to prefer.
+
+Because folding drops successes from `results`, a consumer that wants the
+payload of a check that *passed* needs `verbose: true`. A failing
+`registry.issuer` appears in the folded `results` with its payload either
+way.
 
 ## Presentation vs credential scopes
 
@@ -489,7 +526,8 @@ dcc-transaction-service UI implementation.
             { "type": "https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED",
               "title": "Issuer Not Registered",
               "detail": "Issuer DID not in any registry." }
-          ]},
+          ],
+          "payload": { "matches": [], "uncheckedRegistries": [] }},
           "fatal": false }
       ],
       "summary": [

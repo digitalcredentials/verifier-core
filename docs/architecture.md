@@ -47,7 +47,7 @@ src/
 │   ├── data-integrity-crypto.ts     Default CryptoService implementation (Data Integrity / Linked Data Proofs)
 │   ├── registry-lookup.ts           createRegistryLookup factory: builds a LookupIssuers from handlers + cache
 │   └── registry-handlers/           Per-type registry handlers behind a port
-│       ├── types.ts                 RegistryHandler, RegistryHandlerMap, RegistryHandlerContext
+│       ├── types.ts                 RegistryHandler, RegistryHandlerMap, RegistryHandlerContext, HandlerResult (a `found` result may carry the registry's `entity`)
 │       ├── dcc-legacy-handler.ts    DCC legacy DID-list registry
 │       ├── oidf-handler.ts          OpenID Federation registry: verifies the entity configuration and subordinate statement (ES256/EdDSA), `iss` / `sub` / `exp`
 │       ├── jws-verify.ts            Compact JWS verification against a JWK Set with the shipped key libraries
@@ -92,7 +92,7 @@ src/
 │   ├── http.ts                      HttpGetResult
 │   ├── subject.ts                   VerificationSubject
 │   ├── problem-detail.ts            ProblemDetail (RFC 9457-inspired; carries `instance` JSON Pointer)
-│   └── registry.ts                  EntityIdentityRegistry, LookupIssuers, RegistryLookupResult
+│   └── registry.ts                  EntityIdentityRegistry, LookupIssuers, RegistryLookupResult, RegistryCheckPayload (RegistryMatch / RegistryReference / RegistryEntity)
 └── util/                            Internal helpers
     ├── document-loader-from-http-get.ts  Build a JSON-LD loader backed by an HttpGetService
     ├── did-web-driver-with-http-get.ts   did:web resolution via HttpGetService (cache-sharing)
@@ -305,8 +305,8 @@ VerificationCheck.execute(subject, context)
        │
        ▼
 CheckOutcome
-  ├── { status: 'success', message }
-  ├── { status: 'failure', problems: ProblemDetail[] }
+  ├── { status: 'success', message, payload? }
+  ├── { status: 'failure', problems: ProblemDetail[], payload? }
   └── { status: 'skipped', reason }
        │
        ▼
@@ -336,6 +336,9 @@ break when the flag is left at its default (`false`). See
 - **Failures** carry `ProblemDetail[]` — RFC 9457-inspired structured errors with `type` (URI),
   `title`, and `detail`.
 - **Skips** carry a `reason` string explaining why (e.g. "Credential has no credentialStatus").
+- **`payload`** is an optional, check-specific data result on a `success` or `failure` outcome —
+  what the check learned, so consumers need not parse it back out of the prose. Today only
+  `registry.issuer` emits one (`RegistryCheckPayload`).
 
 ### Default suites
 
@@ -568,6 +571,19 @@ Pointer locating the offending portion of the credential — see
 configuring which issuer registries to check. The `oidf` variant uses OpenID Federation trust
 anchors; `dcc-legacy` uses the older URL-based DCC registry format; `vc-recognition` consumes a
 recognition VC issued by a trust authority.
+
+**`RegistryLookupResult`** is what `LookupIssuers` returns: `found`, plus the two lists that make
+up **`RegistryCheckPayload`** — `matches` and `uncheckedRegistries`. A `RegistryMatch` pairs a
+`RegistryReference` (`name`, `type`, and the `url` the registry is read from — `trustAnchorEC` for
+`oidf`) with an optional `RegistryEntity`, the registry's own record of the issuer (`name`, `url`,
+`logo`, and the untouched `raw` entry). Because the lookup stops at the first registry that
+matches unless run with `exhaustive`, `matches` normally holds at most one entry. The registry
+check returns the payload on its outcome, on success and on failure; a handler supplies the
+`entity` on its `found` result. Only the `dcc-legacy` handler fills one in today.
+
+A lookup result cached by an earlier version, in the shape that predates `matches`, is treated as
+a cache miss rather than an error: the issuer is looked up again and the current shape is cached
+over it.
 
 ## Result models
 

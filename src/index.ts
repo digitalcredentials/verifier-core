@@ -26,6 +26,10 @@ export type {
   DccLegacyEntityIdentityRegistry,
   VcRecognitionEntityIdentityRegistry,
   RegistryLookupResult,
+  RegistryCheckPayload,
+  RegistryMatch,
+  RegistryReference,
+  RegistryEntity,
   LookupIssuers,
   LookupIssuersOptions
 } from './types/registry.js';
@@ -99,7 +103,8 @@ export type { ProblemType } from './problem-types.js';
 export type {
   RegistryHandlerContext,
   RegistryHandlerMap,
-  RegistryHandler
+  RegistryHandler,
+  HandlerResult
 } from './services/registry-handlers/types.js';
 export { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
 export type { DataIntegrityCryptoConfig } from './services/data-integrity-crypto.js';

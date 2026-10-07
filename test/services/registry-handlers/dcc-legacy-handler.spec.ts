@@ -61,7 +61,31 @@ describe('lookupDccLegacy', () => {
       dccRegistry,
       buildCtx({ httpGetService })
     );
-    expect(result).toEqual({ status: 'found', registryName: 'Sandbox' });
+    expect(result).toEqual({
+      status: 'found',
+      registryName: 'Sandbox',
+      entity: {
+        name: 'Found Issuer',
+        url: 'https://issuer.example',
+        raw: sampleBody.registry['did:key:found']
+      }
+    });
+  });
+
+  it('returns a found result with no entity fields for a bare entry', async () => {
+    const httpGetService = FakeHttpGetService({
+      [registryUrl]: okJsonBody({ registry: { 'did:key:bare': {} } })
+    });
+    const result = await lookupDccLegacy(
+      'did:key:bare',
+      dccRegistry,
+      buildCtx({ httpGetService })
+    );
+    expect(result).toEqual({
+      status: 'found',
+      registryName: 'Sandbox',
+      entity: { raw: {} }
+    });
   });
 
   it.each(['__proto__', 'constructor', 'toString'])(

@@ -97,6 +97,46 @@ answered and others could not be checked, `ISSUER_NOT_REGISTERED` says how many
 answered, and a `REGISTRY_UNCHECKED` problem names the rest. Pass
 `registries: []` to skip the registry check.
 
+#### What the registry check returns
+
+Whenever the lookup ran, the `registry.issuer` outcome carries a
+`RegistryCheckPayload` — on success and on failure alike. Read that rather
+than parsing the outcome's `message`, which is display text and will not
+survive a registry name containing `, `.
+
+```typescript
+interface RegistryCheckPayload {
+  /** Registries that listed the issuer, in configured order. */
+  matches: Array<{
+    registry: { name: string; type: 'oidf' | 'dcc-legacy' | 'vc-recognition'; url?: string };
+    /** The registry's own record of the issuer, when it has one. */
+    entity?: { name?: string; url?: string; logo?: string; raw?: unknown };
+  }>;
+  /** Registries that could not be reached or did not answer usefully. */
+  uncheckedRegistries: Array<{ name: string; type: string; url?: string }>;
+}
+```
+
+A lookup stops at the first registry that matches, so `matches` normally
+holds at most one entry; only a lookup run with `exhaustive: true` returns
+more. A registry's `url` is where it is read from: the list URL for
+`dcc-legacy` and `vc-recognition`, and the trust anchor's entity
+configuration (`trustAnchorEC`) for `oidf`.
+
+`entity` is the registry's description of the issuer, not the credential's
+description of itself, so it is the display name to prefer — the credential
+cannot alter it. Only `dcc-legacy` registries populate it today; `oidf` and
+`vc-recognition` matches carry no `entity` yet.
+
+```typescript
+const outcome = result.results.find(r => r.check === 'registry.issuer')?.outcome;
+const payload = outcome?.payload as RegistryCheckPayload | undefined;
+const displayName = payload?.matches[0]?.entity?.name;
+```
+
+A custom handler passed via `registryHandlers` can supply an `entity` on its
+`found` result (see `HandlerResult`), and the lookup passes it through.
+
 > [!CAUTION] The DCC registry list does not make claims about the registries it
 > contains. It is a list of registries that the DCC knows about — it says
 > nothing about the quality, meaning, or value of credentials issued by anyone
@@ -192,7 +232,27 @@ interface ProblemDetail {
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
     { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
     { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
-    { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } }
+    { "suite": "registry", "check": "registry.issuer",   "outcome": {
+      "status": "success",
+      "message": "Issuer found in registry: DCC Sandbox Registry",
+      "payload": {
+        "matches": [
+          {
+            "registry": {
+              "name": "DCC Sandbox Registry",
+              "type": "dcc-legacy",
+              "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+            },
+            "entity": {
+              "name": "Example University",
+              "url": "https://example.edu",
+              "raw": { "name": "Example University", "url": "https://example.edu" }
+            }
+          }
+        ],
+        "uncheckedRegistries": []
+      }
+    } }
   ]
 }
 ```

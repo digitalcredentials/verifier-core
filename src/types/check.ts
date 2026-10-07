@@ -24,12 +24,16 @@ import type { TaskTiming } from './timing.js';
  * - **skipped** — the check was irrelevant to this input (e.g. no
  *   `credentialStatus`); `reason` explains why.
  *
+ * A `success` or `failure` outcome may carry a check-specific `payload` —
+ * what the check learned, as data, so consumers need not read it out of the
+ * prose. See {@link ../types/registry.js#RegistryCheckPayload}.
+ *
  * Checks never throw for verification failures — they return a failure outcome.
  * Throws are reserved for unexpected infrastructure errors.
  */
 export type CheckOutcome =
   | { status: 'success'; message: string; payload?: unknown }
-  | { status: 'failure'; problems: ProblemDetail[] }
+  | { status: 'failure'; problems: ProblemDetail[]; payload?: unknown }
   | { status: 'skipped'; reason: string };
 
 /**

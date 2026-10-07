@@ -7,7 +7,9 @@ import type {
   EntityIdentityRegistry,
   LookupIssuers,
   LookupIssuersOptions,
-  RegistryLookupResult
+  RegistryLookupResult,
+  RegistryMatch,
+  RegistryReference
 } from '../types/registry.js';
 import type { Verifier } from '../types/verifier.js';
 import type { CacheService } from './cache-service/cache-service.js';
@@ -28,6 +30,19 @@ import { DEFAULT_TTL_MS } from './registry-handlers/cache-ttl.js';
  * verification does not wait out the HTTP timeout again.
  */
 const PARTIAL_RESULT_TTL_MS = 60 * 1000;
+
+/**
+ * The configured registry, as it is named in a lookup result. `oidf`
+ * registries are identified by their trust anchor entity configuration;
+ * the other two by the URL their list is read from.
+ */
+function registryReference(registry: EntityIdentityRegistry): RegistryReference {
+  return {
+    name: registry.name,
+    type: registry.type,
+    url: registry.type === 'oidf' ? registry.trustAnchorEC : registry.url
+  };
+}
 
 const defaultHandlers: RegistryHandlerMap = {
   'dcc-legacy': lookupDccLegacy,
@@ -62,6 +77,9 @@ const defaultHandlers: RegistryHandlerMap = {
  * Options:
  * - `fresh: true` — bypass the DID-level result cache (but underlying data caches still apply)
  * - `exhaustive: true` — check all registries even after finding a match (default: short-circuit on first found)
+ *
+ * Because the walk short-circuits, `matches` normally holds at most one
+ * entry; only an `exhaustive` lookup can return more.
  */
 export function createRegistryLookup(
   httpGetService: HttpGetService,
@@ -80,7 +98,10 @@ export function createRegistryLookup(
       const cached = (await cacheService.get(cacheKey)) as
         | RegistryLookupResult
         | undefined;
-      if (cached) {
+      // A result cached by an earlier version, before `matches` existed, is
+      // a cache miss rather than an error: look the issuer up again and
+      // cache the current shape over it.
+      if (cached && Array.isArray(cached.matches)) {
         return cached;
       }
     }
@@ -99,24 +120,27 @@ export function createRegistryLookup(
       }
     };
 
-    const matchingRegistries: string[] = [];
-    const uncheckedRegistries: string[] = [];
+    const matches: RegistryMatch[] = [];
+    const uncheckedRegistries: RegistryReference[] = [];
 
     for (const registry of registries) {
       const outcome = await handlers[registry.type](did, registry, ctx);
       if (outcome.status === 'found') {
-        matchingRegistries.push(outcome.registryName);
+        matches.push({
+          registry: registryReference(registry),
+          ...(outcome.entity ? { entity: outcome.entity } : {})
+        });
         if (!options?.exhaustive) {
           break;
         }
       } else if (outcome.status === 'unchecked') {
-        uncheckedRegistries.push(outcome.registryName);
+        uncheckedRegistries.push(registryReference(registry));
       }
     }
 
     const result: RegistryLookupResult = {
-      found: matchingRegistries.length > 0,
-      matchingRegistries,
+      found: matches.length > 0,
+      matches,
       uncheckedRegistries
     };
 

@@ -54,6 +54,26 @@ Verifier results now fold per-suite checks into a single
   `@digitalcredentials/vc` by `DataIntegrityCryptoService`. Custom
   `CryptoService` implementations may ignore it; omitting it means "now" as the
   adapter's own library sees it.
+- `RegistryCheckPayload` on the `registry.issuer` outcome, on success and on
+  failure alike: `matches`, one per registry that listed the issuer, each
+  `{ registry: { name, type, url? }, entity? }`, and `uncheckedRegistries`,
+  each `{ name, type, url? }`. The registry's `url` is where it is read from —
+  the list URL for `dcc-legacy` and `vc-recognition`, the trust anchor's entity
+  configuration for `oidf`. The lookup stops at the first registry that
+  matches, so `matches` normally holds at most one entry; only a lookup run
+  with `exhaustive` returns more. The outcome's `message` is unchanged, and is
+  display text only — read the payload rather than parsing it.
+- `RegistryEntity` on a match: the registry's own record of the issuer
+  (`name`, `url`, `logo`, and the untouched registry entry as `raw`). Because
+  it comes from the registry rather than from the credential, it is the display
+  name to prefer. Only the `dcc-legacy` handler fills it in today; `oidf` and
+  `vc-recognition` entities are still to come.
+- `payload?: unknown` on `failure` outcomes of `CheckOutcome`. Additive —
+  `success` already allowed one.
+- `RegistryCheckPayload`, `RegistryMatch`, `RegistryReference`,
+  `RegistryEntity` and `HandlerResult` are exported from the package entry, so
+  a custom handler passed via `registryHandlers` can return an `entity` on its
+  `found` result and have the lookup pass it through.
 - `domain` on `verifyPresentation`, checked alongside `challenge`.
 - `BuiltinHttpGetService({ timeoutMs, maxBytes })`: the deadline (default 10 s)
   and body cap (default 5 MB) of the built-in HTTP service.
@@ -76,6 +96,13 @@ Verifier results now fold per-suite checks into a single
   prettier 3; package manager is **pnpm**. `engines.node` raised to `>=24`.
   `exports` now declare `react-native` / `import` conditions for `.` and
   `./openbadges`, and the package is marked `sideEffects: false`.
+- **`RegistryLookupResult` carries `matches` and registry references in place
+  of its lists of names.** `matchingRegistries: string[]` is replaced by
+  `matches: RegistryMatch[]`, and `uncheckedRegistries: string[]` by
+  `uncheckedRegistries: RegistryReference[]`. A lookup result cached in the old
+  shape — one with no `matches` array — is treated as a cache miss, not an
+  error: the issuer is looked up again and the new shape is cached over it. No
+  cache needs clearing on upgrade.
 - `HttpGetResult.body` from the built-in HTTP service is parsed JSON whenever
   the body is valid JSON, whatever its content type. Previously only JSON
   content types were parsed, so a `text/plain` status list or DID document
@@ -214,6 +241,38 @@ Verifier results now fold per-suite checks into a single
   `result.results[]` for failure detail; use
   `r.id?.startsWith(summary.id + '.')` to find detail rows under a failing
   summary entry.
+- **Registry matches.** 1.x returned the registry's record of the issuer at the
+  top level of the verification result, as `matchingIssuers[]`, each
+  `{ issuer: { federation_entity: { organization_name, homepage_uri, logo_uri?,
+  … } }, registry: { name, type, url } }`. 2.0 returns the same information as
+  the `payload` of the `registry.issuer` check's outcome, a
+  `RegistryCheckPayload` whose `matches[]` entries are
+  `{ registry: { name, type, url? }, entity? }`. What 1.x called `issuer`
+  (its `federation_entity`) is now `entity`:
+
+  | 1.x | 2.0 |
+  |-----|-----|
+  | `matchingIssuers[]` | `payload.matches[]` |
+  | `…issuer.federation_entity.organization_name` | `…entity.name` |
+  | `…issuer.federation_entity.homepage_uri` | `…entity.url` |
+  | `…issuer.federation_entity.logo_uri` | `…entity.logo` |
+  | `…registry` | `…registry` (`name`, `type`, `url`) |
+
+  The whole registry entry is also available, unmodified, as `entity.raw`.
+  Only `dcc-legacy` registries populate `entity` today. Because folding drops
+  successes from `results[]`, reading the payload of a *passing*
+  `registry.issuer` needs `verbose: true`.
+- **Reading registry names out of the message.** Code that parsed the
+  `registry.issuer` message — "Issuer found in registry: A. 1 registries could
+  not be checked: B" — should read `payload.matches[].registry.name` and
+  `payload.uncheckedRegistries[].name` instead. The message is unchanged, but
+  it joins names with `, `, so a registry whose own name contains `, ` cannot
+  be recovered from it.
+- **Custom `LookupIssuers` or `registryHandlers`.** A custom `LookupIssuers`
+  must now return `matches: RegistryMatch[]` rather than
+  `matchingRegistries: string[]`, and `uncheckedRegistries` as references
+  rather than names. A custom handler's `found` result is unchanged unless it
+  wants to supply an `entity`, which is optional.
 
 ## 1.0.0-beta.11 - December 15 2025
 
