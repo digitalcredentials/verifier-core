@@ -16,6 +16,7 @@ import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
 import { documentHasProof } from '../util/document-has-proof.js';
+import { isVerificationMethodMessage } from '../util/verification-method-messages.js';
 
 /**
  * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
@@ -71,6 +72,20 @@ function getHttpError(errors: unknown[]): unknown | undefined {
   });
 }
 
+/**
+ * The messages the libraries actually wrote, in order.
+ *
+ * A failed verification arrives as a `VerificationError` whose own
+ * message is "Verification error(s)." — true of a tampered credential and
+ * of a misconfigured key alike, and so of no use to anyone reading the
+ * result. The real messages are the wrapped ones.
+ */
+function messagesOf(errors: unknown[]): string[] {
+  return errors
+    .map(e => (e as { message?: string } | undefined)?.message)
+    .filter((m): m is string => typeof m === 'string' && m.length > 0);
+}
+
 function isDidWeb(did: string): boolean {
   return did.toLowerCase().startsWith('did:web');
 }
@@ -79,7 +94,13 @@ function didWebToUrlPattern(did: string): string {
   return did.slice(8).replaceAll(':', '/').toLowerCase();
 }
 
-function classifySignatureError(
+/**
+ * Turn a signature library's rejection into problems a consumer can act on.
+ *
+ * Exported for the unit tests that pin the library message patterns; it is
+ * not part of the package's public surface (see `src/index.ts`).
+ */
+export function classifySignatureError(
   error: unknown,
   credential: Record<string, unknown> | undefined
 ): ProblemDetail[] {
@@ -134,12 +155,26 @@ function classifySignatureError(
     ];
   }
 
-  const err = error as { message?: string } | undefined;
+  const messages = messagesOf(errors);
+
+  // The issuer's key setup, not the content: say so, rather than accusing
+  // an honestly-signed credential of having been altered.
+  const verificationMethodMessage = messages.find(isVerificationMethodMessage);
+  if (verificationMethodMessage !== undefined) {
+    return [
+      {
+        type: ProblemTypes.VERIFICATION_METHOD_ERROR,
+        title: 'Verification Method Error',
+        detail: verificationMethodMessage
+      }
+    ];
+  }
+
   return [
     {
       type: ProblemTypes.INVALID_SIGNATURE,
       title: 'Invalid Signature',
-      detail: err?.message || 'The signature is not valid.'
+      detail: messages.join(' ') || 'The signature is not valid.'
     }
   ];
 }

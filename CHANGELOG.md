@@ -45,6 +45,10 @@ Verifier results now fold per-suite checks into a single
   at the pinned moment. Signature clock-skew and key rotation are still ahead.
 - `CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` on `ProblemTypes`, under
   the same URI namespace as the other synthesized types.
+- `VERIFICATION_METHOD_ERROR` on `ProblemTypes`, under the same URI namespace.
+  Reported by `proof.signature` when the proof's verification method cannot be
+  found, its controller has not authorized it for the proof purpose, or the
+  credential's issuer is not that controller.
 - Optional `now?: Date` on `CryptoVerifyOptions`, filled by the calling check
   from the verification context's `TimeService` and passed through to
   `@digitalcredentials/vc` by `DataIntegrityCryptoService`. Custom
@@ -79,6 +83,17 @@ Verifier results now fold per-suite checks into a single
 
 ### Fixed
 
+- **A key or controller mismatch is no longer reported as `INVALID_SIGNATURE`
+  with the detail "Verification error(s).", exactly what a tampered credential
+  reported.** A verification method that is missing, unauthorized by its
+  controller for the proof purpose, or controlled by someone other than the
+  issuer now fails with `VERIFICATION_METHOD_ERROR` ("Verification Method
+  Error"): the issuer's key setup is wrong, which is not the same accusation as
+  "the content was altered". Still fatal.
+- **A failed signature check now reports the signature library's own message.**
+  Every failure took its `detail` from the `VerificationError` wrapper
+  ("Verification error(s).") rather than from the errors it wraps; a tampered
+  credential now reads "Invalid signature.".
 - **An expired or not-yet-valid credential is no longer reported as
   `INVALID_SIGNATURE` / "Invalid Signature", the same verdict as a forgery.**
   `@digitalcredentials/vc` reads validity dates only after the proof verifies,
