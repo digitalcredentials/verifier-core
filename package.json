@@ -3,13 +3,13 @@
   "description": "For verifying Verifiable Credentials in the browser, Node.js, and React Native.",
   "version": "2.0.0",
   "scripts": {
-    "build": "pnpm run clear && tsc",
+    "build": "rimraf dist/* && tsc",
     "clear": "rimraf dist/*",
     "dev": "vite",
     "fix": "eslint --fix src test && pnpm run format",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\"",
     "lint": "eslint src test",
-    "prepare": "pnpm run build",
+    "prepack": "rimraf dist/* && tsc",
     "rebuild": "pnpm run clear && pnpm run build",
     "test": "pnpm run lint && pnpm run test:node",
     "test:browser": "playwright test",
@@ -18,20 +18,22 @@
     "test:smoke": "vitest run --config vitest.smoke.config.ts"
   },
   "type": "module",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "react-native": "./dist/index.js",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./openbadges": {
       "types": "./dist/openbadges/index.d.ts",
       "react-native": "./dist/openbadges/index.js",
-      "import": "./dist/openbadges/index.js"
+      "import": "./dist/openbadges/index.js",
+      "default": "./dist/openbadges/index.js"
     }
   },
   "files": [
