@@ -8,7 +8,11 @@ import { createVerifier } from '../src/verifier.js';
 import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
 import { runSuites } from '../src/run-suites.js';
 import { defaultSuites } from '../src/default-suites.js';
-import { VerificationCheck, CheckOutcome } from '../src/types/check.js';
+import {
+  VerificationCheck,
+  CheckOutcome,
+  CheckResult
+} from '../src/types/check.js';
 import { ProblemTypes } from '../src/problem-types.js';
 import {
   BitstringStatusEntry,
@@ -177,16 +181,33 @@ describe('verifyCredential', () => {
   });
 
   describe('expired credentials', () => {
+    // An authentic credential whose validity has ended is not a forgery,
+    // and must not be reported as one: the signature verified, which is
+    // the only reason the date check ran at all.
+    const expiryProblem = (results: CheckResult[]) => {
+      const signature = results.find(r => r.check === 'proof.signature');
+      expect(signature?.outcome.status).toBe('failure');
+      return signature?.outcome.status === 'failure'
+        ? signature.outcome.problems[0]
+        : undefined;
+    };
+
     it('detects expired v1 credentials', async () => {
       const result = await verifyCredential({ credential: v1Expired });
 
       expect(result.verified).toBe(false);
+      const problem = expiryProblem(result.results);
+      expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_EXPIRED);
+      expect(problem?.title).toBe('Credential Expired');
     });
 
     it('detects expired v2 credentials', async () => {
       const result = await verifyCredential({ credential: v2Expired });
 
       expect(result.verified).toBe(false);
+      const problem = expiryProblem(result.results);
+      expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_EXPIRED);
+      expect(problem?.detail).toContain('validUntil');
     });
   });
 

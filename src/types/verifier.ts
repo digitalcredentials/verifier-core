@@ -139,9 +139,12 @@ export interface VerifierConfig {
    * {@link FakeTimeService} from
    * `@digitalcredentials/verifier-core` in tests for
    * deterministic timing assertions, or with any other
-   * {@link TimeService} when injecting a controlled clock for
-   * future features (credential expiration, signature clock-
-   * skew window, key rotation).
+   * {@link TimeService} when the verifier should judge time
+   * against a controlled clock. Credential validity dates
+   * (`proof.signature`) and status-list freshness
+   * (`status.bitstring`) are both decided by this clock;
+   * signature clock-skew windows and key rotation will join
+   * them.
    */
   timeService?: TimeService;
 }

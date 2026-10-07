@@ -209,7 +209,11 @@ export function DataIntegrityCryptoService(
           credential,
           suite: suites,
           documentLoader: options.documentLoader,
-          checkStatus: noopCheckStatus
+          checkStatus: noopCheckStatus,
+          // vc checks validity dates after the proof verifies; `now`
+          // is the caller's clock, and vc falls back to its own when
+          // it is undefined.
+          now: options.now
         });
 
         const verified = result.verified ?? false;

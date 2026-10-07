@@ -257,11 +257,14 @@ both clocks, so every `TaskTiming` field — including
 counter semantics and `seed` options (`baseDateMs`,
 `performanceTickMs`).
 
-The `TimeService` is the recommended source of truth for any
-future check that needs to ask "what time is it?" — credential
-expiration, signature clock-skew windows, key rotation,
-status-list freshness, etc. Read it from
-`VerificationContext.timeService` inside `execute()`.
+The `TimeService` is the source of truth for any check that
+needs to ask "what time is it?". `proof.signature` already reads
+it to judge credential expiry (`validUntil` / `expirationDate`)
+and `status.bitstring` to judge status-list freshness, so a
+verifier built on a `FakeTimeService` decides both at the pinned
+moment. Signature clock-skew windows and key rotation belong
+there too. Read it from `VerificationContext.timeService` inside
+`execute()`.
 
 ## Prompt-ready appendix
 
