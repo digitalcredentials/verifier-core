@@ -1,4 +1,7 @@
-import type { OidfEntityIdentityRegistry } from '../../types/registry.js';
+import type {
+  OidfEntityIdentityRegistry,
+  RegistryEntity
+} from '../../types/registry.js';
 import type { CacheService } from '../cache-service/cache-service.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import { parseCacheControlMaxAge, resolveTtl } from './cache-ttl.js';
@@ -30,6 +33,11 @@ import type {
  * endpoint is `not-found`; every other failure, including any failed check,
  * is `unchecked`, because it says nothing about whether the issuer is a
  * member.
+ *
+ * A match carries the subordinate statement's `metadata` as its entity. It
+ * is read only from a statement that has just verified, on the fresh path
+ * and on a cache hit alike, so it is always the trust anchor's signed
+ * description of the issuer.
  */
 export const lookupOidf: RegistryHandler = async (did, registry, ctx) => {
   if (registry.type !== 'oidf') {
@@ -80,8 +88,15 @@ async function lookupOidfForRegistry(
 
   const cached = await cacheService.get(lookupKey);
   if (typeof cached === 'string' && cached) {
-    if (await verifySubordinateStatement(cached, ec, did)) {
-      return { status: 'found', registryName: registry.name };
+    const reverified = await verifySubordinateStatement(cached, ec, did);
+    if (reverified) {
+      // The entity comes from the statement verified just now, not from
+      // anything recorded alongside the cached JWT.
+      return {
+        status: 'found',
+        registryName: registry.name,
+        entity: entityFromMetadata(reverified.metadata)
+      };
     }
     // A cached statement that no longer verifies (typically one past its
     // `exp`) is refetched rather than trusted.
@@ -113,7 +128,43 @@ async function lookupOidfForRegistry(
     issuerJwt,
     ttlBoundedByExp(result.headers, verified.exp)
   );
-  return { status: 'found', registryName: registry.name };
+  return {
+    status: 'found',
+    registryName: registry.name,
+    entity: entityFromMetadata(verified.metadata)
+  };
+}
+
+/**
+ * The registry's record of the issuer, read from the verified statement's
+ * `metadata`: the federation entity's organisation name, homepage and
+ * logo, plus the whole metadata object, so a consumer can read fields this
+ * shape does not name.
+ *
+ * Only members that are strings are named, because `metadata` is arbitrary
+ * JSON that happened to be signed.
+ */
+function entityFromMetadata(metadata: Record<string, unknown>): RegistryEntity {
+  const federationEntity = (
+    metadata as {
+      federation_entity?: {
+        organization_name?: unknown;
+        homepage_uri?: unknown;
+        logo_uri?: unknown;
+      };
+    }
+  ).federation_entity;
+  const entity: RegistryEntity = { raw: metadata };
+  if (typeof federationEntity?.organization_name === 'string') {
+    entity.name = federationEntity.organization_name;
+  }
+  if (typeof federationEntity?.homepage_uri === 'string') {
+    entity.url = federationEntity.homepage_uri;
+  }
+  if (typeof federationEntity?.logo_uri === 'string') {
+    entity.logo = federationEntity.logo_uri;
+  }
+  return entity;
 }
 
 /**
@@ -198,14 +249,14 @@ async function verifyEntityConfiguration(
 /**
  * Verify a subordinate statement for `did`: signed by one of the anchor's
  * keys, issued by the anchor's entity identifier, about `did`, unexpired,
- * and carrying a `metadata` object. Returns its `exp`, or `null` on any
- * failure.
+ * and carrying a `metadata` object. Returns its `exp` and that verified
+ * `metadata`, or `null` on any failure.
  */
 async function verifySubordinateStatement(
   jwt: string,
   ec: VerifiedEntityConfiguration,
   did: string
-): Promise<{ exp: number } | null> {
+): Promise<{ exp: number; metadata: Record<string, unknown> } | null> {
   const result = await verifyJws(jwt, ec.jwks);
   if (!result.valid) {
     return null;
@@ -218,7 +269,7 @@ async function verifySubordinateStatement(
   if (metadata === null || typeof metadata !== 'object') {
     return null;
   }
-  return { exp };
+  return { exp, metadata: metadata as Record<string, unknown> };
 }
 
 /**

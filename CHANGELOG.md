@@ -66,8 +66,15 @@ Verifier results now fold per-suite checks into a single
 - `RegistryEntity` on a match: the registry's own record of the issuer
   (`name`, `url`, `logo`, and the untouched registry entry as `raw`). Because
   it comes from the registry rather than from the credential, it is the display
-  name to prefer. Only the `dcc-legacy` handler fills it in today; `oidf` and
-  `vc-recognition` entities are still to come.
+  name to prefer. The `dcc-legacy` and `oidf` handlers fill it in;
+  `vc-recognition` entities are still to come. For `oidf` it is the `metadata`
+  of the trust anchor's subordinate statement — `name` from
+  `federation_entity.organization_name`, `url` from `homepage_uri`, `logo` from
+  `logo_uri`, and the whole verified `metadata` as `raw` — read only from a
+  statement that has just verified, on a cache hit as well as on a fresh fetch.
+  An OIDF `logo_uri` may be a `data:` URI holding the image itself rather than
+  a link to it, so `entity.logo` can be large, and it is cached along with the
+  rest of the lookup.
 - `payload?: unknown` on `failure` outcomes of `CheckOutcome`. Additive —
   `success` already allowed one.
 - `RegistryCheckPayload`, `RegistryMatch`, `RegistryReference`,
@@ -258,8 +265,10 @@ Verifier results now fold per-suite checks into a single
   | `…issuer.federation_entity.logo_uri` | `…entity.logo` |
   | `…registry` | `…registry` (`name`, `type`, `url`) |
 
-  The whole registry entry is also available, unmodified, as `entity.raw`.
-  Only `dcc-legacy` registries populate `entity` today. Because folding drops
+  The whole registry entry is also available, unmodified, as `entity.raw`:
+  for `oidf` that is the verified subordinate statement's whole `metadata`,
+  which is where 1.x read `issuer` from. `dcc-legacy` and `oidf` registries
+  populate `entity`; `vc-recognition` does not yet. Because folding drops
   successes from `results[]`, reading the payload of a *passing*
   `registry.issuer` needs `verbose: true`.
 - **Reading registry names out of the message.** Code that parsed the

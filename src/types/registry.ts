@@ -79,15 +79,22 @@ export interface RegistryReference {
  * credential's description of itself, so it is the display name to
  * prefer: the credential cannot alter it.
  *
- * Only `dcc-legacy` populates this today; `oidf` and `vc-recognition`
- * matches carry no entity yet.
+ * `dcc-legacy` and `oidf` populate this; `vc-recognition` matches carry no
+ * entity yet. For `oidf` it comes from the `metadata` of the trust
+ * anchor's subordinate statement, read only after that statement has
+ * verified — on a cache hit as well, since the cached statement is
+ * re-verified on every hit.
  */
 export interface RegistryEntity {
   /** Organisation name as the registry records it. */
   name?: string;
   /** The entity's homepage, as the registry records it. */
   url?: string;
-  /** URL of the entity's logo, as the registry records it. */
+  /**
+   * The entity's logo, as the registry records it. Usually a URL, but an
+   * OIDF `logo_uri` may be a `data:` URI holding the image itself, which
+   * can be large; it is cached along with the rest of the lookup.
+   */
   logo?: string;
   /** The registry's entry for the entity, unmodified. */
   raw?: unknown;
