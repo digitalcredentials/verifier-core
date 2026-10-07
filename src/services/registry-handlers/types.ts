@@ -1,11 +1,20 @@
 import type { CacheService } from '../cache-service/cache-service.js';
-import type { EntityIdentityRegistry } from '../../types/registry.js';
+import type {
+  EntityIdentityRegistry,
+  RegistryEntity
+} from '../../types/registry.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import type { Verifier } from '../../types/verifier.js';
 
-/** Outcome of looking up one issuer DID in a single registry entry. */
+/**
+ * Outcome of looking up one issuer DID in a single registry entry.
+ *
+ * A `found` result may carry the registry's own record of the entity,
+ * which the lookup passes through to the check's payload. A custom
+ * handler that has such a record should return it.
+ */
 export type HandlerResult =
-  | { status: 'found'; registryName: string }
+  | { status: 'found'; registryName: string; entity?: RegistryEntity }
   | { status: 'not-found' }
   | { status: 'unchecked'; registryName: string };
 

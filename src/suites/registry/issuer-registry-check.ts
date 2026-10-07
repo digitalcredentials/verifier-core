@@ -3,6 +3,21 @@ import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
+import type {
+  RegistryCheckPayload,
+  RegistryLookupResult
+} from '../../types/registry.js';
+
+/**
+ * What the lookup found, as the outcome's payload. The message says the
+ * same thing in prose; this is the copy meant to be read by code.
+ */
+function payloadFor(result: RegistryLookupResult): RegistryCheckPayload {
+  return {
+    matches: result.matches,
+    uncheckedRegistries: result.uncheckedRegistries
+  };
+}
 
 /**
  * Extract issuer DID from credential.
@@ -44,6 +59,11 @@ function getIssuerDid(credential: Record<string, unknown>): string | undefined {
  *   and a `REGISTRY_UNCHECKED` problem follows naming the rest
  * - Every registry could not be checked (`REGISTRY_UNCHECKED` only, since
  *   no registry answered and "not registered" was never established)
+ *
+ * Whenever the lookup ran — on success and on both of those failures —
+ * the outcome carries a {@link RegistryCheckPayload}: the registries that
+ * matched, with what each knows about the issuer, and the registries that
+ * could not be checked. Read that rather than parsing the `message`.
  */
 export const issuerRegistryCheck: VerificationCheck = {
   id: 'registry.issuer',
@@ -101,25 +121,33 @@ export const issuerRegistryCheck: VerificationCheck = {
     try {
       const result = await lookupIssuers(issuerDid, context.registries);
 
+      // Names are for the message only; the payload carries the registries
+      // themselves, so a name containing ", " survives.
+      const matchingNames = result.matches.map(match => match.registry.name);
+      const uncheckedNames = result.uncheckedRegistries.map(
+        registry => registry.name
+      );
+
       if (result.found) {
         const message =
-          result.matchingRegistries.length === 1
-            ? `Issuer found in registry: ${result.matchingRegistries[0]}`
-            : `Issuer found in ${result.matchingRegistries.length} registries: ${result.matchingRegistries.join(', ')}`;
+          matchingNames.length === 1
+            ? `Issuer found in registry: ${matchingNames[0]}`
+            : `Issuer found in ${matchingNames.length} registries: ${matchingNames.join(', ')}`;
 
         // Include unchecked registries info if any
         const fullMessage =
-          result.uncheckedRegistries.length > 0
-            ? `${message}. ${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`
+          uncheckedNames.length > 0
+            ? `${message}. ${uncheckedNames.length} registries could not be checked: ${uncheckedNames.join(', ')}`
             : message;
 
         return {
           status: 'success',
-          message: fullMessage
+          message: fullMessage,
+          payload: payloadFor(result)
         };
       }
 
-      const uncheckedSummary = `${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`;
+      const uncheckedSummary = `${uncheckedNames.length} registries could not be checked: ${uncheckedNames.join(', ')}`;
 
       // Every registry is queried when nothing is found, so equal counts
       // mean no registry answered at all (an injected lookup reporting more
@@ -133,7 +161,8 @@ export const issuerRegistryCheck: VerificationCheck = {
               title: 'Registry Unchecked',
               detail: `Issuer registration could not be determined: ${uncheckedSummary}`
             }
-          ]
+          ],
+          payload: payloadFor(result)
         };
       }
 
@@ -153,7 +182,7 @@ export const issuerRegistryCheck: VerificationCheck = {
       ];
 
       // Add warning about unchecked registries
-      if (result.uncheckedRegistries.length > 0) {
+      if (uncheckedCount > 0) {
         problems.push({
           type: ProblemTypes.REGISTRY_UNCHECKED,
           title: 'Registry Unchecked',
@@ -163,7 +192,8 @@ export const issuerRegistryCheck: VerificationCheck = {
 
       return {
         status: 'failure',
-        problems
+        problems,
+        payload: payloadFor(result)
       };
     } catch (error) {
       // Error during registry lookup

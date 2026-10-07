@@ -60,12 +60,65 @@ export type EntityIdentityRegistry =
   | VcRecognitionEntityIdentityRegistry;
 
 /**
+ * A configured registry, as named in a lookup result or check payload.
+ *
+ * `url` is where the registry is read from: the list URL for `dcc-legacy`
+ * and `vc-recognition`, and the trust anchor's entity configuration
+ * (`trustAnchorEC`) for `oidf`.
+ */
+export interface RegistryReference {
+  name: string;
+  type: EntityIdentityRegistry['type'];
+  url?: string;
+}
+
+/**
+ * What a registry records about the issuer it matched.
+ *
+ * This is the registry's own description of the entity, not the
+ * credential's description of itself, so it is the display name to
+ * prefer: the credential cannot alter it.
+ *
+ * Only `dcc-legacy` populates this today; `oidf` and `vc-recognition`
+ * matches carry no entity yet.
+ */
+export interface RegistryEntity {
+  /** Organisation name as the registry records it. */
+  name?: string;
+  /** The entity's homepage, as the registry records it. */
+  url?: string;
+  /** URL of the entity's logo, as the registry records it. */
+  logo?: string;
+  /** The registry's entry for the entity, unmodified. */
+  raw?: unknown;
+}
+
+/** One registry that listed the issuer, with what that registry knows about it. */
+export interface RegistryMatch {
+  registry: RegistryReference;
+  entity?: RegistryEntity;
+}
+
+/**
+ * Payload of the `registry.issuer` check's outcome, on success and on
+ * failure — what the lookup found, as data. The check's `message` says
+ * the same thing as display text; read it, not parse it.
+ *
+ * A lookup stops at the first registry that matches unless it is run
+ * with `exhaustive`, so `matches` normally holds at most one entry.
+ */
+export interface RegistryCheckPayload {
+  /** The registries that listed the issuer, in configured order. */
+  matches: RegistryMatch[];
+  /** The registries that could not be reached or did not answer usefully. */
+  uncheckedRegistries: RegistryReference[];
+}
+
+/**
  * Normalized result of an issuer registry lookup (port output for `lookupIssuers`).
  */
-export interface RegistryLookupResult {
+export interface RegistryLookupResult extends RegistryCheckPayload {
   found: boolean;
-  matchingRegistries: string[];
-  uncheckedRegistries: string[];
 }
 
 /**
