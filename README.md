@@ -44,7 +44,7 @@ Verification runs an ordered pipeline of **suites**, each containing one or more
 
 | Suite           | Phase           | What it checks                                                                                                                                                                                                                                                                                                                         | Fatal?                         |
 | --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| **Core**        | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists                                                                                                                                                                                                                                          | Yes                            |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, VC structure, VP structure, credential ID valid, proof exists                                                                                                                                                                                                                        | Yes                            |
 | **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                             |
 | **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                                                                                                                                                                                                   | Yes                            |
 | **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No) |
@@ -172,12 +172,19 @@ interface VerifyCredentialOptions {
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
 
+  // Pipeline controls:
+  recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
+  phases?: SuitePhase[]; // Run only the suites tagged with these phases
+  verbose?: boolean; // Keep every check that ran in `results[]`
+  timing?: boolean; // Attach `timing` to every check, suite, and the result
+
   // Service overrides (otherwise sensible defaults are used):
   httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
   documentLoader?: DocumentLoader;
+  timeService?: TimeService; // See "Pluggable clock (`TimeService`)"
 }
 ```
 
@@ -538,12 +545,19 @@ interface VerifyPresentationOptions {
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
 
+  // Pipeline controls:
+  recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
+  phases?: SuitePhase[]; // Run only the suites tagged with these phases
+  verbose?: boolean; // Keep every check that ran in `results[]`
+  timing?: boolean; // Attach `timing` to every check, suite, and the result
+
   // Service overrides (otherwise sensible defaults are used):
   httpGetService?: HttpGetService; // See "Network policy of the built-in HTTP service"
   cacheService?: CacheService;
   cryptoServices?: CryptoService[];
   registryHandlers?: RegistryHandlerMap;
   documentLoader?: DocumentLoader;
+  timeService?: TimeService; // See "Pluggable clock (`TimeService`)"
 }
 ```
 
