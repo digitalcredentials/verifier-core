@@ -310,7 +310,7 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { suite, check, outcome, fatal?, timing? }
+CheckResult: { id, suite, check, outcome, fatal?, timing? }
 ```
 
 `timing` is opt-in: present on every `CheckResult`,

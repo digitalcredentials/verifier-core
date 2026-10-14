@@ -50,14 +50,33 @@ function mkSuite(
   return { id, name: id, checks, phase: options.phase };
 }
 
+/**
+ * Phase each fixture suite in this file is tagged with, so `mkResult`
+ * can stamp the same `id` the suite runner would have. `custom` is
+ * deliberately absent: it stands for an untagged suite.
+ */
+const FIXTURE_PHASES: Record<string, SuitePhase | undefined> = {
+  core: 'cryptographic',
+  proof: 'cryptographic',
+  status: 'cryptographic',
+  alpha: 'cryptographic',
+  registry: 'trust',
+  recognition: 'recognition',
+  extra: 'semantic',
+  mix: 'semantic',
+  beta: 'semantic'
+};
+
 function mkResult(
   suite: string,
   check: string,
   status: 'success' | 'failure' | 'skipped',
   options: { fatal?: boolean; reason?: string } = {}
 ): CheckResult {
+  const id = computeId(FIXTURE_PHASES[suite], suite, check);
   if (status === 'success') {
     return {
+      id,
       suite,
       check,
       outcome: { status: 'success', message: 'ok' },
@@ -66,6 +85,7 @@ function mkResult(
   }
   if (status === 'failure') {
     return {
+      id,
       suite,
       check,
       outcome: { status: 'failure', problems: [stubProblem] },
@@ -73,6 +93,7 @@ function mkResult(
     };
   }
   return {
+    id,
     suite,
     check,
     outcome: { status: 'skipped', reason: options.reason ?? 'n/a' }
@@ -115,7 +136,7 @@ describe('foldCheckResults', () => {
     ]);
     expect(summaries).toHaveLength(1);
     expect(summaries[0].status).toBe('success');
-    expect(summaries[0].verified).toBe(true);
+    expect(summaries[0].hasFailures).toBe(false);
     expect(summaries[0].counts).toEqual({
       passed: 4,
       failed: 0,
@@ -141,7 +162,7 @@ describe('foldCheckResults', () => {
 
     expect(results).toHaveLength(2);
     expect(summaries[0].status).toBe('failure');
-    expect(summaries[0].verified).toBe(false);
+    expect(summaries[0].hasFailures).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 2,
@@ -174,7 +195,7 @@ describe('foldCheckResults', () => {
     expect(results.filter(r => r.outcome.status === 'failure')).toHaveLength(1);
     expect(results[1].check).toBe('core.b');
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].verified).toBe(false);
+    expect(summaries[0].hasFailures).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 3,
       failed: 1,
@@ -198,7 +219,7 @@ describe('foldCheckResults', () => {
     expect(results).toHaveLength(1);
     expect(results[0].check).toBe('extra.applies');
     expect(summaries[0].status).toBe('skipped');
-    expect(summaries[0].verified).toBe(true);
+    expect(summaries[0].hasFailures).toBe(false);
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 0,
@@ -236,7 +257,7 @@ describe('foldCheckResults', () => {
       'proof.d'
     ]);
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].verified).toBe(false);
+    expect(summaries[0].hasFailures).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 1,
       failed: 1,
@@ -296,7 +317,7 @@ describe('foldCheckResults', () => {
         'proof not run: core.context-exists failed'
       );
       expect(summaries[1].status).toBe('skipped');
-      expect(summaries[1].verified).toBe(true);
+      expect(summaries[1].hasFailures).toBe(false);
       expect(summaries[1].counts).toEqual({
         passed: 0,
         failed: 0,

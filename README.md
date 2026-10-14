@@ -811,18 +811,22 @@ a `summary: SuiteSummary[]` rollup of per-suite outcomes alongside the full
 
 ```ts
 const result = await verifier.verifyCredential({ credential });
-// result.summary[i] = { id, phase, suite, status, verified, message, counts, ... }
+// result.summary[i] = { id, phase, suite, status, hasFailures, message, counts, ... }
 // result.results[]  = every check that ran, was skipped, or was not run,
-//                     each with .id populated
+//                     each with its .id
 
 // Detail rows for one summary entry — filter by status for just the failures.
 const failures = result.results.filter(
-  r => r.id?.startsWith(result.summary[0].id + '.') &&
+  r => r.id.startsWith(result.summary[0].id + '.') &&
        r.outcome.status === 'failure'
 );
 ```
 
 Render from `summary[]` and lazy-expand into `results[]`.
+
+Check ids and the built-in suites' `phase` tags are fixed for 2.x. An id
+embeds its suite's phase, so re-tagging a built-in suite would rename every
+check in it: changing either is a breaking change.
 
 See [`docs/api/verification-results.md`](./docs/api/verification-results.md) for
 the full reference (phase model, `SuiteSummary` fields, `id` namespace, UI

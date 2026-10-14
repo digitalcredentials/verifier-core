@@ -82,6 +82,7 @@ describe('Foundation types', () => {
   describe('CheckResult', () => {
     it('tags outcome with suite and check ids', () => {
       const result: CheckResult = {
+        id: 'cryptographic.core.proof-exists',
         check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' }
@@ -91,7 +92,7 @@ describe('Foundation types', () => {
       expect(result.outcome.status).toBe('success');
     });
 
-    it('accepts an optional namespaced id', () => {
+    it('requires a namespaced id', () => {
       const result: CheckResult = {
         id: 'cryptographic.core.proof-exists',
         check: 'core.proof-exists',
@@ -109,7 +110,7 @@ describe('Foundation types', () => {
         phase: 'cryptographic',
         suite: 'core',
         status: 'success',
-        verified: true,
+        hasFailures: false,
         message: '4 of 4 checks passed',
         counts: { passed: 4, failed: 0, skipped: 0 }
       };
@@ -123,7 +124,7 @@ describe('Foundation types', () => {
         phase: 'cryptographic',
         suite: 'proof',
         status: 'failure',
-        verified: false,
+        hasFailures: true,
         message: '1 of 3 checks failed (0 passed)',
         counts: { passed: 0, failed: 1, skipped: 0 },
         fatalFailureAt: 'proof.signature'
@@ -138,7 +139,7 @@ describe('Foundation types', () => {
         phase,
         suite: 'custom',
         status: 'success',
-        verified: true,
+        hasFailures: false,
         message: '1 of 1 checks passed',
         counts: { passed: 1, failed: 0, skipped: 0 }
       };
@@ -154,7 +155,7 @@ describe('Foundation types', () => {
         phase: 'recognition',
         suite: 'recognition',
         status: 'skipped',
-        verified: true,
+        hasFailures: false,
         message: 'no recognizer matched',
         counts: { passed: 0, failed: 0, skipped: 1 }
       };

@@ -463,14 +463,14 @@ describe('verifyPresentation', () => {
         true
       );
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => s.verified)).toBe(true);
+      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
 
       expect(result.credentialResults).toHaveLength(1);
       const cred = result.credentialResults[0];
       expect(cred.results.length).toBeGreaterThan(0);
       expect(cred.results.every(r => r.id !== undefined)).toBe(true);
       expect(cred.summary.length).toBeGreaterThan(0);
-      expect(cred.summary.every(s => s.verified)).toBe(true);
+      expect(cred.summary.every(s => !s.hasFailures)).toBe(true);
     });
   });
 
@@ -502,7 +502,7 @@ describe('verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => s.verified)).toBe(true);
+      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
     });
 
     it('passing credential summary is all green; failing credential surfaces a failure entry', async () => {
@@ -514,13 +514,13 @@ describe('verifyPresentation', () => {
       expect(passing).toBeDefined();
       expect(failing).toBeDefined();
 
-      expect(passing!.summary.every(s => s.verified)).toBe(true);
+      expect(passing!.summary.every(s => !s.hasFailures)).toBe(true);
       expect(passing!.results.length).toBeGreaterThan(0);
       expect(
         passing!.results.every(r => r.outcome.status !== 'failure')
       ).toBe(true);
 
-      const failureSummaries = failing!.summary.filter(s => !s.verified);
+      const failureSummaries = failing!.summary.filter(s => s.hasFailures);
       expect(failureSummaries.length).toBeGreaterThan(0);
       expect(
         failing!.results.filter(r => r.outcome.status === 'failure').length
@@ -532,12 +532,12 @@ describe('verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
       const failing = result.credentialResults.find(c => !c.verified)!;
-      const failingSummary = failing.summary.find(s => !s.verified)!;
+      const failingSummary = failing.summary.find(s => s.hasFailures)!;
       // `results[]` carries passes and skips too, so a prefix match
       // has to be narrowed by status to reach the failure detail.
       const detail = failing.results.filter(
         r =>
-          r.id?.startsWith(failingSummary.id + '.') &&
+          r.id.startsWith(failingSummary.id + '.') &&
           r.outcome.status === 'failure'
       );
       expect(detail.length).toBeGreaterThan(0);

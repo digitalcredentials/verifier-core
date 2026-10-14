@@ -64,8 +64,17 @@ export interface SuiteSummary {
    */
   status: 'success' | 'failure' | 'skipped' | 'mixed';
 
-  /** True iff no child check returned `'failure'`. */
-  verified: boolean;
+  /**
+   * True iff at least one child check returned `'failure'`,
+   * whether or not that check was fatal.
+   *
+   * Deliberately not called `verified`: the only `verified` in a
+   * result is the top-level one, which means "no fatal check
+   * failed" across the whole subject. A suite with a non-fatal
+   * failure has `hasFailures: true` inside a `verified: true`
+   * result, and that is not a contradiction.
+   */
+  hasFailures: boolean;
 
   /**
    * Human-readable rollup message. Conventions:

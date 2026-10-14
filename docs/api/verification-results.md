@@ -55,6 +55,10 @@ A successful single-credential verification:
       "suite": "status", "check": "status.bitstring",
       "outcome": { "status": "skipped",
                    "reason": "Credential has no credentialStatus." } },
+    { "id": "cryptographic.status.list-issuer",
+      "suite": "status", "check": "status.list-issuer",
+      "outcome": { "status": "skipped",
+                   "reason": "No status list was checked." } },
     { "id": "trust.registry.issuer",
       "suite": "registry", "check": "registry.issuer",
       "outcome": {
@@ -74,23 +78,23 @@ A successful single-credential verification:
   ],
   "summary": [
     { "id": "cryptographic.core",     "phase": "cryptographic",
-      "suite": "core",     "status": "success", "verified": true,
+      "suite": "core",     "status": "success", "hasFailures": false,
       "message": "5 of 5 checks passed",
       "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
     { "id": "recognition",            "phase": "recognition",
-      "suite": "recognition", "status": "skipped", "verified": true,
+      "suite": "recognition", "status": "skipped", "hasFailures": false,
       "message": "1 of 1 check skipped",
       "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
     { "id": "cryptographic.proof",    "phase": "cryptographic",
-      "suite": "proof",   "status": "success", "verified": true,
+      "suite": "proof",   "status": "success", "hasFailures": false,
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
     { "id": "cryptographic.status",   "phase": "cryptographic",
-      "suite": "status",  "status": "skipped", "verified": true,
-      "message": "1 of 1 check skipped",
-      "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
+      "suite": "status",  "status": "skipped", "hasFailures": false,
+      "message": "2 of 2 checks skipped",
+      "counts": { "passed": 0, "failed": 0, "skipped": 2 } },
     { "id": "trust.registry",         "phase": "trust",
-      "suite": "registry","status": "success", "verified": true,
+      "suite": "registry","status": "success", "hasFailures": false,
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
   ]
@@ -232,8 +236,12 @@ interface SuiteSummary {
   /** Suite id (matches VerificationSuite.id). */
   suite: string;
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-  /** Convenience: `status !== 'failure' && status !== 'mixed'`. */
-  verified: boolean;
+  /**
+   * True iff at least one check in this suite failed —
+   * `status === 'failure' || status === 'mixed'`. Deliberately not
+   * called `verified`: only the top-level `verified` is a verdict.
+   */
+  hasFailures: boolean;
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   /**
@@ -273,15 +281,27 @@ interface SuiteSummary {
 | `mixed`   | ⚠ | amber | Both passes and failures in the same suite |
 | `skipped` | — | gray  | Suite was acknowledged but produced no run checks |
 
-`verified === false` iff `status === 'failure' || status === 'mixed'`. A
+`hasFailures === true` iff `status === 'failure' || status === 'mixed'`.
+It is a per-suite fact, not a verdict: a non-fatal failure sets it on a
+suite inside a result whose top-level `verified` is still `true`. The
 top-level `result.verified` is the AND of every credential's
 `result.verified` AND no presentation-level fatal failures.
 
 ## `id` namespace reference
 
 Every `CheckResult` has an `id` of the form
-`<phase>.<suite>.<localPart>`. Every `SuiteSummary` has the matching
-`<phase>.<suite>` prefix (no trailing local part). Built-in ids:
+`<phase>.<suite>.<localPart>` — the suite runner sets it on every row
+it emits, so it is always there. Every `SuiteSummary` has the matching
+`<phase>.<suite>` prefix (no trailing local part).
+
+> **Stable for 2.x.** Check ids and the built-in suites' `phase` tags
+> are API. Because an id embeds its suite's phase, re-tagging a
+> built-in suite renames every check in it — so changing either a
+> check id or a built-in phase tag is a breaking change, not a
+> refactor.
+
+Every id the default suites, the parse-failure path and the
+`/openbadges` suites can produce:
 
 ```
 cryptographic.core
@@ -295,24 +315,36 @@ cryptographic.proof
   cryptographic.proof.signature
 cryptographic.status
   cryptographic.status.bitstring
+  cryptographic.status.list-issuer
 trust.registry
   trust.registry.issuer
 recognition
   recognition.profile
+cryptographic.parsing                           (parse failures only)
+  cryptographic.parsing.envelope
 semantic.openbadges                             (openBadgesSuite)
+  semantic.openbadges.applies
   semantic.openbadges.schema.obv3.result-ref
   semantic.openbadges.schema.obv3.achieved-level
   semantic.openbadges.schema.obv3.missing-result-status
   semantic.openbadges.schema.obv3.unknown-achievement-type
   semantic.openbadges.schema.obv3.json
 semantic.openbadges.semantic                    (openBadgesSemanticSuite)
+  semantic.openbadges.semantic.applies
   semantic.openbadges.semantic.schema.obv3.result-ref
   semantic.openbadges.semantic.schema.obv3.achieved-level
   semantic.openbadges.semantic.schema.obv3.missing-result-status
   semantic.openbadges.semantic.schema.obv3.unknown-achievement-type
 semantic.openbadges.schema                      (openBadgesSchemaSuite)
+  semantic.openbadges.schema.applies
   semantic.openbadges.schema.schema.obv3.json
 ```
+
+The three `*.applies` rows appear only when the suite was queued
+explicitly via `additionalSuites` and its predicate rejected the
+credential, or when that predicate threw; see rule 5 below. A suite
+supplied by a consumer without a `phase` tag produces ids beginning
+`unknown.` (e.g. `unknown.my-suite.my-check`).
 
 ### Computation rules
 
@@ -394,7 +426,7 @@ function failureDetail(
   failing: SuiteSummary,
 ) {
   return cr.results.filter(
-    r => r.id?.startsWith(failing.id + '.') && r.outcome.status === 'failure',
+    r => r.id.startsWith(failing.id + '.') && r.outcome.status === 'failure',
   );
 }
 
@@ -429,9 +461,11 @@ Lazy-expand them — most users only want the verdict + per-phase status.
 
 ## Backwards compatibility
 
-- **Deprecated.** `CheckResult.check` and `CheckResult.suite` are
-  marked `@deprecated`. Use `CheckResult.id` instead. Removal target:
-  the major after v2.0.0.
+- **Deprecated.** `CheckResult.check` is marked `@deprecated`. Use
+  `CheckResult.id` instead. Removal target: the major after v2.0.0.
+  `CheckResult.suite` is **not** deprecated: it is how rows are
+  grouped, it matches `SuiteSummary.suite`, and it cannot be
+  recovered from `id`, because a suite id may itself contain dots.
 - **`flattenPresentationResults`** is unchanged. Use it as the "give me
   one array of every check" escape hatch when you don't want to walk
   `credentialResults[].results`.
@@ -474,7 +508,7 @@ dcc-transaction-service UI implementation.
   ],
   "summary": [
     { "id": "cryptographic.proof", "phase": "cryptographic",
-      "suite": "proof", "status": "success", "verified": true,
+      "suite": "proof", "status": "success", "hasFailures": false,
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
   ],
@@ -495,19 +529,19 @@ dcc-transaction-service UI implementation.
       ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "verified": true,
+          "suite": "core",  "status": "success", "hasFailures": false,
           "message": "5 of 5 checks passed",
           "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
         { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "verified": true,
+          "suite": "recognition", "status": "success", "hasFailures": false,
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
         { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "verified": true,
+          "suite": "proof", "status": "success", "hasFailures": false,
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
         { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "success", "verified": true,
+          "suite": "registry", "status": "success", "hasFailures": false,
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
       ]
@@ -536,19 +570,19 @@ dcc-transaction-service UI implementation.
       ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "verified": true,
+          "suite": "core",  "status": "success", "hasFailures": false,
           "message": "5 of 5 checks passed",
           "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
         { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "verified": true,
+          "suite": "recognition", "status": "success", "hasFailures": false,
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
         { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "verified": true,
+          "suite": "proof", "status": "success", "hasFailures": false,
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
         { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "failure", "verified": false,
+          "suite": "registry", "status": "failure", "hasFailures": true,
           "message": "1 of 1 check failed",
           "counts": { "passed": 0, "failed": 1, "skipped": 0 } }
       ]
@@ -572,7 +606,7 @@ interface SuiteSummary {
   phase: SuiteSummaryPhase;
   suite: string;
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-  verified: boolean;
+  hasFailures: boolean;
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   fatalFailureAt?: string;
@@ -602,7 +636,7 @@ function failureDetail(
   failing: SuiteSummary,
 ) {
   return cr.results.filter(
-    r => r.id?.startsWith(failing.id + '.') && r.outcome.status === 'failure',
+    r => r.id.startsWith(failing.id + '.') && r.outcome.status === 'failure',
   );
 }
 ```

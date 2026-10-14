@@ -82,7 +82,8 @@ import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
 import { coreSuite } from './suites/core/index.js';
 import { proofSuite } from './suites/proof/index.js';
-import { computeId, foldCheckResults } from './fold-results.js';
+import { foldCheckResults } from './fold-results.js';
+import { computeId } from './compute-id.js';
 import {
   defaultHttpGetService,
   createDefaultCacheService,
@@ -176,8 +177,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       const recognized = extractRecognition(rawChecks);
 
-      populateCheckIds(rawChecks, suites);
-
       const folded = foldCheckResults(rawChecks, suites);
 
       const result: CredentialVerificationResult = {
@@ -245,8 +244,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         ctx,
         { explicitSuiteIds, phases: effectivePhases }
       );
-
-      populateCheckIds(rawPresentationChecks, presentationSuites);
 
       const foldedPresentation = foldCheckResults(
         rawPresentationChecks,
@@ -339,25 +336,6 @@ function hasFatalFailures(results: CheckResult[]): boolean {
 }
 
 /**
- * Populate `id` on every `CheckResult` using {@link computeId} so
- * `results[]` and `summary[]` both carry the dot-separated
- * namespace. Mutates each result in place; called after
- * `runSuites` returns and before {@link foldCheckResults}.
- */
-function populateCheckIds(
-  checks: CheckResult[],
-  suites: VerificationSuite[]
-): void {
-  const phaseBySuiteId = new Map<string, SuitePhase | undefined>();
-  for (const s of suites) {
-    phaseBySuiteId.set(s.id, s.phase);
-  }
-  for (const c of checks) {
-    c.id = computeId(phaseBySuiteId.get(c.suite), c.suite, c.check);
-  }
-}
-
-/**
  * Apply the auto-include rule for phase requests: if `'semantic'`
  * is requested without `'recognition'`, add `'recognition'` so
  * semantic checks have access to the normalized credential form
@@ -428,12 +406,12 @@ function parseErrorResult(
   timeService: TimeService | undefined
 ): CheckResult {
   const result: CheckResult = {
+    id: computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope'),
     suite: 'parsing',
     check: 'parsing.envelope',
     outcome: { status: 'failure', problems: [problem] },
     fatal: true
   };
-  result.id = computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope');
   if (timeService !== undefined) {
     // Parse failures short-circuit before any check runs, so the
     // synthetic `parsing.envelope` check is the only thing the
@@ -458,7 +436,7 @@ function parseErrorResult(
  * Build the one-entry `summary[]` that accompanies every
  * parse-error result. The single check is always a fatal failure,
  * so the summary always has `status: 'failure'`,
- * `verified: false`.
+ * `hasFailures: true`.
  *
  * `foldCheckResults` rolls per-check timing into the summary, so
  * the suite-level `timing` propagates here too when the call ran

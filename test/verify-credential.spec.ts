@@ -582,7 +582,7 @@ describe('verifyCredential', () => {
       });
 
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => s.verified)).toBe(true);
+      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
       const ids = new Set(result.summary.map(s => s.id));
       expect(ids).toContain('cryptographic.core');
       expect(ids).toContain('cryptographic.proof');
@@ -617,7 +617,7 @@ describe('verifyCredential', () => {
       ).toBe(true);
       const proofSummary = result.summary.find(s => s.suite === 'proof');
       expect(['failure', 'mixed']).toContain(proofSummary?.status);
-      expect(proofSummary?.verified).toBe(false);
+      expect(proofSummary?.hasFailures).toBe(true);
     });
 
     it('parse error: result has one summary entry tagged cryptographic.parsing', async () => {

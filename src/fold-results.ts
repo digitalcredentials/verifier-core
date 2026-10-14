@@ -27,9 +27,12 @@ import type {
   SuitePhase,
   VerificationSuite
 } from './types/check.js';
-import type { SuiteSummary, SuiteSummaryPhase } from './types/suite-summary.js';
+import type { SuiteSummary } from './types/suite-summary.js';
 import type { TaskTiming } from './types/timing.js';
 import { NOT_RUN_REASON_PREFIX } from './run-suites.js';
+import { computeId } from './compute-id.js';
+
+export { computeId };
 
 export function foldCheckResults(
   checks: CheckResult[],
@@ -50,39 +53,6 @@ export function foldCheckResults(
   }
 
   return { results: checks, summaries };
-}
-
-/**
- * Compute the dot-separated namespaced id for a single
- * `CheckResult` or `SuiteSummary`.
- *
- * Rules:
- *  - Strip the `<suite>.` prefix from `localCheckId` if present.
- *  - When `phase === suite`, collapse to a single segment.
- *  - When `phase` is missing, use `'unknown'`.
- *  - When `localCheckId` is empty (suite-summary case), drop the
- *    trailing segment.
- *
- * @example
- *   computeId('cryptographic', 'core', 'core.proof-exists')
- *     // → 'cryptographic.core.proof-exists'
- *   computeId('recognition', 'recognition', 'recognition.profile')
- *     // → 'recognition.profile'
- *   computeId('cryptographic', 'core', '')
- *     // → 'cryptographic.core'
- */
-export function computeId(
-  phase: SuitePhase | undefined,
-  suite: string,
-  localCheckId: string
-): string {
-  const phaseSeg: SuiteSummaryPhase = phase ?? 'unknown';
-  const localPart = localCheckId.startsWith(`${suite}.`)
-    ? localCheckId.slice(suite.length + 1)
-    : localCheckId;
-  const segments: string[] =
-    phaseSeg === suite ? [phaseSeg, localPart] : [phaseSeg, suite, localPart];
-  return segments.filter(Boolean).join('.');
 }
 
 // ----------------------------------------------------------------
@@ -140,12 +110,10 @@ function summarizeSuite(
   const fatalCheck = suiteChecks.find(
     c => c.fatal === true && c.outcome.status === 'failure'
   );
-  const fatalFailureAt = fatalCheck
-    ? (fatalCheck.id ?? computeId(phase, suiteId, fatalCheck.check))
-    : undefined;
+  const fatalFailureAt = fatalCheck?.id;
 
   const status = deriveStatus(counts);
-  const verified = counts.failed === 0;
+  const hasFailures = counts.failed > 0;
 
   const message = formatMessage(
     suiteId,
@@ -162,7 +130,7 @@ function summarizeSuite(
     phase: phase ?? 'unknown',
     suite: suiteId,
     status,
-    verified,
+    hasFailures,
     message,
     counts,
     ...(fatalFailureAt !== undefined ? { fatalFailureAt } : {}),

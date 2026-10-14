@@ -14,9 +14,18 @@ not run after a fatal failure.
   `@interop/ecdsa-multikey`. `defaultCryptoSuites()` now registers three suites:
   Ed25519Signature2020, EdDSA RDFC-2022, and ECDSA RDFC-2019.
 - `SuiteSummary` type and `summary: SuiteSummary[]` field on
-  `CredentialVerificationResult` and `PresentationVerificationResult`.
-- `id: string` field on `CheckResult` — dot-separated
-  `<phase>.<suite>.<localPart>` namespace.
+  `CredentialVerificationResult` and `PresentationVerificationResult`. Each
+  entry carries `hasFailures: boolean` — true when any check in that suite
+  failed. It is not called `verified`: only the top-level `verified` is a
+  verdict ("no fatal check failed"), and a non-fatal failure sets
+  `hasFailures` on a suite inside a result that is still `verified: true`.
+- Required `id: string` field on `CheckResult` — dot-separated
+  `<phase>.<suite>.<localPart>` namespace, set by the suite runner on every
+  row it emits (including not-run rows and synthetic `<suite>.applies`
+  rows), and by the parse-failure path on its one row. A suite with no
+  `phase` produces ids beginning `unknown.`. Check ids and the built-in
+  suites' phase tags are fixed for 2.x; since an id embeds its suite's
+  phase, changing either is a breaking change.
 - Pure `foldCheckResults` helper and `computeId` namespace builder, both
   exported from the package barrel.
 - New consumer doc at `docs/api/verification-results.md` covering the result
@@ -224,8 +233,10 @@ not run after a fatal failure.
 
 ### Deprecated
 
-- `CheckResult.check` and `CheckResult.suite` — use `CheckResult.id` instead.
-  Removal target: the next major.
+- `CheckResult.check` — use `CheckResult.id` instead. Removal target: the
+  next major. `CheckResult.suite` is **not** deprecated: it is how rows are
+  grouped, it matches `SuiteSummary.suite`, and it cannot be recovered from
+  `id`, because a suite id may itself contain dots.
 
 ### Removed
 
@@ -240,7 +251,7 @@ not run after a fatal failure.
 
 - To adopt the new shape: read `result.summary[]` for the per-suite rollup; read
   `result.results[]` for per-check detail; use
-  `r.id?.startsWith(summary.id + '.')` to find the detail rows under a summary
+  `r.id.startsWith(summary.id + '.')` to find the detail rows under a summary
   entry, narrowing by `r.outcome.status` when you want only the failures.
 - **Registry matches.** 1.x returned the registry's record of the issuer at the
   top level of the verification result, as `matchingIssuers[]`, each

@@ -84,6 +84,88 @@ describe('runSuites', () => {
     });
   });
 
+  describe('namespaced ids', () => {
+    it('stamps `<phase>.<suite>.<check>` on every row it writes', async () => {
+      const suite: VerificationSuite = {
+        id: 'core',
+        name: 'Core',
+        phase: 'cryptographic',
+        checks: [
+          createMockCheck('core.a', 'failure', { fatal: true }),
+          createMockCheck('core.b', 'success')
+        ]
+      };
+
+      const results = await runSuites(
+        [suite],
+        { verifiableCredential: {} },
+        mockContext
+      );
+
+      // The second row is the not-run row the fatal failure produced.
+      expect(results.map(r => r.id)).toEqual([
+        'cryptographic.core.a',
+        'cryptographic.core.b'
+      ]);
+    });
+
+    it('uses "unknown" as the phase segment for an untagged suite', async () => {
+      const suite: VerificationSuite = {
+        id: 'custom',
+        name: 'Custom',
+        checks: [createMockCheck('custom.x', 'success')]
+      };
+
+      const results = await runSuites(
+        [suite],
+        { verifiableCredential: {} },
+        mockContext
+      );
+
+      expect(results.map(r => r.id)).toEqual(['unknown.custom.x']);
+    });
+
+    it('stamps the synthetic `.applies` skip of an explicitly queued suite', async () => {
+      const suite: VerificationSuite = {
+        id: 'openbadges',
+        name: 'Open Badges',
+        phase: 'semantic',
+        applies: () => false,
+        checks: [createMockCheck('openbadges.x', 'success')]
+      };
+
+      const results = await runSuites(
+        [suite],
+        { verifiableCredential: {} },
+        mockContext,
+        { explicitSuiteIds: new Set(['openbadges']) }
+      );
+
+      expect(results.map(r => r.id)).toEqual(['semantic.openbadges.applies']);
+    });
+
+    it('stamps the `.applies` failure of a throwing predicate', async () => {
+      const suite: VerificationSuite = {
+        id: 'openbadges',
+        name: 'Open Badges',
+        phase: 'semantic',
+        applies: () => {
+          throw new Error('boom');
+        },
+        checks: [createMockCheck('openbadges.x', 'success')]
+      };
+
+      const results = await runSuites(
+        [suite],
+        { verifiableCredential: {} },
+        mockContext
+      );
+
+      expect(results.map(r => r.id)).toEqual(['semantic.openbadges.applies']);
+      expect(results[0].outcome.status).toBe('failure');
+    });
+  });
+
   // A check that records whether it executed.
   const spyCheck = (
     id: string,

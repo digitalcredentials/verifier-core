@@ -14,6 +14,9 @@
  * - A throw never escapes. A throwing `execute` or `applies` becomes a
  *   `failure` result carrying {@link ProblemTypes.CHECK_ERROR}, so
  *   `runSuites` always resolves.
+ * - Every row carries its namespaced `id` (see {@link computeId}),
+ *   including not-run rows and both kinds of synthetic `.applies`
+ *   row. Nothing downstream has to fill one in.
  *
  * This module is pure orchestration — it has no knowledge of what any
  * check actually does.
@@ -28,6 +31,7 @@ import {
 } from './types/check.js';
 import { VerificationContext } from './types/context.js';
 import { ProblemTypes } from './problem-types.js';
+import { computeId } from './compute-id.js';
 import { VerificationSubject } from './types/subject.js';
 import type { TimeService } from './services/time-service/time-service.js';
 import type { TaskTiming } from './types/timing.js';
@@ -150,7 +154,7 @@ export async function runSuites(
       } catch (error) {
         const fatal = suite.checks.some(c => c.fatal === true);
         results.push(
-          buildAppliesErrorResult(suite.id, error, fatal, timing, timeService)
+          buildAppliesErrorResult(suite, error, fatal, timing, timeService)
         );
         if (fatal && haltedBy === undefined) {
           haltedBy = `${suite.id}.applies`;
@@ -162,7 +166,7 @@ export async function runSuites(
     if (!applies) {
       if (options.explicitSuiteIds?.has(suite.id)) {
         results.push(
-          buildSyntheticAppliesSkipResult(suite.id, timing, timeService)
+          buildSyntheticAppliesSkipResult(suite, timing, timeService)
         );
       }
       continue;
@@ -175,7 +179,7 @@ export async function runSuites(
 
       if (haltedBy !== undefined) {
         results.push(
-          buildNotRunResult(suite.id, check, haltedBy, timing, timeService)
+          buildNotRunResult(suite, check, haltedBy, timing, timeService)
         );
         continue;
       }
@@ -192,6 +196,7 @@ export async function runSuites(
         : undefined;
 
       const result: CheckResult = {
+        id: computeId(suite.phase, suite.id, check.id),
         check: check.id,
         suite: suite.id,
         outcome,
@@ -236,16 +241,17 @@ function buildCheckErrorOutcome(id: string, error: unknown): CheckOutcome {
  * decision, like {@link buildSyntheticAppliesSkipResult}.
  */
 function buildAppliesErrorResult(
-  suiteId: string,
+  suite: VerificationSuite,
   error: unknown,
   fatal: boolean,
   timing: boolean,
   timeService: TimeService | undefined
 ): CheckResult {
-  const checkId = `${suiteId}.applies`;
+  const checkId = `${suite.id}.applies`;
   const result: CheckResult = {
+    id: computeId(suite.phase, suite.id, checkId),
     check: checkId,
-    suite: suiteId,
+    suite: suite.id,
     outcome: buildCheckErrorOutcome(checkId, error),
     fatal
   };
@@ -259,15 +265,16 @@ function buildAppliesErrorResult(
  * {@link buildSyntheticAppliesSkipResult}.
  */
 function buildNotRunResult(
-  suiteId: string,
+  suite: VerificationSuite,
   check: VerificationCheck,
   haltedBy: string,
   timing: boolean,
   timeService: TimeService | undefined
 ): CheckResult {
   const result: CheckResult = {
+    id: computeId(suite.phase, suite.id, check.id),
     check: check.id,
-    suite: suiteId,
+    suite: suite.id,
     outcome: {
       status: 'skipped',
       reason: `${NOT_RUN_REASON_PREFIX}${haltedBy} failed`
@@ -287,13 +294,15 @@ function buildNotRunResult(
  * the predicate itself.
  */
 function buildSyntheticAppliesSkipResult(
-  suiteId: string,
+  suite: VerificationSuite,
   timing: boolean,
   timeService: TimeService | undefined
 ): CheckResult {
+  const checkId = `${suite.id}.applies`;
   const result: CheckResult = {
-    check: `${suiteId}.applies`,
-    suite: suiteId,
+    id: computeId(suite.phase, suite.id, checkId),
+    check: checkId,
+    suite: suite.id,
     outcome: {
       status: 'skipped',
       reason: 'suite predicate returned false'

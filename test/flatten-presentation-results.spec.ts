@@ -10,6 +10,7 @@ import type { VerifiablePresentation } from '../src/schemas/presentation.js';
 
 function mkCheck(suite: string, checkId: string): CheckResult {
   return {
+    id: `cryptographic.${suite}.${checkId}`,
     suite,
     check: checkId,
     outcome: { status: 'success', message: 'ok' }
