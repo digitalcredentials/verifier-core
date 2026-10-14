@@ -80,8 +80,7 @@ describe('Registry Suite', () => {
         httpGetService: FakeHttpGetService({}),
         cacheService: InMemoryCacheService(),
         cryptoServices: [FakeCryptoService({ verified: true })],
-        registries: testRegistries,
-        verbose: true
+        registries: testRegistries
       });
       const result = await verifier.verifyCredential({
         credential: CredentialFactory({ version: 'v2', credential: {} }),
@@ -341,8 +340,7 @@ describe('Registry Suite', () => {
         }),
         cacheService: InMemoryCacheService(),
         cryptoServices: [FakeCryptoService({ verified: true })],
-        registries: testRegistries,
-        verbose: true
+        registries: testRegistries
       });
       const result = await verifier.verifyCredential({
         credential: CredentialFactory({ version: 'v2', credential: {} })
@@ -465,8 +463,7 @@ describe('Registry Suite', () => {
         }),
         cacheService,
         cryptoServices: [FakeCryptoService({ verified: true })],
-        registries: testRegistries,
-        verbose: true
+        registries: testRegistries
       });
       const result = await verifier.verifyCredential({
         credential: CredentialFactory({ version: 'v2', credential: {} })

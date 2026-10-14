@@ -1,12 +1,12 @@
 # Verification results
 
 > Consumer reference for `CredentialVerificationResult` and
-> `PresentationVerificationResult`. Covers result folding (default since
-> v2.0.0), the `id` namespace, the `SuiteSummary` rollup, the verbose
-> escape hatch, and a UI rendering recipe.
+> `PresentationVerificationResult`. Covers the `results[]` array, the
+> `id` namespace, the `SuiteSummary` rollup (new in v2.0.0), and a UI
+> rendering recipe.
 >
 > **Audience.** UI/integration teams building on top of `verifier-core`,
-> primarily `dcc-transaction-service`. The §9 prompt-ready appendix is
+> primarily `dcc-transaction-service`. The §8 prompt-ready appendix is
 > written to be copy-pasted as the seed of an LLM prompt.
 >
 > **See also.** For per-check / per-suite / per-call timing data
@@ -14,32 +14,69 @@
 
 ## Table of Contents
 
-1. [Overview — folded vs verbose](#overview)
+1. [Overview](#overview)
    - [Check payloads](#check-payloads)
 2. [Presentation vs credential scopes](#presentation-vs-credential-scopes)
 3. [Phase model](#phase-model)
 4. [`SuiteSummary` reference](#suitesummary-reference)
 5. [`id` namespace reference](#id-namespace-reference)
 6. [UI rendering recipe](#ui-rendering-recipe)
-7. [Verbose mode](#verbose-mode)
-8. [Backwards compatibility](#backwards-compatibility)
-9. [Prompt-ready appendix](#prompt-ready-appendix)
+7. [Backwards compatibility](#backwards-compatibility)
+8. [Prompt-ready appendix](#prompt-ready-appendix)
 
 ## Overview
 
-A successful single-credential verification, **folded** (the default
-since v2.0.0):
+`results[]` carries **every** check: the ones that passed, the ones that
+were skipped (with the reason), and the ones that were not run because an
+earlier fatal failure halted the pipeline. `summary[]`, new in v2.0.0, is
+the per-suite rollup over those rows.
+
+A successful single-credential verification:
 
 ```jsonc
 {
   "verified": true,
   "verifiableCredential": { "...parsed credential..." },
-  "results": [],                      // empty: no failures, no explicit skips
+  "results": [
+    { "id": "cryptographic.core.context-exists",
+      "suite": "core", "check": "core.context-exists",
+      "outcome": { "status": "success", "message": "..." },
+      "fatal": true },
+    { "id": "cryptographic.core.vc-context",      /* success */ },
+    { "id": "cryptographic.core.vc-structure",    /* success */ },
+    { "id": "cryptographic.core.credential-id",   /* success */ },
+    { "id": "cryptographic.core.proof-exists",    /* success */ },
+    { "id": "recognition.profile",
+      "suite": "recognition", "check": "recognition.profile",
+      "outcome": { "status": "skipped",
+                   "reason": "no recognizer matched" } },
+    { "id": "cryptographic.proof.signature",      /* success */ },
+    { "id": "cryptographic.status.bitstring",
+      "suite": "status", "check": "status.bitstring",
+      "outcome": { "status": "skipped",
+                   "reason": "Credential has no credentialStatus." } },
+    { "id": "trust.registry.issuer",
+      "suite": "registry", "check": "registry.issuer",
+      "outcome": {
+        "status": "success",
+        "message": "Issuer found in registry: DCC Sandbox Registry",
+        "payload": {
+          "matches": [
+            { "registry": { "name": "DCC Sandbox Registry", "type": "dcc-legacy",
+                            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json" },
+              "entity": { "name": "Example University", "url": "https://example.edu",
+                          "raw": { "name": "Example University", "url": "https://example.edu" } } }
+          ],
+          "uncheckedRegistries": []
+        }
+      },
+      "fatal": false }
+  ],
   "summary": [
     { "id": "cryptographic.core",     "phase": "cryptographic",
       "suite": "core",     "status": "success", "verified": true,
-      "message": "4 of 4 checks passed",
-      "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
+      "message": "5 of 5 checks passed",
+      "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
     { "id": "recognition",            "phase": "recognition",
       "suite": "recognition", "status": "skipped", "verified": true,
       "message": "1 of 1 check skipped",
@@ -60,44 +97,9 @@ since v2.0.0):
 }
 ```
 
-The same verification with `verbose: true`:
-
-```jsonc
-{
-  "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
-  "results": [
-    { "id": "cryptographic.core.context-exists",
-      "suite": "core", "check": "core.context-exists",
-      "outcome": { "status": "success", "message": "..." },
-      "fatal": true },
-    { "id": "cryptographic.core.vc-context",      /* ... */ },
-    { "id": "cryptographic.core.vc-structure",    /* ... */ },
-    { "id": "cryptographic.core.credential-id",   /* ... */ },
-    { "id": "cryptographic.core.proof-exists",    /* ... */ },
-    { "id": "recognition.profile",                /* skipped: no recognizers configured */ },
-    { "id": "cryptographic.proof.signature",      /* ... */ },
-    { "id": "cryptographic.status.bitstring",     /* skipped: no credentialStatus */ },
-    { "id": "trust.registry.issuer",
-      "suite": "registry", "check": "registry.issuer",
-      "outcome": {
-        "status": "success",
-        "message": "Issuer found in registry: DCC Sandbox Registry",
-        "payload": {
-          "matches": [
-            { "registry": { "name": "DCC Sandbox Registry", "type": "dcc-legacy",
-                            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json" },
-              "entity": { "name": "Example University", "url": "https://example.edu",
-                          "raw": { "name": "Example University", "url": "https://example.edu" } } }
-          ],
-          "uncheckedRegistries": []
-        }
-      },
-      "fatal": false }
-  ],
-  "summary": [ /* identical to the folded summary above */ ]
-}
-```
+Render from `summary[]` and lazy-expand into `results[]`: the rollup is
+one row per suite, which is the shape a UI wants, and the detail rows are
+there whenever a user asks for them.
 
 ### Check payloads
 
@@ -125,10 +127,9 @@ verified, on a cache hit as well as on a fresh fetch. Note that an OIDF
 link to it, so `entity.logo` can be large, and it is cached along with the
 rest of the lookup.
 
-Because folding drops successes from `results`, a consumer that wants the
-payload of a check that *passed* needs `verbose: true`. A failing
-`registry.issuer` appears in the folded `results` with its payload either
-way.
+The payload rides on the `registry.issuer` row in `results[]` whether the
+check passed or failed, so a consumer reading registry matches does not
+have to treat the two cases differently.
 
 ## Presentation vs credential scopes
 
@@ -340,9 +341,10 @@ package barrel) builds these strings. Rules:
 
 Two consequences worth remembering when consuming:
 
-- **A failing summary's children always start with `summary.id + '.'`.**
-  Filter `cr.results` with that prefix to find the failure detail rows
-  for a given summary entry. (See §6 step 3.)
+- **A summary's children always start with `summary.id + '.'`.**
+  Filter `cr.results` with that prefix to find the detail rows for a
+  given summary entry; narrow by `outcome.status` when you want only the
+  failures, since passes and skips share the prefix. (See §6 step 3.)
 - **Suite ids do not need to match phases.** The OB suites all live
   under phase `'semantic'`, but their checks still carry their
   authored ids (e.g. `schema.obv3.result-ref`), so the resulting ids
@@ -350,9 +352,6 @@ Two consequences worth remembering when consuming:
   prefix-stable.
 
 ## UI rendering recipe
-
-Reproduces the layout described in
-[`docs/plans/2026-04-18-suite-result-folding/00-ui-use-case.md`](../plans/2026-04-18-suite-result-folding/00-ui-use-case.md).
 
 ```ts
 import type {
@@ -387,12 +386,16 @@ function groupByPhase(cr: CredentialVerificationResult) {
   return groups;
 }
 
-// 3. For a failing phase row, find detail (the failure CheckResult entries)
+// 3. For a failing phase row, find detail (the failure CheckResult entries).
+//    `results[]` holds passes and skips under the same prefix, so filter
+//    by status as well.
 function failureDetail(
   cr: CredentialVerificationResult,
   failing: SuiteSummary,
 ) {
-  return cr.results.filter(r => r.id?.startsWith(failing.id + '.'));
+  return cr.results.filter(
+    r => r.id?.startsWith(failing.id + '.') && r.outcome.status === 'failure',
+  );
 }
 
 // 4. Recognized profile label (from the recognition pipeline)
@@ -424,47 +427,18 @@ Presentation: ✗ (1 of 2 credentials verified)
 The `└─` rows under each failing phase row come from `failureDetail()`.
 Lazy-expand them — most users only want the verdict + per-phase status.
 
-## Verbose mode
-
-`verbose: true` restores the pre-v2.0.0 result shape on `results[]`
-(every check that ran is included, with `id` populated). `summary[]`
-is unchanged.
-
-| Where | Wins |
-|-------|------|
-| `createVerifier({ verbose: true })` | Instance default |
-| `verifier.verifyCredential({ credential, verbose: true })` | Per-call (overrides instance default) |
-| `verifyCredential({ credential, verbose: true })` | Standalone wrapper |
-| `verifier.verifyPresentation({ presentation, verbose: true })` | VP and every embedded VC inherit the flag |
-
-When to use it:
-
-- Triage of an unexpected `verified: false` outcome — see exactly
-  which checks ran and what they returned.
-- Persisted audit dumps where the full check sequence is part of the
-  record.
-- Debugger / browser dev-tools snapshots while wiring a new UI.
-
-When _not_ to use it:
-
-- Production happy-path responses. The folded shape is dramatically
-  smaller and exactly what a UI needs.
-
 ## Backwards compatibility
 
 - **Deprecated.** `CheckResult.check` and `CheckResult.suite` are
   marked `@deprecated`. Use `CheckResult.id` instead. Removal target:
   the major after v2.0.0.
-- **`flattenPresentationResults`** is unchanged. In folded mode the
-  array it returns is naturally smaller (failures + explicit skips
-  only). Use it as the "give me one array of every relevant check"
-  escape hatch when you don't want to walk
+- **`flattenPresentationResults`** is unchanged. Use it as the "give me
+  one array of every check" escape hatch when you don't want to walk
   `credentialResults[].results`.
 - **Migration recipe for code that filtered/found by `check` or
-  `suite`:**
-  - Easiest: pass `verbose: true` and keep your existing assertions.
-  - Cleanest: switch to `id` and prefix-matching against the summary
-    rollup. See §6 step 3 for the canonical pattern.
+  `suite`:** switch to `id` and prefix-matching against the summary
+  rollup, narrowing by `outcome.status`. See §6 step 3 for the
+  canonical pattern.
 
 ## Prompt-ready appendix
 
@@ -475,25 +449,29 @@ dcc-transaction-service UI implementation.
 > component that renders a presentation verification result. Group
 > per-credential summaries by phase
 > (`cryptographic` → `trust` → `recognition` → `semantic` → `unknown`).
-> Show failure detail rows (from `results[]` filtered by `id` prefix)
-> under the failing phase row, lazy-expanded.
+> Show failure detail rows (from `results[]` filtered by `id` prefix
+> **and** `outcome.status === 'failure'`) under the failing phase row,
+> lazy-expanded.
 >
 > The result is the return value of
 > `verifier.verifyPresentation({ presentation })` from
-> `@digitalcredentials/verifier-core` (v2.0.0+). The folded result
-> shape is the default; `results[]` carries only failures and
-> explicit `<suite>.applies` skips. Pass `verbose: true` to get
-> every check.
+> `@digitalcredentials/verifier-core` (v2.0.0+). `results[]` carries
+> every check — passes, skips with a reason, and rows not run after a
+> fatal failure — so a row's `outcome.status` is what distinguishes
+> them.
 
 ---
 
-**Folded JSON example.**
+**JSON example.**
 
 ```jsonc
 {
   "verified": false,
   "verifiablePresentation": { /* parsed VP */ },
-  "presentationResults": [],
+  "presentationResults": [
+    { "id": "cryptographic.core.vp-structure",  /* success */ },
+    { "id": "cryptographic.proof.signature",    /* success */ }
+  ],
   "summary": [
     { "id": "cryptographic.proof", "phase": "cryptographic",
       "suite": "proof", "status": "success", "verified": true,
@@ -505,12 +483,21 @@ dcc-transaction-service UI implementation.
       "verified": true,
       "verifiableCredential": { /* good VC */ },
       "recognizedProfile": "obv3p0.openbadge",
-      "results": [],
+      "results": [
+        { "id": "cryptographic.core.context-exists",  /* success */ },
+        { "id": "cryptographic.core.vc-context",      /* success */ },
+        { "id": "cryptographic.core.vc-structure",    /* success */ },
+        { "id": "cryptographic.core.credential-id",   /* success */ },
+        { "id": "cryptographic.core.proof-exists",    /* success */ },
+        { "id": "recognition.profile",                /* success */ },
+        { "id": "cryptographic.proof.signature",      /* success */ },
+        { "id": "trust.registry.issuer",              /* success */ }
+      ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
           "suite": "core",  "status": "success", "verified": true,
-          "message": "4 of 4 checks passed",
-          "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
+          "message": "5 of 5 checks passed",
+          "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
         { "id": "recognition", "phase": "recognition",
           "suite": "recognition", "status": "success", "verified": true,
           "message": "1 of 1 check passed",
@@ -530,6 +517,13 @@ dcc-transaction-service UI implementation.
       "verifiableCredential": { /* bad VC */ },
       "recognizedProfile": "obv3p0.openbadge",
       "results": [
+        { "id": "cryptographic.core.context-exists",  /* success */ },
+        { "id": "cryptographic.core.vc-context",      /* success */ },
+        { "id": "cryptographic.core.vc-structure",    /* success */ },
+        { "id": "cryptographic.core.credential-id",   /* success */ },
+        { "id": "cryptographic.core.proof-exists",    /* success */ },
+        { "id": "recognition.profile",                /* success */ },
+        { "id": "cryptographic.proof.signature",      /* success */ },
         { "id": "trust.registry.issuer",
           "suite": "registry", "check": "registry.issuer",
           "outcome": { "status": "failure", "problems": [
@@ -543,8 +537,8 @@ dcc-transaction-service UI implementation.
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
           "suite": "core",  "status": "success", "verified": true,
-          "message": "4 of 4 checks passed",
-          "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
+          "message": "5 of 5 checks passed",
+          "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
         { "id": "recognition", "phase": "recognition",
           "suite": "recognition", "status": "success", "verified": true,
           "message": "1 of 1 check passed",
@@ -607,7 +601,9 @@ function failureDetail(
   cr: CredentialVerificationResult,
   failing: SuiteSummary,
 ) {
-  return cr.results.filter(r => r.id?.startsWith(failing.id + '.'));
+  return cr.results.filter(
+    r => r.id?.startsWith(failing.id + '.') && r.outcome.status === 'failure',
+  );
 }
 ```
 

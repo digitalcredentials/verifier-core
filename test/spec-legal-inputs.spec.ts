@@ -132,8 +132,7 @@ describe('spec-legal inputs verify end to end', () => {
   const verifier = (http = offlineHttp()) =>
     createVerifier({
       httpGetService: http.service,
-      documentLoader,
-      verbose: true
+      documentLoader
     });
 
   beforeAll(async () => {
@@ -424,8 +423,7 @@ describe('spec-legal inputs verify end to end', () => {
       const result = await createVerifier({
         httpGetService: offlineHttp().service,
         documentLoader,
-        cryptoServices: [FakeCryptoService({ verified: true })],
-        verbose: true
+        cryptoServices: [FakeCryptoService({ verified: true })]
       }).verifyPresentation({ presentation, unsignedPresentation: true });
 
       expect(
@@ -479,8 +477,7 @@ describe('structure failures halt verification', () => {
 
     const result = await createVerifier({
       httpGetService: http.service,
-      documentLoader: bundledLoader,
-      verbose: true
+      documentLoader: bundledLoader
     }).verifyCredential({ credential });
 
     expect(result.verified).toBe(false);
@@ -523,8 +520,7 @@ describe('structure failures halt verification', () => {
 
     const result = await createVerifier({
       httpGetService: http.service,
-      documentLoader: bundledLoader,
-      verbose: true
+      documentLoader: bundledLoader
     }).verifyPresentation({ presentation, challenge: CHALLENGE });
 
     expect(result.verified).toBe(false);

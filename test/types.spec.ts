@@ -185,20 +185,20 @@ describe('Foundation types', () => {
     });
   });
 
-  describe('verbose flag', () => {
-    it('is accepted on VerifierConfig and per-call args', () => {
-      const config: VerifierConfig = { verbose: true };
-      const credCall: VerifyCredentialCall = {
-        credential: {},
-        verbose: false
-      };
-      const presCall: VerifyPresentationCall = {
-        presentation: {},
+  describe('verbose option (removed)', () => {
+    it('is rejected by the config and the per-call arg types', () => {
+      const config: VerifierConfig = { phases: ['cryptographic'] };
+      const credCall: VerifyCredentialCall = { credential: {} };
+      const presCall: VerifyPresentationCall = { presentation: {} };
+      expect(config.phases).toEqual(['cryptographic']);
+      expect(credCall.credential).toEqual({});
+      expect(presCall.presentation).toEqual({});
+
+      const verifier = publicApi.createVerifier({
+        // @ts-expect-error every check is always returned; the option is gone.
         verbose: true
-      };
-      expect(config.verbose).toBe(true);
-      expect(credCall.verbose).toBe(false);
-      expect(presCall.verbose).toBe(true);
+      });
+      expect(typeof verifier.verifyCredential).toBe('function');
     });
   });
 

@@ -27,12 +27,11 @@ import { v1Expired } from './fixtures/v1-expired.js';
 import { v2Expired } from './fixtures/v2-expired.js';
 import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
 
-// ests in this file ensure spec completion by inspecting every check in
-// `result.results`. Use a verbose verifier to enable these checks; folded-mode
-// coverage lives in `describe('folded vs verbose shape', …)` below.
+// Tests in this file ensure spec completion by inspecting every check in
+// `result.results`, which always carries every check that ran, was skipped
+// or was not run.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('verifyCredential', () => {
@@ -329,7 +328,7 @@ describe('verifyCredential', () => {
 
       // Default crypto services: their `canVerify` rejects an unsigned
       // credential, which used to surface as a second, misleading failure.
-      const result = await verifyCredential({ credential, verbose: true });
+      const result = await verifyCredential({ credential });
 
       expect(result.verified).toBe(false);
       const proofExists = result.results.find(
@@ -367,7 +366,7 @@ describe('verifyCredential', () => {
         credential: { id: 'not-a-valid-url' }
       });
 
-      const result = await verifyCredential({ credential, verbose: true });
+      const result = await verifyCredential({ credential });
 
       const core = result.summary.find(s => s.suite === 'core');
       expect(core?.message).toBe(
@@ -559,17 +558,29 @@ describe('verifyCredential', () => {
     });
   });
 
-  describe('folded vs verbose shape', () => {
+  describe('result shape', () => {
     const cryptoOnly = {
       cryptoServices: [FakeCryptoService({ verified: true })]
     };
 
-    it('default (verbose unset): folds successes; results[] has only failures + explicit skips', async () => {
+    it('default options: results[] carries passes and reasoned skips alike', async () => {
       const credential = CredentialFactory({ version: 'v1', credential: {} });
       const result = await verifyCredential({ credential, ...cryptoOnly });
 
       expect(result.verified).toBe(true);
-      expect(result.results).toEqual([]);
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results.every(r => r.id !== undefined)).toBe(true);
+
+      // A credential with no `credentialStatus`: the signature passed and
+      // the bitstring check was skipped, and both say so.
+      const signature = result.results.find(r => r.check === 'proof.signature');
+      expect(signature?.outcome.status).toBe('success');
+      const bitstring = result.results.find(r => r.check === 'status.bitstring');
+      expect(bitstring?.outcome).toEqual({
+        status: 'skipped',
+        reason: 'Credential has no credentialStatus.'
+      });
+
       expect(result.summary.length).toBeGreaterThan(0);
       expect(result.summary.every(s => s.verified)).toBe(true);
       const ids = new Set(result.summary.map(s => s.id));
@@ -577,27 +588,18 @@ describe('verifyCredential', () => {
       expect(ids).toContain('cryptographic.proof');
     });
 
-    it('verbose: true: results[] carries every check, summary[] identical to folded mode', async () => {
+    it('default options: an unmatched recognizer leaves a skipped recognition row', async () => {
       const credential = CredentialFactory({ version: 'v1', credential: {} });
-      const folded = await verifyCredential({ credential, ...cryptoOnly });
-      const verbose = await verifyCredential({
-        credential,
-        ...cryptoOnly,
-        verbose: true
-      });
+      const result = await verifyCredential({ credential, ...cryptoOnly });
 
-      expect(verbose.results.length).toBeGreaterThan(0);
-      expect(verbose.results.every(r => r.id !== undefined)).toBe(true);
-      expect(verbose.summary.map(s => s.id)).toEqual(
-        folded.summary.map(s => s.id)
+      const recognition = result.results.find(
+        r => r.check === 'recognition.profile'
       );
-      expect(verbose.summary.map(s => s.status)).toEqual(
-        folded.summary.map(s => s.status)
-      );
-      expect(verbose.verified).toBe(folded.verified);
+      expect(recognition?.outcome.status).toBe('skipped');
+      expect(result.recognizedProfile).toBeUndefined();
     });
 
-    it('failure path (folded): results[] surfaces just the proof failure; summary marks proof as failure', async () => {
+    it('failure path: results[] carries the proof failure alongside the passes', async () => {
       const credential = CredentialFactory({ version: 'v1', credential: {} });
       const result = await verifyCredential({
         credential,
@@ -605,9 +607,14 @@ describe('verifyCredential', () => {
       });
 
       expect(result.verified).toBe(false);
-      expect(result.results.every(r => r.outcome.status === 'failure')).toBe(
-        true
+      const failures = result.results.filter(
+        r => r.outcome.status === 'failure'
       );
+      expect(failures.length).toBeGreaterThan(0);
+      expect(failures.every(r => r.suite === 'proof')).toBe(true);
+      expect(
+        result.results.some(r => r.outcome.status === 'success')
+      ).toBe(true);
       const proofSummary = result.summary.find(s => s.suite === 'proof');
       expect(['failure', 'mixed']).toContain(proofSummary?.status);
       expect(proofSummary?.verified).toBe(false);
@@ -667,7 +674,7 @@ describe('verifyCredential', () => {
         { [STATUS_LIST_URL]: statusListE5Fixture },
         { fallback: defaultDocumentLoaderFor(defaultHttpGetService()) }
       );
-      const verifier = createVerifier({ verbose: true, documentLoader });
+      const verifier = createVerifier({ documentLoader });
       const result = await verifier.verifyCredential({
         credential: v2WithValidStatus
       });

@@ -187,8 +187,7 @@ describe('verification method errors (signed offline)', () => {
   const verifier = () =>
     createVerifier({
       httpGetService: offlineHttpGetService,
-      documentLoader: bundledLoader,
-      verbose: true
+      documentLoader: bundledLoader
     });
 
   it('reports an issuer that is not the verification method controller as VERIFICATION_METHOD_ERROR', async () => {

@@ -19,12 +19,8 @@ import { obv3p0Recognizer } from '../src/openbadges/recognizers.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 import { sampleAchievementCredential } from './openbadges/fixtures/sample-achievement-credential.js';
 
-// Verbose verifier so the `recognition.profile` check is visible
-// in `results[]` regardless of outcome (folded mode hides
-// successes / non-applies skips).
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('verifier recognition pipeline', () => {

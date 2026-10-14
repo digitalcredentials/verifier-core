@@ -108,7 +108,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const constructorRegistries = config.registries;
   const recognizers = config.recognizers ?? [];
   const constructorPhases = config.phases;
-  const constructorVerbose = config.verbose;
   const constructorTiming = config.timing;
   const timeService: TimeService = config.timeService ?? RealTimeService();
 
@@ -179,8 +178,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       populateCheckIds(rawChecks, suites);
 
-      const verbose = call.verbose ?? constructorVerbose ?? false;
-      const folded = foldCheckResults(rawChecks, suites, { verbose });
+      const folded = foldCheckResults(rawChecks, suites);
 
       const result: CredentialVerificationResult = {
         verified: !hasFatalFailures(rawChecks),
@@ -250,11 +248,9 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       populateCheckIds(rawPresentationChecks, presentationSuites);
 
-      const verbose = call.verbose ?? constructorVerbose ?? false;
       const foldedPresentation = foldCheckResults(
         rawPresentationChecks,
-        presentationSuites,
-        { verbose }
+        presentationSuites
       );
 
       const credentials = extractCredentialsFrom(presentation);
@@ -267,7 +263,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
               additionalSuites: call.additionalSuites,
               registries: call.registries,
               phases: call.phases,
-              verbose,
               // Propagate explicitly so embedded credentials inherit
               // the presentation-level decision; otherwise the
               // recursive call would re-evaluate from
@@ -345,9 +340,9 @@ function hasFatalFailures(results: CheckResult[]): boolean {
 
 /**
  * Populate `id` on every `CheckResult` using {@link computeId} so
- * folded summaries and verbose-mode consumers both see the
- * dot-separated namespace. Mutates each result in place; called
- * after `runSuites` returns and before {@link foldCheckResults}.
+ * `results[]` and `summary[]` both carry the dot-separated
+ * namespace. Mutates each result in place; called after
+ * `runSuites` returns and before {@link foldCheckResults}.
  */
 function populateCheckIds(
   checks: CheckResult[],
@@ -410,7 +405,7 @@ function extractRecognition(
 
 /**
  * Synthetic suite definition used solely so the parse-error
- * `CheckResult` folds into a meaningful `SuiteSummary`. Tagged
+ * `CheckResult` rolls up into a meaningful `SuiteSummary`. Tagged
  * `'cryptographic'` so UI sections that group by phase show
  * structural failures alongside other foundational checks.
  */
@@ -463,16 +458,14 @@ function parseErrorResult(
  * Build the one-entry `summary[]` that accompanies every
  * parse-error result. The single check is always a fatal failure,
  * so the summary always has `status: 'failure'`,
- * `verified: false`. We surface the parse error in `results[]`
- * regardless of `verbose` (a parse error is unusable without it).
+ * `verified: false`.
  *
- * Folds in `verbose: true` so the parse-error check survives;
  * `foldCheckResults` rolls per-check timing into the summary, so
  * the suite-level `timing` propagates here too when the call ran
  * with `timing: true`.
  */
 function parseErrorSummary(check: CheckResult): SuiteSummary[] {
-  const folded = foldCheckResults([check], [PARSING_SUITE], { verbose: true });
+  const folded = foldCheckResults([check], [PARSING_SUITE]);
   return folded.summaries;
 }
 

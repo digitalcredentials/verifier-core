@@ -211,8 +211,7 @@ describe('status list cryptosuite parity', () => {
     return createVerifier({
       httpGetService: offlineHttpGetService,
       documentLoader,
-      cryptoServices,
-      verbose: true
+      cryptoServices
     });
   }
 

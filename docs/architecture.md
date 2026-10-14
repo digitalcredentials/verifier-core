@@ -326,9 +326,9 @@ break when the flag is left at its default (`false`). See
 - **`fatal`** on a check means a failure halts every remaining check for the subject, in that
   suite and in all later suites: once the subject is known to be invalid, later checks would
   only report misleading follow-on failures or do needless network I/O. Each check that would
-  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`
-  (visible with `verbose: true`), so the report stays complete. Suites that would not have run
-  anyway (phase filter, `applies` false) stay silent.
+  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`,
+  so the report stays complete. Suites that would not have run anyway (phase filter, `applies`
+  false) stay silent.
 - **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
   `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
   yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
@@ -617,14 +617,13 @@ over it.
 }
 ```
 
-### Result folding
+### Per-suite summaries
 
-Since v2.0.0, `results[]` (on both result types, and on each embedded `credentialResults[i]`)
-carries only failures and explicit `<suite>.applies` skips by default; the per-suite rollup lives in
-`summary[]`. Pass `verbose: true` (on the verifier or per call) to restore the legacy "every check"
-shape on `results[]`. The folding itself is implemented as a pure helper — `foldCheckResults` /
-`computeId` in `src/fold-results.ts` — and is also exported from the package barrel for consumers
-that append late results and want to re-fold.
+`results[]` (on both result types, and on each embedded `credentialResults[i]`) carries every
+check that ran, was skipped, or was not run after a fatal failure. Since v2.0.0 it is accompanied
+by `summary[]`, a per-suite rollup. The rollup is computed by a pure helper — `foldCheckResults` /
+`computeId` in `src/fold-results.ts` — which is also exported from the package barrel for consumers
+that append late results and want to recompute their summaries.
 
 See [`docs/api/verification-results.md`](api/verification-results.md) for the full reference,
 including the `id` namespace, rendering recipes, and the LLM prompt appendix for downstream UIs.

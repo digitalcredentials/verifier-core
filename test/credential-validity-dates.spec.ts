@@ -120,8 +120,7 @@ describe('credential validity dates', () => {
   const verifier = () =>
     createVerifier({
       httpGetService: offlineHttpGetService,
-      documentLoader: bundledLoader,
-      verbose: true
+      documentLoader: bundledLoader
     });
 
   it('reports a v2 credential whose validFrom is in the future as CREDENTIAL_NOT_YET_VALID', async () => {
@@ -168,8 +167,7 @@ describe('credential validity dates', () => {
       // v2Expired is valid from 2010-01-01 until 2011-01-01.
       timeService: FakeTimeService({
         baseDateMs: Date.parse('2010-06-01T00:00:00Z')
-      }),
-      verbose: true
+      })
     });
 
     const result = await withinV2Validity.verifyCredential({
@@ -190,8 +188,7 @@ describe('credential validity dates', () => {
       // 2025-01-09.
       timeService: FakeTimeService({
         baseDateMs: Date.parse('2025-01-09T16:00:00Z')
-      }),
-      verbose: true
+      })
     });
 
     const result = await withinV1Validity.verifyCredential({

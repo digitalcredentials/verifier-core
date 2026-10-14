@@ -67,11 +67,8 @@ function cloneCredential(): Record<string, unknown> {
   return structuredClone(sampleAchievementCredential);
 }
 
-// Verbose verifier so OB check ids surface in `results[]`
-// regardless of outcome; folded mode hides successes.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {

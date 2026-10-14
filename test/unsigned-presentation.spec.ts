@@ -76,8 +76,7 @@ describe('unsignedPresentation with the default crypto service', () => {
   const verify = (presentation: unknown, unsignedPresentation?: boolean) =>
     createVerifier({
       httpGetService: offlineHttpGetService as never,
-      documentLoader,
-      verbose: true
+      documentLoader
     }).verifyPresentation({
       presentation,
       challenge: CHALLENGE,

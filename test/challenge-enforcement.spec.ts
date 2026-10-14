@@ -89,8 +89,7 @@ describe('challenge enforcement with the default crypto service', () => {
   ) =>
     createVerifier({
       httpGetService: offlineHttpGetService as never,
-      documentLoader,
-      verbose: true
+      documentLoader
     }).verifyPresentation({
       presentation,
       ...options,

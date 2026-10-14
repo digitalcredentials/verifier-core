@@ -17,12 +17,10 @@ import { FakeDocumentLoader } from './factories/services/fake-document-loader.js
 import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
 
 // Existing tests in this file inspect every check in
-// `result.results` / `result.presentationResults`. Use a verbose
-// verifier to keep those assertions valid; folded-mode coverage
-// lives in `describe('folded vs verbose shape', …)` below.
+// `result.results` / `result.presentationResults`, both of which
+// always carry every check that ran, was skipped or was not run.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('verifyPresentation', () => {
@@ -450,39 +448,29 @@ describe('verifyPresentation', () => {
     });
   });
 
-  describe('folded vs verbose shape', () => {
+  describe('result shape', () => {
     const cryptoOnly = {
       cryptoServices: [FakeCryptoService({ verified: true })]
     };
 
-    it('default folded happy path: every credential summary green; results[] empty', async () => {
+    it('default happy path: every summary green, every check present', async () => {
       const presentation = PresentationFactory();
       const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
       expect(result.verified).toBe(true);
-      expect(result.presentationResults).toEqual([]);
+      expect(result.presentationResults.length).toBeGreaterThan(0);
+      expect(result.presentationResults.every(r => r.id !== undefined)).toBe(
+        true
+      );
       expect(result.summary.length).toBeGreaterThan(0);
       expect(result.summary.every(s => s.verified)).toBe(true);
 
       expect(result.credentialResults).toHaveLength(1);
       const cred = result.credentialResults[0];
-      expect(cred.results).toEqual([]);
-      expect(cred.summary.length).toBeGreaterThan(0);
-      expect(cred.summary.every(s => s.verified)).toBe(true);
-    });
-
-    it('verbose: presentation propagates verbose to embedded credentials', async () => {
-      const presentation = PresentationFactory();
-      const result = await verifyPresentation({
-        presentation,
-        ...cryptoOnly,
-        verbose: true
-      });
-
-      expect(result.presentationResults.length).toBeGreaterThan(0);
-      const cred = result.credentialResults[0];
       expect(cred.results.length).toBeGreaterThan(0);
       expect(cred.results.every(r => r.id !== undefined)).toBe(true);
+      expect(cred.summary.length).toBeGreaterThan(0);
+      expect(cred.summary.every(s => s.verified)).toBe(true);
     });
   });
 
@@ -527,14 +515,16 @@ describe('verifyPresentation', () => {
       expect(failing).toBeDefined();
 
       expect(passing!.summary.every(s => s.verified)).toBe(true);
-      expect(passing!.results).toEqual([]);
+      expect(passing!.results.length).toBeGreaterThan(0);
+      expect(
+        passing!.results.every(r => r.outcome.status !== 'failure')
+      ).toBe(true);
 
       const failureSummaries = failing!.summary.filter(s => !s.verified);
       expect(failureSummaries.length).toBeGreaterThan(0);
-      expect(failing!.results.length).toBeGreaterThan(0);
-      expect(failing!.results.every(r => r.outcome.status === 'failure')).toBe(
-        true
-      );
+      expect(
+        failing!.results.filter(r => r.outcome.status === 'failure').length
+      ).toBeGreaterThan(0);
     });
 
     it('failure detail rows can be located by id prefix from a failing summary entry', async () => {
@@ -543,39 +533,28 @@ describe('verifyPresentation', () => {
 
       const failing = result.credentialResults.find(c => !c.verified)!;
       const failingSummary = failing.summary.find(s => !s.verified)!;
-      const detail = failing.results.filter(r =>
-        r.id?.startsWith(failingSummary.id + '.')
+      // `results[]` carries passes and skips too, so a prefix match
+      // has to be narrowed by status to reach the failure detail.
+      const detail = failing.results.filter(
+        r =>
+          r.id?.startsWith(failingSummary.id + '.') &&
+          r.outcome.status === 'failure'
       );
       expect(detail.length).toBeGreaterThan(0);
-      expect(detail.every(r => r.outcome.status === 'failure')).toBe(true);
     });
 
-    it('verbose mode preserves all checks; summary[] identical to folded mode', async () => {
+    it('the failing credential keeps its not-run rows', async () => {
       const presentation = buildMixedResultPresentation();
-      const folded = await verifyPresentation({ presentation, ...cryptoOnly });
-      const verbose = await verifyPresentation({
-        presentation,
-        ...cryptoOnly,
-        verbose: true
-      });
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
-      expect(verbose.verified).toBe(folded.verified);
-      expect(verbose.summary.map(s => s.id)).toEqual(
-        folded.summary.map(s => s.id)
+      const failing = result.credentialResults.find(c => !c.verified)!;
+      const notRun = failing.results.filter(
+        r =>
+          r.outcome.status === 'skipped' &&
+          r.outcome.reason.startsWith('Not run: ')
       );
-      expect(verbose.summary.map(s => s.status)).toEqual(
-        folded.summary.map(s => s.status)
-      );
-
-      for (let i = 0; i < verbose.credentialResults.length; i++) {
-        const v = verbose.credentialResults[i];
-        const f = folded.credentialResults[i];
-        expect(v.summary.map(s => s.id)).toEqual(f.summary.map(s => s.id));
-        expect(v.summary.map(s => s.status)).toEqual(
-          f.summary.map(s => s.status)
-        );
-        expect(v.results.length).toBeGreaterThanOrEqual(f.results.length);
-      }
+      expect(notRun.length).toBeGreaterThan(0);
+      expect(notRun.some(r => r.check === 'proof.signature')).toBe(true);
     });
   });
 
@@ -620,7 +599,6 @@ describe('verifyPresentation', () => {
         { fallback: defaultDocumentLoaderFor(defaultHttpGetService()) }
       );
       const verifier = createVerifier({
-        verbose: true,
         documentLoader,
         cryptoServices: [
           FakeCryptoService({

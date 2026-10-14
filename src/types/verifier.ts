@@ -99,22 +99,6 @@ export interface VerifierConfig {
   phases?: SuitePhase[];
 
   /**
-   * Default verbosity for every call on this verifier. Per-call
-   * `verbose` overrides this.
-   *
-   * - `false` (default) — `results[]` / `presentationResults[]`
-   *   carries only failures and explicitly-emitted skips; the
-   *   per-suite rollup lives in `summary[]`. Recommended for
-   *   production / UI consumption.
-   * - `true` — `results[]` carries every check that ran (the
-   *   pre-folding shape). Useful for debugging and for tests
-   *   asserting on individual check outcomes.
-   *
-   * `summary[]` is populated either way.
-   */
-  verbose?: boolean;
-
-  /**
    * Default timing instrumentation flag for every call on this
    * verifier. Per-call `timing` overrides this.
    *
@@ -123,11 +107,6 @@ export interface VerifierConfig {
    *  - `true` — every `CheckResult` carries `timing`, every
    *    `SuiteSummary` carries a rolled-up `timing`, and the
    *    top-level result carries an inclusive `timing`.
-   *
-   * Pairs naturally with `verbose: true` so per-check timings
-   * survive into `results[]`. With `verbose: false` (default)
-   * the suite-level `timing` on `summary[]` is preserved by
-   * `foldCheckResults`, so suite-grain timing is never lost.
    *
    * @see ../../docs/api/timing.md
    */
@@ -172,11 +151,6 @@ export interface VerifyCredentialCall {
   phases?: SuitePhase[];
 
   /**
-   * Per-call override of {@link VerifierConfig.verbose}.
-   */
-  verbose?: boolean;
-
-  /**
    * Per-call override of {@link VerifierConfig.timing}.
    */
   timing?: boolean;
@@ -215,9 +189,6 @@ export interface VerifyPresentationCall {
 
   /** Override the constructor's `phases` for this single call. See {@link VerifierConfig.phases}. */
   phases?: SuitePhase[];
-
-  /** Per-call override of {@link VerifierConfig.verbose}. */
-  verbose?: boolean;
 
   /** Per-call override of {@link VerifierConfig.timing}. */
   timing?: boolean;

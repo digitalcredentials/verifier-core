@@ -86,10 +86,7 @@ describe('Verifier cache sharing', () => {
       httpGetService: http,
       cacheService: InMemoryCacheService(),
       cryptoServices: [FakeCryptoService({ verified: true })],
-      registries: [dccLegacyRegistry],
-      // Verbose so the registry success surfaces in `results[]` for
-      // the sanity assertion below; folded mode would hide it.
-      verbose: true
+      registries: [dccLegacyRegistry]
     });
 
     const first = await verifier.verifyCredential({
@@ -266,8 +263,7 @@ describe('Verifier cache sharing', () => {
     ) => {
       const result = await verifier.verifyCredential({
         credential: makeBadge(id),
-        additionalSuites: [openBadgesSchemaSuite],
-        verbose: true
+        additionalSuites: [openBadgesSchemaSuite]
       });
       // Sanity: the schema check ran and passed, so the count below is
       // about caching rather than a check that never got that far.

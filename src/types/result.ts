@@ -43,21 +43,18 @@ export interface CredentialVerificationResult {
   recognizedProfile?: string;
 
   /**
-   * Flat array of check results.
-   *
-   * In the default (`verbose: false`) mode this carries only
-   * failures and explicitly-emitted skips — successes are folded
-   * away into the per-suite rollup on {@link summary}. Pass
-   * `verbose: true` on `VerifierConfig` (or per-call) to receive
-   * every check that ran.
+   * Flat array of check results: every check that ran, every
+   * check that was skipped (with its reason), and every check
+   * that was not run because an earlier fatal failure halted the
+   * pipeline (reason starting `Not run: `). A check that passed
+   * and a check that never ran are therefore distinguishable.
    */
   results: CheckResult[];
 
   /**
-   * Per-suite rollup of every (phase, suite) that ran. Always
-   * populated regardless of `verbose`. Primary surface for UI
-   * rendering; lazy-expand into {@link results} for failure
-   * detail. See {@link SuiteSummary}.
+   * Per-suite rollup of every (phase, suite) that ran. Primary
+   * surface for UI rendering; lazy-expand into {@link results}
+   * for per-check detail. See {@link SuiteSummary}.
    */
   summary: SuiteSummary[];
 
@@ -100,7 +97,7 @@ export interface PresentationVerificationResult {
 
   /**
    * Check results from presentation-level verification (VP
-   * signature). Honors the `verbose` flag the same way
+   * signature). Carries every check, the same way
    * {@link CredentialVerificationResult.results} does.
    */
   presentationResults: CheckResult[];
@@ -112,7 +109,7 @@ export interface PresentationVerificationResult {
    * Per-suite rollup of presentation-level checks (i.e. the
    * suites that produced {@link presentationResults}). Per-credential
    * rollups live on each {@link credentialResults} entry's own
-   * `summary`. Always populated regardless of `verbose`.
+   * `summary`.
    */
   summary: SuiteSummary[];
 

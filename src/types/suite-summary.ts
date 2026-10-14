@@ -2,10 +2,9 @@
  * Suite-level rollup of one or more `CheckResult`s.
  *
  * One `SuiteSummary` per (phase, suite) that ran is emitted on
- * every result, regardless of whether the verifier was called in
- * `verbose: true` or `verbose: false` (default) mode. The summary
- * is the primary surface for UI rendering: one row per suite, with
- * a human-readable `message` and `counts` already rolled up.
+ * every result. The summary is the primary surface for UI
+ * rendering: one row per suite, with a human-readable `message`
+ * and `counts` already rolled up.
  *
  * Computed by `foldCheckResults` (see `src/fold-results.ts`) from
  * the raw `CheckResult[]` returned by `runSuites`.
@@ -32,15 +31,15 @@ export type SuiteSummaryPhase = SuitePhase | 'unknown';
 
 /**
  * Suite-level rollup of one or more `CheckResult`s. One entry per
- * (phase, suite) that ran; always emitted regardless of `verbose`.
+ * (phase, suite) that ran.
  *
  * UIs should render primarily from `summary[]` and lazy-expand
- * into `results[]` for failure detail.
+ * into `results[]` for per-check detail.
  */
 export interface SuiteSummary {
   /**
    * Dot-separated namespace identifying this suite within the
-   * folded result set; e.g. `"cryptographic.core"`,
+   * result set; e.g. `"cryptographic.core"`,
    * `"semantic.openbadges"`. When `phase === suite` (the
    * `recognition` suite is the canonical example), the duplicate
    * segment collapses to a single `"recognition"`.
@@ -105,9 +104,7 @@ export interface SuiteSummary {
    *    `endedAt - startedAt`, which would also include any
    *    inter-check gap).
    *
-   * Survives result folding: even when `verbose: false` hides
-   * individual check details, this rollup is computed before
-   * checks are folded away. See {@link TaskTiming}.
+   * See {@link TaskTiming}.
    */
   timing?: TaskTiming;
 }

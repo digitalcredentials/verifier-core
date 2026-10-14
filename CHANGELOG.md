@@ -2,10 +2,9 @@
 
 ## 2.0.0 - Month XX 2026
 
-Verifier results now fold per-suite checks into a single
-`summary: SuiteSummary[]` rollup; `results[]` carries only failures and explicit
-`<suite>.applies` skips by default. The full check list remains available via
-`verbose: true` on the verifier or per call.
+Verifier results now carry a per-suite `summary: SuiteSummary[]` rollup
+alongside `results[]`, which lists every check that ran, was skipped, or was
+not run after a fatal failure.
 
 ### Added
 
@@ -18,21 +17,18 @@ Verifier results now fold per-suite checks into a single
   `CredentialVerificationResult` and `PresentationVerificationResult`.
 - `id: string` field on `CheckResult` — dot-separated
   `<phase>.<suite>.<localPart>` namespace.
-- `verbose?: boolean` on `VerifierConfig`, `VerifyCredentialCall`,
-  `VerifyPresentationCall` (per-call wins over instance default;
-  `verifyPresentation` propagates the flag to embedded credentials).
 - Pure `foldCheckResults` helper and `computeId` namespace builder, both
   exported from the package barrel.
-- New consumer doc at `docs/api/verification-results.md` covering the folded
+- New consumer doc at `docs/api/verification-results.md` covering the result
   shape, the `id` namespace, a UI rendering recipe, and a prompt-ready appendix
   for downstream UIs.
 - `timing?: boolean` flag on `VerifierConfig`, `VerifyCredentialCall`, and
   `VerifyPresentationCall`. When true, every `CheckResult`, every
   `SuiteSummary`, and every top-level
   `Credential|PresentationVerificationResult` carries a `timing: TaskTiming`
-  field describing wall-clock start/end and monotonic duration. Mirrors the
-  `verbose` flag's plumbing; per-call wins; propagates from `verifyPresentation`
-  into embedded `verifyCredential` calls. See `docs/api/timing.md`.
+  field describing wall-clock start/end and monotonic duration. Per-call wins
+  over the instance default; propagates from `verifyPresentation` into embedded
+  `verifyCredential` calls. See `docs/api/timing.md`.
 - `TaskTiming` interface (`startedAt`, `endedAt`, `durationMs`, optional
   recursive `events`). The reserved `events` field is forward-compatible with
   future sub-event capture from inside a single check.
@@ -87,10 +83,10 @@ Verifier results now fold per-suite checks into a single
 
 ### Changed
 
-- **Default `results[]` shape**: failures + explicit `<suite>.applies` skips
-  only. Pass `verbose: true` to restore the prior shape.
-- `flattenPresentationResults` semantically unchanged; in folded mode the
-  returned array is naturally smaller.
+- **`results[]` shape**: every check that ran, was skipped (with its reason),
+  or was not run after a fatal failure (reason starting `Not run: `). A check
+  that passed and a check that never ran are now distinguishable.
+- `flattenPresentationResults` semantically unchanged.
 - **Status list credential proofs** are verified through the `cryptoServices`
   configured on `createVerifier`, not through a second, non-injectable suite
   list. Consumers who inject custom `CryptoService`s now get them applied to
@@ -242,12 +238,10 @@ Verifier results now fold per-suite checks into a single
 
 ### Migration
 
-- To restore the prior result shape with no other changes: pass `verbose: true`
-  on the verifier or per call.
 - To adopt the new shape: read `result.summary[]` for the per-suite rollup; read
-  `result.results[]` for failure detail; use
-  `r.id?.startsWith(summary.id + '.')` to find detail rows under a failing
-  summary entry.
+  `result.results[]` for per-check detail; use
+  `r.id?.startsWith(summary.id + '.')` to find the detail rows under a summary
+  entry, narrowing by `r.outcome.status` when you want only the failures.
 - **Registry matches.** 1.x returned the registry's record of the issuer at the
   top level of the verification result, as `matchingIssuers[]`, each
   `{ issuer: { federation_entity: { organization_name, homepage_uri, logo_uri?,
@@ -268,9 +262,8 @@ Verifier results now fold per-suite checks into a single
   The whole registry entry is also available, unmodified, as `entity.raw`:
   for `oidf` that is the verified subordinate statement's whole `metadata`,
   which is where 1.x read `issuer` from. `dcc-legacy` and `oidf` registries
-  populate `entity`; `vc-recognition` does not yet. Because folding drops
-  successes from `results[]`, reading the payload of a *passing*
-  `registry.issuer` needs `verbose: true`.
+  populate `entity`; `vc-recognition` does not yet. The payload is on the
+  `registry.issuer` row in `results[]` whether the check passed or failed.
 - **Reading registry names out of the message.** Code that parsed the
   `registry.issuer` message — "Issuer found in registry: A. 1 registries could
   not be checked: B" — should read `payload.matches[].registry.name` and

@@ -23,8 +23,7 @@ describe('timing instrumentation (acceptance)', () => {
   it('happy path: default RealTimeService, timing: true populates every level and rollups hold', async () => {
     const verifier = createVerifier({
       cryptoServices: [FakeCryptoService({ verified: true })],
-      timing: true,
-      verbose: true
+      timing: true
     });
     const presentation = PresentationFactory({
       verifiableCredential: [
@@ -82,8 +81,7 @@ describe('timing instrumentation (acceptance)', () => {
 
   it('default (timing: false): no timing field appears anywhere in the result tree', async () => {
     const verifier = createVerifier({
-      cryptoServices: [FakeCryptoService({ verified: true })],
-      verbose: true
+      cryptoServices: [FakeCryptoService({ verified: true })]
     });
     const presentation = PresentationFactory({
       verifiableCredential: [CredentialFactory({ credential: {} })]

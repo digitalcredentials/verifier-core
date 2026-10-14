@@ -42,12 +42,9 @@ import { sampleAchievementCredential } from './openbadges/fixtures/sample-achiev
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 
 // Phase-filter integration tests inspect every suite that ran via
-// `result.results.map(r => r.suite)`. Use a verbose verifier so
-// successful suites still appear in `results[]`; folded mode would
-// hide them.
+// `result.results.map(r => r.suite)`.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 const fakeCtx: VerificationContext = {

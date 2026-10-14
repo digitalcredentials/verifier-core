@@ -13,7 +13,7 @@
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
   - [Network policy of the built-in HTTP service](#network-policy-of-the-built-in-http-service)
 - [Custom Suites](#custom-suites)
-- [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
+- [Per-suite summaries](#per-suite-summaries)
 - [Capturing timing data](#capturing-timing-data)
 - [Pluggable clock (TimeService)](#pluggable-clock-timeservice)
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
@@ -175,7 +175,6 @@ interface VerifyCredentialOptions {
   // Pipeline controls:
   recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
   phases?: SuitePhase[]; // Run only the suites tagged with these phases
-  verbose?: boolean; // Keep every check that ran in `results[]`
   timing?: boolean; // Attach `timing` to every check, suite, and the result
 
   // Service overrides (otherwise sensible defaults are used):
@@ -207,11 +206,10 @@ interface CredentialVerificationResult {
 }
 ```
 
-`verified` is `true` when no check returned a failure. By default (since v2.0.0)
-`results` carries only failures and explicit `<suite>.applies` skips, while
-`summary` provides the per-suite rollup (see
-[Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)). Pass
-`verbose: true` to receive every check that ran in `results`.
+`verified` is `true` when no check returned a failure. `results` carries every
+check — the ones that passed, the ones that were skipped (with a reason), and
+the ones that were not run after a fatal failure — while `summary` provides the
+per-suite rollup (see [Per-suite summaries](#per-suite-summaries)).
 
 Each `CheckResult` contains a discriminated `CheckOutcome`:
 
@@ -245,6 +243,7 @@ interface ProblemDetail {
     { "suite": "core",   "check": "core.vc-structure",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
     { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
+    { "suite": "recognition", "check": "recognition.profile", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
     { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
     { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
@@ -277,8 +276,8 @@ interface ProblemDetail {
 
 An invalid signature is fatal — it means any part of the credential could have
 been tampered with, so every later check for the credential, in any suite, is
-halted. With `verbose: true`, each check that would have run appears as
-`skipped` with reason `Not run: <check-id> failed`.
+halted. Each check that would have run appears as `skipped` with reason
+`Not run: <check-id> failed`.
 
 ```json
 {
@@ -291,8 +290,28 @@ halted. With `verbose: true`, each check that would have run appears as
     },
     {
       "suite": "core",
+      "check": "core.vc-context",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.vc-structure",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.credential-id",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
       "check": "core.proof-exists",
       "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "recognition",
+      "check": "recognition.profile",
+      "outcome": { "status": "skipped", "reason": "no recognizer matched" }
     },
     {
       "suite": "proof",
@@ -360,6 +379,31 @@ not fetched, and the check's message or skip reason names them.
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "suite": "core",
+      "check": "core.vc-context",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.vc-structure",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.credential-id",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "core",
+      "check": "core.proof-exists",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "suite": "recognition",
+      "check": "recognition.profile",
+      "outcome": { "status": "skipped", "reason": "no recognizer matched" }
+    },
+    {
       "suite": "proof",
       "check": "proof.signature",
       "outcome": {
@@ -384,6 +428,14 @@ not fetched, and the check's message or skip reason names them.
     {
       "suite": "status",
       "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: status.bitstring failed"
+      }
+    },
+    {
+      "suite": "registry",
+      "check": "registry.issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: status.bitstring failed"
@@ -548,7 +600,6 @@ interface VerifyPresentationOptions {
   // Pipeline controls:
   recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
   phases?: SuitePhase[]; // Run only the suites tagged with these phases
-  verbose?: boolean; // Keep every check that ran in `results[]`
   timing?: boolean; // Attach `timing` to every check, suite, and the result
 
   // Service overrides (otherwise sensible defaults are used):
@@ -580,7 +631,8 @@ interface PresentationVerificationResult {
 ```
 
 `presentationResults` and each embedded `credentialResults[i].results` follow
-the same folded-by-default shape as `verifyCredential`'s `results`. The
+the same shape as `verifyCredential`'s `results`: every check that ran, was
+skipped, or was not run after a fatal failure. The
 top-level `summary` rolls up the VP envelope's own suites; per-credential
 rollups live on `credentialResults[i].summary`.
 
@@ -751,24 +803,26 @@ const result = await verifyCredential({
 Custom suites run after the default suites. Each check receives the same
 `VerificationSubject` and `VerificationContext` as built-in checks.
 
-## Verbose mode and folded summaries
+## Per-suite summaries
 
 Each `CredentialVerificationResult` and `PresentationVerificationResult` carries
-a `summary: SuiteSummary[]` rollup of per-suite outcomes. By default (since
-v2.0.0), `results[]` carries only failures and explicit `<suite>.applies` skips;
-pass `verbose: true` to keep every check in `results[]`.
+a `summary: SuiteSummary[]` rollup of per-suite outcomes alongside the full
+`results[]` list.
 
 ```ts
 const result = await verifier.verifyCredential({ credential });
 // result.summary[i] = { id, phase, suite, status, verified, message, counts, ... }
-// result.results[]  = failures + explicit skips only
+// result.results[]  = every check that ran, was skipped, or was not run,
+//                     each with .id populated
 
-const verbose = await verifier.verifyCredential({ credential, verbose: true });
-// verbose.results[] carries every check that ran, with .id populated.
+// Detail rows for one summary entry — filter by status for just the failures.
+const failures = result.results.filter(
+  r => r.id?.startsWith(result.summary[0].id + '.') &&
+       r.outcome.status === 'failure'
+);
 ```
 
-`verbose` is also accepted on `createVerifier(...)` as an instance default;
-per-call values win when both are set.
+Render from `summary[]` and lazy-expand into `results[]`.
 
 See [`docs/api/verification-results.md`](./docs/api/verification-results.md) for
 the full reference (phase model, `SuiteSummary` fields, `id` namespace, UI
@@ -778,10 +832,10 @@ rendering recipe, and a prompt-ready appendix for downstream UIs).
 
 Every result can carry per-check, per-suite, and per-call `TaskTiming` data
 (wall-clock `startedAt` / `endedAt` plus a monotonic `durationMs`). Off by
-default; opt in via `timing: true` on `createVerifier(...)` or per-call. Mirrors
-`verbose`'s plumbing — per-call wins, and `verifyPresentation` propagates the
-flag into embedded `verifyCredential` calls so the top-level `result.timing` is
-an inclusive wrapper.
+default; opt in via `timing: true` on `createVerifier(...)` or per-call.
+Per-call wins, and `verifyPresentation` propagates the flag into embedded
+`verifyCredential` calls so the top-level `result.timing` is an inclusive
+wrapper.
 
 ```ts
 const verifier = createVerifier({ timing: true });
@@ -790,9 +844,8 @@ console.log(result.timing!.durationMs);
 console.log(result.summary[0].timing!.durationMs);
 ```
 
-In `verbose: false` mode (the default), individual `CheckResult.timing` entries
-fold away in `results[]`, but the per-suite `SuiteSummary.timing` survives in
-`summary[]` so suite-grain timing is never lost. See
+Per-check timings ride on every row of `results[]`, and the per-suite rollup
+lives on `summary[i].timing`. See
 [`docs/api/timing.md`](./docs/api/timing.md) for the full reference, granularity
 table, recipes, and a prompt-ready appendix.
 
