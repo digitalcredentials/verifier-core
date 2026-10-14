@@ -75,11 +75,11 @@ describe('runSuites', () => {
 
       expect(results).toHaveLength(4);
       expect(results.every(r => r.outcome.status === 'success')).toBe(true);
-      expect(results.map(r => r.check)).toEqual([
-        'check1',
-        'check2',
-        'check3',
-        'check4'
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.suite1.check1',
+        'unknown.suite1.check2',
+        'unknown.suite2.check3',
+        'unknown.suite2.check4'
       ]);
     });
   });
@@ -220,15 +220,15 @@ describe('runSuites', () => {
       const results = await runSuites([suite1, suite2], subject, mockContext);
 
       expect(results).toHaveLength(3);
-      expect(results[0].check).toBe('fatal-check');
+      expect(results[0].id).toBe('unknown.suite1.fatal-check');
       expect(results[0].outcome.status).toBe('failure');
-      expect(results[1].check).toBe('check2');
+      expect(results[1].id).toBe('unknown.suite1.check2');
       expect(results[1].suite).toBe('suite1');
       expect(results[1].outcome).toEqual({
         status: 'skipped',
         reason: 'Not run: fatal-check failed'
       });
-      expect(results[2].check).toBe('check3');
+      expect(results[2].id).toBe('unknown.suite2.check3');
       expect(results[2].suite).toBe('suite2');
       expect(results[2].outcome).toEqual({
         status: 'skipped',
@@ -254,7 +254,11 @@ describe('runSuites', () => {
 
       const results = await runSuites([suiteA, suiteB], subject, mockContext);
 
-      expect(results.map(r => r.check)).toEqual(['a.fatal', 'b.one', 'b.two']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.a.fatal',
+        'unknown.b.one',
+        'unknown.b.two'
+      ]);
       expect(results[1].outcome).toEqual(notRun('a.fatal'));
       expect(results[2].outcome).toEqual(notRun('a.fatal'));
       expect(results[1].fatal).toBe(true);
@@ -279,7 +283,7 @@ describe('runSuites', () => {
 
       const results = await runSuites([suiteA, suiteB], subject, mockContext);
 
-      expect(results.map(r => r.check)).toEqual(['a.fatal']);
+      expect(results.map(r => r.id)).toEqual(['unknown.a.fatal']);
       expect(b1.execute).not.toHaveBeenCalled();
     });
 
@@ -300,7 +304,10 @@ describe('runSuites', () => {
         explicitSuiteIds: new Set(['b'])
       });
 
-      expect(results.map(r => r.check)).toEqual(['a.fatal', 'b.applies']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.a.fatal',
+        'unknown.b.applies'
+      ]);
       expect(results[1].outcome).toEqual({
         status: 'skipped',
         reason: 'suite predicate returned false'
@@ -325,7 +332,7 @@ describe('runSuites', () => {
         phases: ['cryptographic']
       });
 
-      expect(results.map(r => r.check)).toEqual(['a.fatal']);
+      expect(results.map(r => r.id)).toEqual(['cryptographic.a.fatal']);
     });
 
     it('does not halt on a non-fatal failure', async () => {
@@ -367,7 +374,10 @@ describe('runSuites', () => {
 
       const results = await runSuites([suiteA, suiteB], subject, mockContext);
 
-      expect(results.map(r => r.check)).toEqual(['a.fatal', 'b.vc-only']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.a.fatal',
+        'unknown.b.vc-only'
+      ]);
       expect(results[1].outcome).toEqual(notRun('a.fatal'));
     });
 
@@ -494,7 +504,10 @@ describe('runSuites', () => {
 
       const results = await runSuites([suiteB, suiteC], subject, mockContext);
 
-      expect(results.map(r => r.check)).toEqual(['b.applies', 'c.one']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.b.applies',
+        'unknown.c.one'
+      ]);
       expect(results[0].suite).toBe('b');
       expect(results[0].fatal).toBe(true);
       expect(results[0].outcome).toEqual({
@@ -527,7 +540,10 @@ describe('runSuites', () => {
 
       const results = await runSuites([suiteB, suiteC], subject, mockContext);
 
-      expect(results.map(r => r.check)).toEqual(['b.applies', 'c.one']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.b.applies',
+        'unknown.c.one'
+      ]);
       expect(results[0].fatal).toBe(false);
       expect(results[0].outcome.status).toBe('failure');
       expect(results[1].outcome.status).toBe('success');
@@ -603,9 +619,9 @@ describe('runSuites', () => {
       const results = await runSuites([suite], subject, mockContext);
 
       expect(results).toHaveLength(2);
-      expect(results[0].check).toBe('check1');
+      expect(results[0].id).toBe('unknown.suite1.check1');
       expect(results[0].outcome.status).toBe('failure');
-      expect(results[1].check).toBe('check2');
+      expect(results[1].id).toBe('unknown.suite1.check2');
       expect(results[1].outcome.status).toBe('success');
     });
   });
@@ -633,7 +649,10 @@ describe('runSuites', () => {
       const results = await runSuites([suite], subject, mockContext);
 
       expect(results).toHaveLength(2);
-      expect(results.map(r => r.check)).toEqual(['vc-check', 'both-check']);
+      expect(results.map(r => r.id)).toEqual([
+        'unknown.suite1.vc-check',
+        'unknown.suite1.both-check'
+      ]);
     });
 
     it('runs checks with no appliesTo restriction for any subject', async () => {
@@ -647,7 +666,7 @@ describe('runSuites', () => {
       const results = await runSuites([suite], subject, mockContext);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('unrestricted-check');
+      expect(results[0].id).toBe('unknown.suite1.unrestricted-check');
     });
   });
 
@@ -722,7 +741,7 @@ describe('runSuites', () => {
       const results = await runSuites([suite], subject, mockContext);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('vp-only');
+      expect(results[0].id).toBe('unknown.suite1.vp-only');
     });
   });
 });

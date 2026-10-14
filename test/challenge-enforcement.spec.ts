@@ -50,7 +50,7 @@ const credentialTemplate = (issuerDid: string): Record<string, unknown> => ({
 });
 
 function signatureResult(results: CheckResult[]): CheckResult | undefined {
-  return results.find(r => r.check === 'proof.signature');
+  return results.find(r => r.id === 'cryptographic.proof.signature');
 }
 
 /** The presentation's own proof failed as an invalid signature. */

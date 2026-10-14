@@ -78,7 +78,6 @@ function mkResult(
     return {
       id,
       suite,
-      check,
       outcome: { status: 'success', message: 'ok' },
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {})
     };
@@ -87,7 +86,6 @@ function mkResult(
     return {
       id,
       suite,
-      check,
       outcome: { status: 'failure', problems: [stubProblem] },
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {})
     };
@@ -95,7 +93,6 @@ function mkResult(
   return {
     id,
     suite,
-    check,
     outcome: { status: 'skipped', reason: options.reason ?? 'n/a' }
   };
 }
@@ -128,11 +125,11 @@ describe('foldCheckResults', () => {
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results.map(r => r.check)).toEqual([
-      'core.a',
-      'core.b',
-      'core.c',
-      'core.d'
+    expect(results.map(r => r.id)).toEqual([
+      'cryptographic.core.a',
+      'cryptographic.core.b',
+      'cryptographic.core.c',
+      'cryptographic.core.d'
     ]);
     expect(summaries).toHaveLength(1);
     expect(summaries[0].status).toBe('success');
@@ -193,7 +190,7 @@ describe('foldCheckResults', () => {
 
     expect(results).toHaveLength(4);
     expect(results.filter(r => r.outcome.status === 'failure')).toHaveLength(1);
-    expect(results[1].check).toBe('core.b');
+    expect(results[1].id).toBe('cryptographic.core.b');
     expect(summaries[0].status).toBe('mixed');
     expect(summaries[0].fatalFailureAt).toBeUndefined();
     expect(summaries[0].counts).toEqual({
@@ -217,7 +214,7 @@ describe('foldCheckResults', () => {
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
     expect(results).toHaveLength(1);
-    expect(results[0].check).toBe('extra.applies');
+    expect(results[0].id).toBe('semantic.extra.applies');
     expect(summaries[0].status).toBe('skipped');
     expect(summaries[0].counts).toEqual({
       passed: 0,
@@ -249,11 +246,11 @@ describe('foldCheckResults', () => {
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results.map(r => r.check)).toEqual([
-      'proof.a',
-      'proof.b',
-      'proof.c',
-      'proof.d'
+    expect(results.map(r => r.id)).toEqual([
+      'cryptographic.proof.a',
+      'cryptographic.proof.b',
+      'cryptographic.proof.c',
+      'cryptographic.proof.d'
     ]);
     expect(summaries[0].status).toBe('mixed');
     expect(summaries[0].counts).toEqual({
@@ -326,12 +323,12 @@ describe('foldCheckResults', () => {
     it('surfaces every not-run row alongside the failure', () => {
       const { results } = foldCheckResults(haltedChecks, [core, proof]);
 
-      expect(results.map(r => r.check)).toEqual([
-        'core.context-exists',
-        'core.vc-context',
-        'core.credential-id',
-        'core.proof-exists',
-        'proof.signature'
+      expect(results.map(r => r.id)).toEqual([
+        'cryptographic.core.context-exists',
+        'cryptographic.core.vc-context',
+        'cryptographic.core.credential-id',
+        'cryptographic.core.proof-exists',
+        'cryptographic.proof.signature'
       ]);
       expect(
         results

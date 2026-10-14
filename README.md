@@ -138,7 +138,8 @@ than a link to it, so `entity.logo` can be large, and it is cached along with
 the rest of the lookup.
 
 ```typescript
-const outcome = result.results.find(r => r.check === 'registry.issuer')?.outcome;
+const outcome = result.results.find(r => r.id === 'trust.registry.issuer')
+  ?.outcome;
 const payload = outcome?.payload as RegistryCheckPayload | undefined;
 const displayName = payload?.matches[0]?.entity?.name;
 ```
@@ -238,16 +239,16 @@ interface ProblemDetail {
   "verified": true,
   "verifiableCredential": { "...parsed credential..." },
   "results": [
-    { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
-    { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.vc-structure",   "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
-    { "suite": "recognition", "check": "recognition.profile", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
-    { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
-    { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
-    { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
-    { "suite": "registry", "check": "registry.issuer",   "outcome": {
+    { "id": "cryptographic.core.context-exists", "suite": "core",   "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
+    { "id": "cryptographic.core.vc-context",     "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.vc-structure",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.credential-id",  "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.proof-exists",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "recognition.profile", "suite": "recognition", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
+    { "id": "cryptographic.proof.signature",     "suite": "proof",  "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "id": "cryptographic.status.bitstring",    "suite": "status", "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
+    { "id": "cryptographic.status.list-issuer",  "suite": "status", "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
+    { "id": "trust.registry.issuer", "suite": "registry",   "outcome": {
       "status": "success",
       "message": "Issuer found in registry: DCC Sandbox Registry",
       "payload": {
@@ -284,38 +285,38 @@ halted. Each check that would have run appears as `skipped` with reason
   "verified": false,
   "results": [
     {
+      "id": "cryptographic.core.context-exists",
       "suite": "core",
-      "check": "core.context-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-context",
       "suite": "core",
-      "check": "core.vc-context",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-structure",
       "suite": "core",
-      "check": "core.vc-structure",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.credential-id",
       "suite": "core",
-      "check": "core.credential-id",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.proof-exists",
       "suite": "core",
-      "check": "core.proof-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "recognition.profile",
       "suite": "recognition",
-      "check": "recognition.profile",
       "outcome": { "status": "skipped", "reason": "no recognizer matched" }
     },
     {
+      "id": "cryptographic.proof.signature",
       "suite": "proof",
-      "check": "proof.signature",
       "outcome": {
         "status": "failure",
         "problems": [
@@ -328,24 +329,24 @@ halted. Each check that would have run appears as `skipped` with reason
       }
     },
     {
+      "id": "cryptographic.status.bitstring",
       "suite": "status",
-      "check": "status.bitstring",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
       }
     },
     {
+      "id": "cryptographic.status.list-issuer",
       "suite": "status",
-      "check": "status.list-issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
       }
     },
     {
+      "id": "trust.registry.issuer",
       "suite": "registry",
-      "check": "registry.issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
@@ -374,46 +375,46 @@ not fetched, and the check's message or skip reason names them.
   "verified": false,
   "results": [
     {
+      "id": "cryptographic.core.context-exists",
       "suite": "core",
-      "check": "core.context-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-context",
       "suite": "core",
-      "check": "core.vc-context",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-structure",
       "suite": "core",
-      "check": "core.vc-structure",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.credential-id",
       "suite": "core",
-      "check": "core.credential-id",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.proof-exists",
       "suite": "core",
-      "check": "core.proof-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "recognition.profile",
       "suite": "recognition",
-      "check": "recognition.profile",
       "outcome": { "status": "skipped", "reason": "no recognizer matched" }
     },
     {
+      "id": "cryptographic.proof.signature",
       "suite": "proof",
-      "check": "proof.signature",
       "outcome": {
         "status": "success",
         "message": "Signature verified successfully."
       }
     },
     {
+      "id": "cryptographic.status.bitstring",
       "suite": "status",
-      "check": "status.bitstring",
       "outcome": {
         "status": "failure",
         "problems": [
@@ -426,16 +427,16 @@ not fetched, and the check's message or skip reason names them.
       }
     },
     {
+      "id": "cryptographic.status.list-issuer",
       "suite": "status",
-      "check": "status.list-issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: status.bitstring failed"
       }
     },
     {
+      "id": "trust.registry.issuer",
       "suite": "registry",
-      "check": "registry.issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: status.bitstring failed"
@@ -455,8 +456,8 @@ with `STATUS_LIST_ISSUER_MISMATCH`:
 
 ```json
 {
+  "id": "cryptographic.status.list-issuer",
   "suite": "status",
-  "check": "status.list-issuer",
   "fatal": false,
   "outcome": {
     "status": "failure",
@@ -484,8 +485,8 @@ with no `credentialStatus` skips the status check:
 
 ```json
 {
+  "id": "cryptographic.status.bitstring",
   "suite": "status",
-  "check": "status.bitstring",
   "outcome": {
     "status": "skipped",
     "reason": "Credential has no credentialStatus."

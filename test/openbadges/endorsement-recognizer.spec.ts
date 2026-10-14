@@ -209,7 +209,7 @@ describe('obv3p0EndorsementRecognizer', () => {
         r => r.suite === 'openbadges'
       );
       expect(obSuiteResults).toHaveLength(1);
-      expect(obSuiteResults[0].check).toBe('openbadges.applies');
+      expect(obSuiteResults[0].id).toBe('semantic.openbadges.applies');
       expect(obSuiteResults[0].outcome.status).toBe('skipped');
     });
   });

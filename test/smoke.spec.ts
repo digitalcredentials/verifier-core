@@ -18,7 +18,7 @@ import { v2didWebWithValidStatus } from './fixtures/v2-did-web-with-valid-status
 import { v2DoubleSigWithValidStatus } from './fixtures/v2-double-sig-with-valid-status.js';
 
 function listIssuerOutcome(result: CredentialVerificationResult) {
-  return result.results.find(r => r.check === 'status.list-issuer')?.outcome;
+  return result.results.find(r => r.id === 'cryptographic.status.list-issuer')?.outcome;
 }
 
 describe('smoke (golden credentials, real crypto + loader)', () => {
@@ -86,7 +86,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
     tampered.credentialSubject = cs;
     const result = await verifyCredential({ credential: tampered });
     expect(result.verified).toBe(false);
-    const sigCheck = result.results.find(r => r.check === 'proof.signature');
+    const sigCheck = result.results.find(r => r.id === 'cryptographic.proof.signature');
     expect(sigCheck?.outcome.status).toBe('failure');
   });
 });

@@ -246,7 +246,7 @@ describe('createVerifier — phase filter integration', () => {
     });
 
     const recognitionResults = result.results.filter(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognitionResults).toHaveLength(1);
   });

@@ -370,7 +370,7 @@ function expandPhases(
 function extractRecognition(
   results: CheckResult[]
 ): { profile: string; normalized: unknown } | undefined {
-  const result = results.find(r => r.check === 'recognition.profile');
+  const result = results.find(r => r.id === 'recognition.profile');
   if (!result || result.outcome.status !== 'success') {
     return undefined;
   }
@@ -408,7 +408,6 @@ function parseErrorResult(
   const result: CheckResult = {
     id: computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope'),
     suite: 'parsing',
-    check: 'parsing.envelope',
     outcome: { status: 'failure', problems: [problem] },
     fatal: true
   };

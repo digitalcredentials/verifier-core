@@ -39,7 +39,7 @@ A successful single-credential verification:
   "verifiableCredential": { "...parsed credential..." },
   "results": [
     { "id": "cryptographic.core.context-exists",
-      "suite": "core", "check": "core.context-exists",
+      "suite": "core",
       "outcome": { "status": "success", "message": "..." },
       "fatal": true },
     { "id": "cryptographic.core.vc-context",      /* success */ },
@@ -47,20 +47,20 @@ A successful single-credential verification:
     { "id": "cryptographic.core.credential-id",   /* success */ },
     { "id": "cryptographic.core.proof-exists",    /* success */ },
     { "id": "recognition.profile",
-      "suite": "recognition", "check": "recognition.profile",
+      "suite": "recognition",
       "outcome": { "status": "skipped",
                    "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",      /* success */ },
     { "id": "cryptographic.status.bitstring",
-      "suite": "status", "check": "status.bitstring",
+      "suite": "status",
       "outcome": { "status": "skipped",
                    "reason": "Credential has no credentialStatus." } },
     { "id": "cryptographic.status.list-issuer",
-      "suite": "status", "check": "status.list-issuer",
+      "suite": "status",
       "outcome": { "status": "skipped",
                    "reason": "No status list was checked." } },
     { "id": "trust.registry.issuer",
-      "suite": "registry", "check": "registry.issuer",
+      "suite": "registry",
       "outcome": {
         "status": "success",
         "message": "Issuer found in registry: DCC Sandbox Registry",
@@ -501,16 +501,16 @@ Lazy-expand them — most users only want the verdict + per-phase status.
 
 ## Backwards compatibility
 
-- **Deprecated.** `CheckResult.check` is marked `@deprecated`. Use
-  `CheckResult.id` instead. Removal target: the major after v2.0.0.
-  `CheckResult.suite` is **not** deprecated: it is how rows are
-  grouped, it matches `SuiteSummary.suite`, and it cannot be
-  recovered from `id`, because a suite id may itself contain dots.
+- **Removed.** `CheckResult.check` is gone. Use `CheckResult.id`.
+  `CheckResult.suite` stays: it is how rows are grouped, it matches
+  `SuiteSummary.suite`, and it cannot be recovered from `id`, because
+  a suite id may itself contain dots.
 - **`flattenPresentationResults`** is unchanged. Use it as the "give me
   one array of every check" escape hatch when you don't want to walk
   `credentialResults[].results`.
-- **Migration recipe for code that filtered/found by `check` or
-  `suite`:** switch to `id` and prefix-matching against the summary
+- **Migration recipe for code that filtered/found by the removed
+  `check` field, or by `suite`:** switch to `id` and prefix-matching
+  against the summary
   rollup, narrowing by `outcome.status`. See §6 step 3 for the
   canonical pattern.
 
@@ -568,7 +568,7 @@ dcc-transaction-service UI implementation.
         { "id": "recognition.profile",                /* success */ },
         { "id": "cryptographic.proof.signature",      /* success */ },
         { "id": "trust.registry.issuer",
-          "suite": "registry", "check": "registry.issuer",
+          "suite": "registry",
           "outcome": { "status": "failure", "problems": [
             { "type": "https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED",
               "title": "Issuer Not Registered",

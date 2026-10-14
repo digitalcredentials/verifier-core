@@ -85,7 +85,7 @@ describe('Status Suite', () => {
       const results = await runSuites([statusSuite], subject, context);
 
       expect(results).toHaveLength(2);
-      expect(results[0].check).toBe('status.bitstring');
+      expect(results[0].id).toBe('cryptographic.status.bitstring');
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
         expect(results[0].outcome.reason).toContain('no credentialStatus');
@@ -862,7 +862,7 @@ describe('Status Suite', () => {
     }
 
     function listIssuerResult(results: Awaited<ReturnType<typeof runSuites>>) {
-      const result = results.find(r => r.check === 'status.list-issuer');
+      const result = results.find(r => r.id === 'cryptographic.status.list-issuer');
       expect(result, 'status.list-issuer result present').toBeDefined();
       return result!;
     }

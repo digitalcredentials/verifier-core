@@ -234,15 +234,12 @@ not run after a fatal failure.
   `REGISTRY_UNCHECKED` problem that names the unreachable registries, and the
   success message, are unchanged.
 
-### Deprecated
-
-- `CheckResult.check` — use `CheckResult.id` instead. Removal target: the
-  next major. `CheckResult.suite` is **not** deprecated: it is how rows are
-  grouped, it matches `SuiteSummary.suite`, and it cannot be recovered from
-  `id`, because a suite id may itself contain dots.
-
 ### Removed
 
+- `CheckResult.check` — the namespaced `CheckResult.id` is the identifier.
+  `CheckResult.suite` stays: it is how rows are grouped, it matches
+  `SuiteSummary.suite`, and it cannot be recovered from `id`, because a suite
+  id may itself contain dots.
 - `cryptoSuites` and `verifyBitstringStatusListCredential` on
   `VerificationContext`. Both were `@internal` and neither was reachable through
   `VerifierConfig`, so only code constructing a `VerificationContext` directly
@@ -252,6 +249,10 @@ not run after a fatal failure.
 
 ### Migration
 
+- **Code that read `CheckResult.check`** reads `CheckResult.id` instead. The id
+  is namespaced — `<phase>.<suite>.<localPart>` — so a match on the old local
+  id such as `'proof.signature'` becomes a match on
+  `'cryptographic.proof.signature'`.
 - To adopt the new shape: read `result.summary[]` for the per-suite rollup; read
   `result.results[]` for per-check detail; use
   `r.id.startsWith(summary.id + '.')` to find the detail rows under a summary

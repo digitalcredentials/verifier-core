@@ -119,7 +119,6 @@ describe('verifyPresentation', () => {
 
       expect(result.presentationResults.length).toBeGreaterThan(0);
       for (const r of result.presentationResults) {
-        expect(r.check).not.toBe('parsing.envelope');
         expect(r.id).not.toMatch(/parsing\.envelope$/);
       }
     });
@@ -261,13 +260,15 @@ describe('verifyPresentation', () => {
       expect(result.verified).toBe(false);
       // The bad credential fails its own gate; the presentation's does not.
       expect(
-        result.presentationResults.some(r => r.check === 'parsing.envelope')
+        result.presentationResults.some(
+          r => r.id === 'cryptographic.parsing.envelope'
+        )
       ).toBe(false);
       expect(result.credentialResults).toHaveLength(2);
       expect(result.credentialResults[0].verified).toBe(true);
       expect(result.credentialResults[1].verified).toBe(false);
-      expect(result.credentialResults[1].results[0]?.check).toBe(
-        'parsing.envelope'
+      expect(result.credentialResults[1].results[0]?.id).toBe(
+        'cryptographic.parsing.envelope'
       );
     });
 
@@ -365,7 +366,7 @@ describe('verifyPresentation', () => {
 
       expect(result.verified).toBe(true);
       const signature = result.presentationResults.find(
-        r => r.check === 'proof.signature'
+        r => r.id === 'cryptographic.proof.signature'
       );
       expect(signature?.outcome).toEqual({
         status: 'skipped',
@@ -563,7 +564,9 @@ describe('verifyPresentation', () => {
           r.outcome.reason.startsWith('Not run: ')
       );
       expect(notRun.length).toBeGreaterThan(0);
-      expect(notRun.some(r => r.check === 'proof.signature')).toBe(true);
+      expect(notRun.some(r => r.id === 'cryptographic.proof.signature')).toBe(
+        true
+      );
     });
   });
 
@@ -631,7 +634,7 @@ describe('verifyPresentation', () => {
       expect(presProofSummary?.status).toBe('success');
 
       const presSig = result.presentationResults.find(
-        r => r.check === 'proof.signature'
+        r => r.id === 'cryptographic.proof.signature'
       );
       expect(presSig?.outcome.status).toBe('success');
 
@@ -645,7 +648,7 @@ describe('verifyPresentation', () => {
       expect(credStatus?.status).toBe('success');
 
       const credSig = result.credentialResults[0].results.find(
-        r => r.check === 'proof.signature'
+        r => r.id === 'cryptographic.proof.signature'
       );
       expect(credSig?.outcome.status).toBe('success');
     });

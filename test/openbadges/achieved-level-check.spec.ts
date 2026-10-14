@@ -34,7 +34,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('skipped');
   });
 
@@ -57,7 +58,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('skipped');
   });
 
@@ -85,7 +87,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
       expect(check.outcome.message).toContain('nothing to validate');
@@ -123,7 +126,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
       expect(check.outcome.message).toContain('1 achievedLevel');
@@ -161,7 +165,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
       expect(check.outcome.problems).toHaveLength(1);
@@ -203,7 +208,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
       expect(check.outcome.problems[0].detail).toContain(
@@ -246,7 +252,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
       expect(check.outcome.problems[0].detail).toContain(
@@ -279,7 +286,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
       expect(check.outcome.message).toContain('nothing to validate');
@@ -327,7 +335,8 @@ describe('OBv3 achieved-level check', () => {
       buildTestContext()
     );
 
-    const check = results.find(r => r.check === 'schema.obv3.achieved-level');
+    const check = results.find(r =>
+        r.id === 'unknown.openbadges.achieved-level.schema.obv3.achieved-level');
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
       expect(check.outcome.problems).toHaveLength(2);

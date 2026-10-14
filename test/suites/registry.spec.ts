@@ -51,7 +51,7 @@ describe('Registry Suite', () => {
       const results = await runSuites([registrySuite], subject, context);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('registry.issuer');
+      expect(results[0].id).toBe('trust.registry.issuer');
       expect(results[0].outcome.status).toBe('skipped');
       if (results[0].outcome.status === 'skipped') {
         expect(results[0].outcome.reason).toContain('No registries configured');
@@ -88,7 +88,7 @@ describe('Registry Suite', () => {
       });
 
       const registryResult = result.results.find(
-        r => r.check === 'registry.issuer'
+        r => r.id === 'trust.registry.issuer'
       );
       expect(registryResult?.outcome.status).toBe('skipped');
       expect(JSON.stringify(result)).not.toContain(
@@ -346,7 +346,7 @@ describe('Registry Suite', () => {
         credential: CredentialFactory({ version: 'v2', credential: {} })
       });
 
-      const outcome = result.results.find(r => r.check === 'registry.issuer')
+      const outcome = result.results.find(r => r.id === 'trust.registry.issuer')
         ?.outcome as CheckOutcome;
       expect(outcome.status).toBe('success');
       expect(payloadOf(outcome)).toEqual({
@@ -469,7 +469,7 @@ describe('Registry Suite', () => {
         credential: CredentialFactory({ version: 'v2', credential: {} })
       });
 
-      const outcome = result.results.find(r => r.check === 'registry.issuer')
+      const outcome = result.results.find(r => r.id === 'trust.registry.issuer')
         ?.outcome as CheckOutcome;
       expect(outcome.status).toBe('success');
       expect(payloadOf(outcome).matches[0].entity?.name).toBe(
@@ -515,7 +515,7 @@ describe('Registry Suite', () => {
       const results = await runSuites([registrySuite], subject, context);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('registry.issuer');
+      expect(results[0].id).toBe('trust.registry.issuer');
       expect(results[0].outcome.status).toBe('success');
     });
   });

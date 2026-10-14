@@ -64,7 +64,7 @@ function v1Template(issuerDid: string): Record<string, unknown> {
 }
 
 function signatureProblem(results: CheckResult[]): ProblemDetail | undefined {
-  const signature = results.find(r => r.check === 'proof.signature');
+  const signature = results.find(r => r.id === 'cryptographic.proof.signature');
   expect(signature, 'proof.signature result present').toBeDefined();
   expect(signature?.outcome.status).toBe('failure');
   return signature?.outcome.status === 'failure'
@@ -176,7 +176,7 @@ describe('credential validity dates', () => {
     });
 
     expect(result.verified).toBe(true);
-    const signature = result.results.find(r => r.check === 'proof.signature');
+    const signature = result.results.find(r => r.id === 'cryptographic.proof.signature');
     expect(signature?.outcome.status).toBe('success');
   });
 

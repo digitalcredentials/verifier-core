@@ -53,21 +53,13 @@ export interface CheckResult {
    * A suite with no `phase` produces ids beginning `"unknown."`.
    *
    * Set by `runSuites` on every row it emits. This is the identity
-   * to match on; prefer it over the legacy `check` field.
+   * to match on.
    *
    * Check ids are API: they are fixed for 2.x, and because an id
    * embeds its suite's `phase`, re-tagging a built-in suite's phase
    * renames its checks and is a breaking change.
    */
   id: string;
-
-  /**
-   * @deprecated Use {@link CheckResult.id}. Will be removed in the
-   * major release after the one that introduced `id`.
-   *
-   * Qualified check id, e.g. `"core.proof-exists"`.
-   */
-  check: string;
 
   /**
    * Suite id this check belongs to, e.g. `"core"`; mirrors

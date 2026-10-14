@@ -144,12 +144,16 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     });
 
     const obSuiteResults = result.results.filter(r => r.suite === 'openbadges');
-    const checkIds = new Set(obSuiteResults.map(r => r.check));
-    expect(checkIds).toContain('schema.obv3.result-ref');
-    expect(checkIds).toContain('schema.obv3.achieved-level');
-    expect(checkIds).toContain('schema.obv3.missing-result-status');
-    expect(checkIds).toContain('schema.obv3.unknown-achievement-type');
-    expect(checkIds).toContain('schema.obv3.json');
+    const checkIds = new Set(obSuiteResults.map(r => r.id));
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.result-ref');
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.achieved-level');
+    expect(checkIds).toContain(
+      'semantic.openbadges.schema.obv3.missing-result-status'
+    );
+    expect(checkIds).toContain(
+      'semantic.openbadges.schema.obv3.unknown-achievement-type'
+    );
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.json');
 
     const failures = obSuiteResults.filter(r => r.outcome.status === 'failure');
     expect(failures, JSON.stringify(failures, null, 2)).toHaveLength(0);
@@ -169,7 +173,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     });
 
     const achievedLevelResult = result.results.find(
-      r => r.check === 'schema.obv3.achieved-level'
+      r => r.id === 'semantic.openbadges.semantic.schema.obv3.achieved-level'
     );
     expect(achievedLevelResult?.outcome.status).toBe('failure');
 
@@ -200,7 +204,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
 
     const obSuiteResults = result.results.filter(r => r.suite === 'openbadges');
     expect(obSuiteResults).toHaveLength(1);
-    expect(obSuiteResults[0].check).toBe('openbadges.applies');
+    expect(obSuiteResults[0].id).toBe('semantic.openbadges.applies');
     expect(obSuiteResults[0].outcome.status).toBe('skipped');
     if (obSuiteResults[0].outcome.status === 'skipped') {
       expect(obSuiteResults[0].outcome.reason).toBe(

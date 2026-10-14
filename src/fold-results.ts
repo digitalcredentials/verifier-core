@@ -119,7 +119,7 @@ function summarizeSuite(
     counts,
     notRunReasons(suiteChecks),
     fatalFailureAt !== undefined,
-    pickAppliesSkipReason(suiteChecks, suiteId)
+    pickAppliesSkipReason(suiteChecks, phase, suiteId)
   );
 
   const timing = rollupSuiteTiming(suiteChecks);
@@ -200,6 +200,7 @@ function deriveStatus(counts: {
  */
 function pickAppliesSkipReason(
   suiteChecks: CheckResult[],
+  phase: SuitePhase | undefined,
   suiteId: string
 ): string | undefined {
   if (suiteChecks.length !== 1) {
@@ -209,7 +210,7 @@ function pickAppliesSkipReason(
   if (only.outcome.status !== 'skipped') {
     return undefined;
   }
-  if (only.check !== `${suiteId}.applies`) {
+  if (only.id !== computeId(phase, suiteId, `${suiteId}.applies`)) {
     return undefined;
   }
   return only.outcome.reason;

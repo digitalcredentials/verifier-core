@@ -39,13 +39,13 @@ describe('Core Structure Suite', () => {
       expect(results).toHaveLength(5);
       expect(results.every(r => r.outcome.status === 'success')).toBe(true);
 
-      const checkIds = results.map(r => r.check);
+      const checkIds = results.map(r => r.id);
       expect(checkIds).toEqual([
-        'core.context-exists',
-        'core.vc-context',
-        'core.vc-structure',
-        'core.credential-id',
-        'core.proof-exists'
+        'cryptographic.core.context-exists',
+        'cryptographic.core.vc-context',
+        'cryptographic.core.vc-structure',
+        'cryptographic.core.credential-id',
+        'cryptographic.core.proof-exists'
       ]);
     });
 
@@ -66,7 +66,9 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      const idCheck = results.find(r => r.check === 'core.credential-id');
+      const idCheck = results.find(
+        r => r.id === 'cryptographic.core.credential-id'
+      );
       expect(idCheck?.outcome.status).toBe('success');
       if (idCheck?.outcome.status === 'success') {
         expect(idCheck.outcome.message).toContain('no ID');
@@ -82,7 +84,7 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('failure');
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].type).toBe(
@@ -103,7 +105,7 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('failure');
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].title).toBe('Invalid JSON-LD');
@@ -134,7 +136,7 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('failure');
     });
 
@@ -146,9 +148,9 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('success');
-      expect(results[1].check).toBe('core.vc-context');
+      expect(results[1].id).toBe('cryptographic.core.vc-context');
       expect(results[1].outcome.status).toBe('failure');
     });
   });
@@ -158,7 +160,7 @@ describe('Core Structure Suite', () => {
       const subject: VerificationSubject = { verifiableCredential: null };
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('failure');
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].detail).toContain(
@@ -178,9 +180,9 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[0].check).toBe('core.context-exists');
+      expect(results[0].id).toBe('cryptographic.core.context-exists');
       expect(results[0].outcome.status).toBe('success');
-      expect(results[1].check).toBe('core.vc-context');
+      expect(results[1].id).toBe('cryptographic.core.vc-context');
       expect(results[1].outcome.status).toBe('failure');
       if (results[1].outcome.status === 'failure') {
         expect(results[1].outcome.problems[0].type).toBe(
@@ -201,7 +203,7 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[3].check).toBe('core.credential-id');
+      expect(results[3].id).toBe('cryptographic.core.credential-id');
       expect(results[3].outcome.status).toBe('failure');
       if (results[3].outcome.status === 'failure') {
         expect(results[3].outcome.problems[0].type).toBe(
@@ -220,7 +222,7 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[3].check).toBe('core.credential-id');
+      expect(results[3].id).toBe('cryptographic.core.credential-id');
       expect(results[3].outcome.status).toBe('failure');
       expectNotRunAfter(results.slice(4), 'core.credential-id');
     });
@@ -233,7 +235,9 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      const idCheck = results.find(r => r.check === 'core.credential-id');
+      const idCheck = results.find(
+        r => r.id === 'cryptographic.core.credential-id'
+      );
       expect(idCheck?.outcome.status).toBe('success');
     });
   });
@@ -246,7 +250,7 @@ describe('Core Structure Suite', () => {
       const results = await runSuites([coreSuite], subject, context);
 
       expect(results).toHaveLength(5);
-      expect(results[4].check).toBe('core.proof-exists');
+      expect(results[4].id).toBe('cryptographic.core.proof-exists');
       expect(results[4].outcome.status).toBe('failure');
       if (results[4].outcome.status === 'failure') {
         expect(results[4].outcome.problems[0].type).toBe(
@@ -278,7 +282,7 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[4].check).toBe('core.proof-exists');
+      expect(results[4].id).toBe('cryptographic.core.proof-exists');
       expect(results[4].outcome.status).toBe('failure');
     });
 
@@ -312,7 +316,7 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[1].check).toBe('core.vc-context');
+      expect(results[1].id).toBe('cryptographic.core.vc-context');
       expect(results[1].outcome.status).toBe('success');
     });
 
@@ -329,7 +333,7 @@ describe('Core Structure Suite', () => {
       const subject = createSubject(cred);
       const results = await runSuites([coreSuite], subject, context);
 
-      expect(results[1].check).toBe('core.vc-context');
+      expect(results[1].id).toBe('cryptographic.core.vc-context');
       expect(results[1].outcome.status).toBe('success');
     });
 
@@ -662,12 +666,12 @@ describe('vc-structure', () => {
         },
         context
       );
-      expect(results.map(r => [r.check, r.outcome.status])).toEqual([
-        ['core.context-exists', 'success'],
-        ['core.vc-context', 'success'],
-        ['core.vc-structure', 'failure'],
-        ['core.credential-id', 'skipped'],
-        ['core.proof-exists', 'skipped']
+      expect(results.map(r => [r.id, r.outcome.status])).toEqual([
+        ['cryptographic.core.context-exists', 'success'],
+        ['cryptographic.core.vc-context', 'success'],
+        ['cryptographic.core.vc-structure', 'failure'],
+        ['cryptographic.core.credential-id', 'skipped'],
+        ['cryptographic.core.proof-exists', 'skipped']
       ]);
     });
 
@@ -922,7 +926,7 @@ describe('vp-structure', () => {
       { verifiablePresentation: PresentationFactory() },
       context
     );
-    expect(results.map(r => r.check)).toEqual(['core.vp-structure']);
+    expect(results.map(r => r.id)).toEqual(['cryptographic.core.vp-structure']);
     expect(results[0].outcome.status).toBe('success');
   });
 
@@ -932,7 +936,9 @@ describe('vp-structure', () => {
       { verifiableCredential: CredentialFactory() },
       context
     );
-    expect(results.map(r => r.check)).not.toContain('core.vp-structure');
+    expect(results.map(r => r.id)).not.toContain(
+      'cryptographic.core.vp-structure'
+    );
   });
 
   describe('@context', () => {

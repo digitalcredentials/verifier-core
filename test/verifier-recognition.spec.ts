@@ -31,7 +31,7 @@ describe('verifier recognition pipeline', () => {
     });
 
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('skipped');
     expect(result.normalizedVerifiableCredential).toBe(undefined);
@@ -51,7 +51,7 @@ describe('verifier recognition pipeline', () => {
     expect(result.normalizedVerifiableCredential).toBeDefined();
 
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('success');
   });
@@ -78,7 +78,7 @@ describe('verifier recognition pipeline', () => {
     expect(result.recognizedProfile).toBe(undefined);
     expect(result.normalizedVerifiableCredential).toBe(undefined);
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('skipped');
   });

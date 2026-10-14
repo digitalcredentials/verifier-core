@@ -47,7 +47,7 @@ describe('timing instrumentation', () => {
       const result = await verifier.verifyCredential({ credential });
       expect(result.results.length).toBeGreaterThan(0);
       for (const c of result.results) {
-        expect(c.timing, `${c.id ?? c.check} missing timing`).toBeDefined();
+        expect(c.timing, `${c.id} missing timing`).toBeDefined();
       }
     });
 

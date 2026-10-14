@@ -80,22 +80,20 @@ describe('Foundation types', () => {
   });
 
   describe('CheckResult', () => {
-    it('tags outcome with suite and check ids', () => {
+    it('tags outcome with suite and check id', () => {
       const result: CheckResult = {
         id: 'cryptographic.core.proof-exists',
-        check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' }
       };
       expect(result.suite).toBe('core');
-      expect(result.check).toBe('core.proof-exists');
+      expect(result.id).toBe('cryptographic.core.proof-exists');
       expect(result.outcome.status).toBe('success');
     });
 
     it('requires a namespaced id', () => {
       const result: CheckResult = {
         id: 'cryptographic.core.proof-exists',
-        check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' }
       };

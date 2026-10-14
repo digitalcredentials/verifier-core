@@ -98,7 +98,7 @@ describe('verifyCredential', () => {
       expect(result.verified).toBe(false);
       expect(result.results).toHaveLength(1);
       expect(result.results[0].suite).toBe('parsing');
-      expect(result.results[0].check).toBe('parsing.envelope');
+      expect(result.results[0].id).toBe('cryptographic.parsing.envelope');
       expect(result.results[0].outcome.status).toBe('failure');
     });
 
@@ -160,7 +160,9 @@ describe('verifyCredential', () => {
       const proofResults = result.results.filter(r => r.suite === 'proof');
       expect(proofResults.length).toBeGreaterThan(0);
 
-      const sigCheck = proofResults.find(r => r.check === 'proof.signature');
+      const sigCheck = proofResults.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       if (sigCheck) {
         expect(sigCheck.outcome.status).toBe('success');
       }
@@ -174,7 +176,9 @@ describe('verifyCredential', () => {
       });
 
       expect(result.verified).toBe(false);
-      const sigCheck = result.results.find(r => r.check === 'proof.signature');
+      const sigCheck = result.results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(sigCheck?.outcome.status).toBe('failure');
     });
   });
@@ -184,7 +188,9 @@ describe('verifyCredential', () => {
     // and must not be reported as one: the signature verified, which is
     // the only reason the date check ran at all.
     const expiryProblem = (results: CheckResult[]) => {
-      const signature = results.find(r => r.check === 'proof.signature');
+      const signature = results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(signature?.outcome.status).toBe('failure');
       return signature?.outcome.status === 'failure'
         ? signature.outcome.problems[0]
@@ -341,7 +347,7 @@ describe('verifyCredential', () => {
       });
 
       const customResult = result.results.find(
-        r => r.check === 'custom.throws'
+        r => r.id === 'unknown.custom.throws'
       );
       expect(customResult?.outcome).toEqual({
         status: 'failure',
@@ -369,11 +375,13 @@ describe('verifyCredential', () => {
 
       expect(result.verified).toBe(false);
       const proofExists = result.results.find(
-        r => r.check === 'core.proof-exists'
+        r => r.id === 'cryptographic.core.proof-exists'
       );
       expect(proofExists?.outcome.status).toBe('failure');
 
-      const signature = result.results.find(r => r.check === 'proof.signature');
+      const signature = result.results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(signature?.outcome).toEqual({
         status: 'skipped',
         reason: 'Not run: core.proof-exists failed'
@@ -429,11 +437,11 @@ describe('verifyCredential', () => {
       expect(result.results.length).toBeGreaterThan(0);
       for (const checkResult of result.results) {
         expect(checkResult.suite).toBeTypeOf('string');
-        expect(checkResult.check).toBeTypeOf('string');
+        expect(checkResult.id).toBeTypeOf('string');
         const st = checkResult.outcome.status;
         if (st !== 'success' && st !== 'failure' && st !== 'skipped') {
           throw new Error(
-            `Unexpected outcome status for ${checkResult.suite}/${checkResult.check}: ${String(st)}`
+            `Unexpected outcome status for ${checkResult.suite}/${checkResult.id}: ${String(st)}`
           );
         }
       }
@@ -564,12 +572,16 @@ describe('verifyCredential', () => {
       );
       expect(verified).toBe(false);
 
-      const statusResult = results.find(r => r.check === 'status.bitstring');
+      const statusResult = results.find(
+        r => r.id === 'cryptographic.status.bitstring'
+      );
       expect(statusResult, 'status.bitstring result present').toBeDefined();
       expect(statusResult?.outcome.status).toBe('failure');
       expect(statusResult?.fatal).toBe(true);
 
-      const proofResult = results.find(r => r.check === 'proof.signature');
+      const proofResult = results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(proofResult?.outcome.status).toBe('success');
     });
   });
@@ -610,9 +622,13 @@ describe('verifyCredential', () => {
 
       // A credential with no `credentialStatus`: the signature passed and
       // the bitstring check was skipped, and both say so.
-      const signature = result.results.find(r => r.check === 'proof.signature');
+      const signature = result.results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(signature?.outcome.status).toBe('success');
-      const bitstring = result.results.find(r => r.check === 'status.bitstring');
+      const bitstring = result.results.find(
+        r => r.id === 'cryptographic.status.bitstring'
+      );
       expect(bitstring?.outcome).toEqual({
         status: 'skipped',
         reason: 'Credential has no credentialStatus.'
@@ -630,7 +646,7 @@ describe('verifyCredential', () => {
       const result = await verifyCredential({ credential, ...cryptoOnly });
 
       const recognition = result.results.find(
-        r => r.check === 'recognition.profile'
+        r => r.id === 'recognition.profile'
       );
       expect(recognition?.outcome.status).toBe('skipped');
       expect(result.recognizedProfile).toBeUndefined();
@@ -730,7 +746,9 @@ describe('verifyCredential', () => {
       expect(proofSummary?.status).toBe('success');
       expect(statusSummary?.status).toBe('success');
 
-      const sigCheck = result.results.find(r => r.check === 'proof.signature');
+      const sigCheck = result.results.find(
+        r => r.id === 'cryptographic.proof.signature'
+      );
       expect(sigCheck?.outcome.status).toBe('success');
     });
   });

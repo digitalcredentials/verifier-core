@@ -222,7 +222,7 @@ describe('status list cryptosuite parity', () => {
     });
 
     const statusResult = result.results.find(
-      r => r.check === 'status.bitstring'
+      r => r.id === 'cryptographic.status.bitstring'
     );
     expect(statusResult, 'status.bitstring result present').toBeDefined();
     expect(statusResult?.outcome.status).toBe('failure');
@@ -232,7 +232,9 @@ describe('status list cryptosuite parity', () => {
       );
     }
 
-    const proofResult = result.results.find(r => r.check === 'proof.signature');
+    const proofResult = result.results.find(
+      r => r.id === 'cryptographic.proof.signature'
+    );
     expect(proofResult?.outcome.status).toBe('success');
   });
 
@@ -243,14 +245,14 @@ describe('status list cryptosuite parity', () => {
     });
 
     const statusResult = result.results.find(
-      r => r.check === 'status.bitstring'
+      r => r.id === 'cryptographic.status.bitstring'
     );
     expect(statusResult, 'status.bitstring result present').toBeDefined();
     expect(statusResult?.outcome.status).toBe('success');
     expect(result.verified).toBe(true);
 
     const issuerResult = result.results.find(
-      r => r.check === 'status.list-issuer'
+      r => r.id === 'cryptographic.status.list-issuer'
     );
     expect(issuerResult?.outcome.status).toBe('success');
   });
@@ -263,12 +265,12 @@ describe('status list cryptosuite parity', () => {
 
     expect(result.verified).toBe(true);
     const statusResult = result.results.find(
-      r => r.check === 'status.bitstring'
+      r => r.id === 'cryptographic.status.bitstring'
     );
     expect(statusResult?.outcome.status).toBe('success');
 
     const issuerResult = result.results.find(
-      r => r.check === 'status.list-issuer'
+      r => r.id === 'cryptographic.status.list-issuer'
     );
     expect(issuerResult?.outcome.status).toBe('failure');
     if (issuerResult?.outcome.status === 'failure') {
@@ -287,7 +289,7 @@ describe('status list cryptosuite parity', () => {
 
     expect(result.verified).toBe(false);
     const statusResult = result.results.find(
-      r => r.check === 'status.bitstring'
+      r => r.id === 'cryptographic.status.bitstring'
     );
     expect(statusResult?.outcome.status).toBe('failure');
     if (statusResult?.outcome.status === 'failure') {

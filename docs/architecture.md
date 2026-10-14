@@ -310,7 +310,7 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { id, suite, check, outcome, fatal?, timing? }
+CheckResult: { id, suite, outcome, fatal?, timing? }
 ```
 
 `timing` is opt-in: present on every `CheckResult`,
@@ -552,7 +552,7 @@ VerifierConfig                       (long-lived deps: http, cache, crypto, regi
           → VerificationSuite[]
             → VerificationCheck.execute(subject, context)
               → CheckOutcome (success | failure | skip)
-                → CheckResult (suite, check, outcome, fatal?, timing?)
+                → CheckResult (id, suite, outcome, fatal?, timing?)
         → CredentialVerificationResult                  ({ verified, verifiableCredential, results })
 ```
 

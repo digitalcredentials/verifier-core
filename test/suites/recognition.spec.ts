@@ -27,7 +27,7 @@ describe('recognitionSuite', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].suite).toBe('recognition');
-    expect(results[0].check).toBe('recognition.profile');
+    expect(results[0].id).toBe('recognition.profile');
     expect(results[0].outcome.status).toBe('skipped');
     if (results[0].outcome.status === 'skipped') {
       expect(results[0].outcome.reason).toBe('no recognizer matched');

@@ -197,7 +197,6 @@ export async function runSuites(
 
       const result: CheckResult = {
         id: computeId(suite.phase, suite.id, check.id),
-        check: check.id,
         suite: suite.id,
         outcome,
         fatal: check.fatal
@@ -250,7 +249,6 @@ function buildAppliesErrorResult(
   const checkId = `${suite.id}.applies`;
   const result: CheckResult = {
     id: computeId(suite.phase, suite.id, checkId),
-    check: checkId,
     suite: suite.id,
     outcome: buildCheckErrorOutcome(checkId, error),
     fatal
@@ -273,7 +271,6 @@ function buildNotRunResult(
 ): CheckResult {
   const result: CheckResult = {
     id: computeId(suite.phase, suite.id, check.id),
-    check: check.id,
     suite: suite.id,
     outcome: {
       status: 'skipped',
@@ -301,7 +298,6 @@ function buildSyntheticAppliesSkipResult(
   const checkId = `${suite.id}.applies`;
   const result: CheckResult = {
     id: computeId(suite.phase, suite.id, checkId),
-    check: checkId,
     suite: suite.id,
     outcome: {
       status: 'skipped',

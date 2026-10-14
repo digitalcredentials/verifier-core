@@ -11,6 +11,8 @@ import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { formatJsonPointer } from '../../src/util/json-pointer.js';
 
 const CHECK_ID = 'schema.obv3.unknown-achievement-type';
+/** The namespaced id `runSuites` stamps on the wrapper suite's row. */
+const RESULT_ID = `unknown.openbadges.unknown-achievement-type.${CHECK_ID}`;
 
 const wrap = (check: VerificationCheck): VerificationSuite => ({
   id: 'openbadges.unknown-achievement-type',
@@ -40,7 +42,7 @@ async function runCheck(
     createSubject(credential),
     buildTestContext()
   );
-  return results.find(r => r.check === CHECK_ID);
+  return results.find(r => r.id === RESULT_ID);
 }
 
 describe('OBv3 unknown-achievement-type check', () => {

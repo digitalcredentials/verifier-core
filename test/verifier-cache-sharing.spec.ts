@@ -268,7 +268,7 @@ describe('Verifier cache sharing', () => {
       // Sanity: the schema check ran and passed, so the count below is
       // about caching rather than a check that never got that far.
       expect(
-        result.results.find(r => r.check === 'schema.obv3.json')?.outcome.status
+        result.results.find(r => r.id === 'semantic.openbadges.schema.schema.obv3.json')?.outcome.status
       ).toBe('success');
     };
 
