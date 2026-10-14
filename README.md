@@ -125,8 +125,7 @@ configuration (`trustAnchorEC`) for `oidf`.
 
 `entity` is the registry's description of the issuer, not the credential's
 description of itself, so it is the display name to prefer — the credential
-cannot alter it. `dcc-legacy` and `oidf` registries populate it;
-`vc-recognition` matches carry no `entity` yet.
+cannot alter it. Every registry type populates it.
 
 For `oidf`, the `entity` is the `metadata` of the trust anchor's subordinate
 statement: `name` from `federation_entity.organization_name`, `url` from
@@ -136,6 +135,14 @@ as well as on a fresh fetch, since the cached statement is re-verified every
 time. An OIDF `logo_uri` may be a `data:` URI holding the image itself rather
 than a link to it, so `entity.logo` can be large, and it is cached along with
 the rest of the lookup.
+
+For `vc-recognition`, the `entity` is the recognition credential's
+`credentialSubject` entry that names the issuer: `name`, `url` and `logo` from
+the entry's members of those names, and the whole entry as `raw`. Each of the
+three is set only where the entry's value is a string, so an entry whose `name`
+is a language map carries no `entity.name` and the value stays readable through
+`raw`, as does anything else the entry holds. The credential is verified before
+its subject is read, on a cache hit as well as on a fresh fetch.
 
 ```typescript
 const outcome = result.results.find(r => r.id === 'trust.registry.issuer')

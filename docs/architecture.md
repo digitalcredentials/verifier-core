@@ -579,10 +579,12 @@ up **`RegistryCheckPayload`** — `matches` and `uncheckedRegistries`. A `Regist
 `logo`, and the untouched `raw` entry). Because the lookup stops at the first registry that
 matches unless run with `exhaustive`, `matches` normally holds at most one entry. The registry
 check returns the payload on its outcome, on success and on failure; a handler supplies the
-`entity` on its `found` result. The `dcc-legacy` and `oidf` handlers fill one in; the
-`vc-recognition` handler does not yet. The OIDF entity is the verified subordinate statement's
-`metadata` — read only after that statement verifies, on a cache hit as well as on a fresh
-fetch — and its `logo` may be a large `data:` URI, cached with the rest of the lookup.
+`entity` on its `found` result, and every built-in handler fills one in. The OIDF entity is the
+verified subordinate statement's `metadata` — read only after that statement verifies, on a cache
+hit as well as on a fresh fetch — and its `logo` may be a large `data:` URI, cached with the rest
+of the lookup. The `vc-recognition` entity is the recognised `credentialSubject` entry, likewise
+read only from a credential that has verified: `name`, `url` and `logo` come from the entry's
+members of those names where they are strings, and the whole entry is `raw`.
 
 A lookup result cached by an earlier version, in the shape that predates `matches`, is treated as
 a cache miss rather than an error: the issuer is looked up again and the current shape is cached

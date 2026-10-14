@@ -79,11 +79,13 @@ export interface RegistryReference {
  * credential's description of itself, so it is the display name to
  * prefer: the credential cannot alter it.
  *
- * `dcc-legacy` and `oidf` populate this; `vc-recognition` matches carry no
- * entity yet. For `oidf` it comes from the `metadata` of the trust
- * anchor's subordinate statement, read only after that statement has
- * verified — on a cache hit as well, since the cached statement is
- * re-verified on every hit.
+ * Every registry type populates this. For `oidf` it comes from the
+ * `metadata` of the trust anchor's subordinate statement, read only after
+ * that statement has verified — on a cache hit as well, since the cached
+ * statement is re-verified on every hit. For `vc-recognition` it is the
+ * recognised `credentialSubject` entry, read only from a recognition
+ * credential that has verified, on a cache hit as well as on a fresh
+ * fetch.
  */
 export interface RegistryEntity {
   /** Organisation name as the registry records it. */
