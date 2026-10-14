@@ -23,6 +23,11 @@ import {
 import { buildTestContext } from './factories/services/build-test-context.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 import { FakeDocumentLoader } from './factories/services/fake-document-loader.js';
+import {
+  FakeHttpGetService,
+  okJsonBody
+} from './factories/services/fake-http-get-service.js';
+import { InMemoryCacheService } from '../src/services/cache-service/in-memory-cache-service.js';
 import { v1Expired } from './fixtures/v1-expired.js';
 import { v2Expired } from './fixtures/v2-expired.js';
 import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
@@ -684,6 +689,50 @@ describe('verifyCredential', () => {
       expect(result.summary[0].status).toBe('failure');
       expect(result.results).toHaveLength(1);
       expect(result.results[0].id).toBe('cryptographic.parsing.envelope');
+    });
+  });
+
+  describe('advisory (non-fatal) failures', () => {
+    // `registry.issuer` is advisory: it reports that the issuer is not
+    // listed, but it does not decide authenticity, so it never flips the
+    // top-level verdict. The suite rollup is where a UI finds it.
+    it('keeps verified: true when the registry check is the only failure', async () => {
+      const credential = CredentialFactory({ version: 'v2', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        ...fakeVerified,
+        httpGetService: FakeHttpGetService({
+          'https://factory.test/registry/legacy.json': okJsonBody({
+            registry: {}
+          })
+        }),
+        cacheService: InMemoryCacheService(),
+        registries: [
+          {
+            name: 'Unit Test Registry',
+            type: 'dcc-legacy',
+            url: 'https://factory.test/registry/legacy.json'
+          }
+        ]
+      });
+
+      expect(
+        result.results
+          .filter(r => r.outcome.status === 'failure')
+          .map(r => r.id)
+      ).toEqual(['trust.registry.issuer']);
+      const registryCheck = result.results.find(
+        r => r.id === 'trust.registry.issuer'
+      );
+      expect(registryCheck?.fatal).toBeFalsy();
+
+      expect(result.verified).toBe(true);
+
+      const registrySummary = result.summary.find(
+        s => s.id === 'trust.registry'
+      );
+      expect(registrySummary?.status).toBe('failure');
+      expect(registrySummary?.fatalFailureAt).toBeUndefined();
     });
   });
 

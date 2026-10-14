@@ -146,7 +146,7 @@ of the suite's own work.
 
 When a credential or presentation envelope fails to parse, the
 verifier short-circuits with a single synthetic
-`parsing.envelope` `CheckResult`. With `timing: true`, this
+`cryptographic.parsing.envelope` `CheckResult`. With `timing: true`, this
 synthetic check, its synthetic suite summary, and the top-level
 result all carry `timing` — same as a normal run:
 
@@ -154,7 +154,7 @@ result all carry `timing` — same as a normal run:
 {
   "verified": false,
   "results": [
-    { "id": "cryptographic.parsing.parsing.envelope",
+    { "id": "cryptographic.parsing.envelope",
       "outcome": { "status": "failure", "problems": [/* ... */] },
       "fatal": true,
       "timing": { "startedAt": "...", "endedAt": "...", "durationMs": 0.001 } }
@@ -237,9 +237,10 @@ counter semantics and `seed` options (`baseDateMs`,
 `performanceTickMs`).
 
 The `TimeService` is the source of truth for any check that
-needs to ask "what time is it?". `proof.signature` already reads
-it to judge credential expiry (`validUntil` / `expirationDate`)
-and `status.bitstring` to judge status-list freshness, so a
+needs to ask "what time is it?". `cryptographic.proof.signature`
+already reads it to judge credential expiry (`validUntil` /
+`expirationDate`) and `cryptographic.status.bitstring` to judge
+status-list freshness, so a
 verifier built on a `FakeTimeService` decides both at the pinned
 moment. Signature clock-skew windows and key rotation belong
 there too. Read it from `VerificationContext.timeService` inside

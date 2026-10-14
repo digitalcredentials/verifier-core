@@ -55,10 +55,10 @@ export interface SuiteSummary {
   /**
    * Aggregate status across the suite's child checks:
    *  - `'success'` — every check that ran returned `success`.
-   *  - `'failure'` — every check that ran returned `failure`.
+   *  - `'failure'` — at least one check failed and none passed
+   *    (failures alone, or failures plus skips).
    *  - `'mixed'`   — at least one `failure` and at least one
-   *    `success`. A suite whose only non-failures are skips is
-   *    `'failure'`.
+   *    `success`. Skips alone never make a suite `'mixed'`.
    *  - `'skipped'` — no check ran (suite predicate returned false,
    *    every check was filtered out by `appliesTo`, or every check
    *    was halted by an earlier fatal failure).

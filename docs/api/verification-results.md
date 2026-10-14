@@ -15,6 +15,7 @@
 ## Table of Contents
 
 1. [Overview](#overview)
+   - [The top-level verdict](#the-top-level-verdict)
    - [Check payloads](#check-payloads)
 2. [Presentation vs credential scopes](#presentation-vs-credential-scopes)
 3. [Phase model](#phase-model)
@@ -31,12 +32,33 @@ were skipped (with the reason), and the ones that were not run because an
 earlier fatal failure halted the pipeline. `summary[]`, new in v2.0.0, is
 the per-suite rollup over those rows.
 
+### The top-level verdict
+
+`verified` is `true` when no **fatal** check failed. For a presentation it
+also requires every embedded credential to be `verified`.
+
+Some checks are **advisory** (non-fatal), and an advisory failure never
+flips `verified`:
+
+- `trust.registry.issuer`
+- `recognition.profile`
+- `cryptographic.status.list-issuer`
+- the Open Badges checks — the semantic `schema.obv3.*` checks and the
+  Open Badges JSON-schema check
+- any caller-supplied check that leaves `fatal` unset
+
+So a credential whose only failing check is the registry lookup is
+`verified: true`, while its `trust.registry` summary has
+`status: 'failure'` and no `fatalFailureAt`. A UI that wants to show
+"issuer not registered" reads the summary rows, not `verified`; see
+[§6 UI rendering recipe](#ui-rendering-recipe).
+
 A successful single-credential verification:
 
 ```jsonc
 {
   "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
+  "verifiableCredential": { "...the credential you passed in, unchanged..." },
   "results": [
     { "id": "cryptographic.core.context-exists",
       "suite": "core",
@@ -476,33 +498,38 @@ function suiteBadge(s: SuiteSummary): Badge {
 }
 ```
 
-A presentation with two credentials, one verified with warnings and
-one not verified, gets rendered as:
+A presentation with two credentials — the first failing only advisory
+checks, the second failing a fatal one — gets rendered as:
 
 ```
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
-├─ Credential 1 (obv3p0.openbadge): ✓
-│   ├─ cryptographic ✓
-│   ├─ trust         ⚠ (1 of 1 check failed)
+├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
+│   ├─ cryptographic ✓ (4 + 1 + 1 = 6 checks passed)
+│   ├─ trust         ⚠ (1 of 1 check failed — advisory)
 │   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓
-│   └─ semantic      ⚠ (1 of 5 checks failed, 4 passed)   [openBadgesSuite]
+│   └─ semantic      ⚠ (1 of 5 checks failed, 4 passed — advisory)
 │       └─ semantic.openbadges.schema.obv3.result-ref — Invalid Result Reference
 └─ Credential 2 (obv3p0.openbadge): ✗
-    ├─ cryptographic ✗ (proof: 1 of 1 check failed; status: not run)
-    │   └─ cryptographic.proof.signature — Credential Expired
-    ├─ trust         — (registry not run: proof.signature failed)
+    ├─ cryptographic ✗ (1 of 1 check failed)
+    │   └─ cryptographic.proof.signature — Invalid Signature
+    ├─ trust         — (not run after fatal)
     ├─ recognition   ✓
-    └─ semantic      — (not run: proof.signature failed)
+    └─ semantic      — (not run after fatal)
 ```
 
-Credential 1 is verified: its registry and Open Badges checks are
-non-fatal, so their failures are warnings (amber), not errors.
-Credential 2 is not verified because `proof.signature` failed fatally;
-its proof suite carries `fatalFailureAt: "cryptographic.proof.signature"`,
-and every later check was not run. A phase takes the most severe badge
-of its suites.
+Credential 1 shows the rule from
+[§1 The top-level verdict](#the-top-level-verdict): the registry and
+Open Badges checks are advisory, so their failures leave
+`credentialResults[0].verified === true` even though those two suites
+report `status: 'failure'` and `'mixed'`. Neither carries
+`fatalFailureAt`, so they render as warnings (amber), not errors. Only
+credential 2's fatal signature failure makes the presentation's own
+`verified` false. A UI that hid advisory failures because the verdict
+was `true` would be hiding exactly what a user wants to know, so render
+them — just not as a failed verdict. A phase takes the most severe
+badge of its suites.
 
 The `└─` rows under each failing phase row come from `failureDetail()`.
 Lazy-expand them — most users only want the verdict + per-phase status.
@@ -543,6 +570,17 @@ dcc-transaction-service UI implementation.
 > every check — passes, skips with a reason, and rows not run after a
 > fatal failure — so a row's `outcome.status` is what distinguishes
 > them.
+>
+> `verified` means "no fatal check failed" (and, for a presentation,
+> that every embedded credential is itself verified). The advisory
+> (non-fatal) checks are `trust.registry.issuer`,
+> `recognition.profile`, `cryptographic.status.list-issuer`, the Open
+> Badges checks (the semantic `schema.obv3.*` checks and the Open
+> Badges JSON-schema check), and any caller-supplied check without
+> `fatal`. A credential whose only failing check is advisory is
+> `verified: true` with `status: 'failure'` (or `'mixed'`) and no
+> `fatalFailureAt` on that suite — render the failure rows as warnings,
+> but do not render the verdict as failed.
 
 ---
 
@@ -551,7 +589,7 @@ dcc-transaction-service UI implementation.
 ```jsonc
 {
   "verified": false,
-  "verifiablePresentation": { /* parsed VP */ },
+  "verifiablePresentation": { /* the VP you passed in, unchanged */ },
   "presentationResults": [
     { "id": "cryptographic.core.vp-structure",  /* success */ },
     { "id": "cryptographic.proof.signature",    /* success */ }
@@ -564,8 +602,9 @@ dcc-transaction-service UI implementation.
   ],
   "credentialResults": [
     {
+      // Only advisory checks failed, so the verdict stays true.
       "verified": true,
-      "verifiableCredential": { /* VC from an unregistered issuer */ },
+      "verifiableCredential": { /* VC with an unregistered issuer */ },
       "recognizedProfile": "obv3p0.openbadge",
       "results": [
         { "id": "cryptographic.core.context-exists",  /* success */ },
@@ -607,8 +646,9 @@ dcc-transaction-service UI implementation.
       ]
     },
     {
+      // A fatal failure: this is what makes a verdict false.
       "verified": false,
-      "verifiableCredential": { /* expired VC */ },
+      "verifiableCredential": { /* VC with a broken signature */ },
       "recognizedProfile": "obv3p0.openbadge",
       "results": [
         { "id": "cryptographic.core.context-exists",  /* success */ },
@@ -618,18 +658,25 @@ dcc-transaction-service UI implementation.
         { "id": "cryptographic.core.proof-exists",    /* success */ },
         { "id": "recognition.profile",                /* success */ },
         { "id": "cryptographic.proof.signature",
-          "suite": "proof", "check": "proof.signature",
+          "suite": "proof",
           "outcome": { "status": "failure", "problems": [
-            { "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_EXPIRED",
-              "title": "Credential Expired",
-              "detail": "..." }
+            { "type": "https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE",
+              "title": "Invalid Signature",
+              "detail": "The credential's signature did not verify." }
           ]},
           "fatal": true },
-        { "id": "trust.registry.issuer",
-          "suite": "registry", "check": "registry.issuer",
+        { "id": "cryptographic.status.bitstring",
+          "suite": "status",
           "outcome": { "status": "skipped",
-                       "reason": "Not run: proof.signature failed" },
-          "fatal": false }
+                       "reason": "Not run: proof.signature failed" } },
+        { "id": "cryptographic.status.list-issuer",
+          "suite": "status",
+          "outcome": { "status": "skipped",
+                       "reason": "Not run: proof.signature failed" } },
+        { "id": "trust.registry.issuer",
+          "suite": "registry",
+          "outcome": { "status": "skipped",
+                       "reason": "Not run: proof.signature failed" } }
       ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
@@ -646,6 +693,10 @@ dcc-transaction-service UI implementation.
           "message": "1 of 1 check failed",
           "counts": { "passed": 0, "failed": 1, "skipped": 0 },
           "fatalFailureAt": "cryptographic.proof.signature" },
+        { "id": "cryptographic.status", "phase": "cryptographic",
+          "suite": "status", "status": "skipped",
+          "message": "status not run: proof.signature failed",
+          "counts": { "passed": 0, "failed": 0, "skipped": 2 } },
         { "id": "trust.registry", "phase": "trust",
           "suite": "registry", "status": "skipped",
           "message": "registry not run: proof.signature failed",
@@ -710,15 +761,14 @@ function failureDetail(
 ```
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
-├─ Credential 1 (obv3p0.openbadge): ✓
+├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
 │   ├─ cryptographic ✓
-│   ├─ trust         ✓
-│   ├─ recognition   ✓
-│   └─ semantic      ✓
+│   ├─ trust         ✗ (1 of 1 check failed — advisory)
+│   │   └─ trust.registry.issuer — Issuer Not Registered
+│   └─ recognition   ✓
 └─ Credential 2 (obv3p0.openbadge): ✗
-    ├─ cryptographic ✓
-    ├─ trust         ✗ (1 of 1 check failed)
-    │   └─ trust.registry.issuer — Issuer Not Registered
-    ├─ recognition   ✓
-    └─ semantic      ✓
+    ├─ cryptographic ✗ (1 of 1 check failed)
+    │   └─ cryptographic.proof.signature — Invalid Signature
+    ├─ trust         — (not run after fatal)
+    └─ recognition   ✓
 ```

@@ -214,7 +214,14 @@ interface CredentialVerificationResult {
 }
 ```
 
-`verified` is `true` when no check returned a failure. `results` carries every
+`verified` is `true` when no **fatal** check returned a failure. Some checks are
+advisory: `trust.registry.issuer`, `recognition.profile`,
+`cryptographic.status.list-issuer`, the Open Badges checks (the semantic
+`schema.obv3.*` checks and the Open Badges JSON-schema check), and any check of
+your own that leaves `fatal` unset. An advisory failure never flips `verified`,
+so a credential whose only failing check is the registry lookup is still
+`verified: true` — its `trust.registry` summary carries `status: 'failure'` and
+no `fatalFailureAt`, which is how a UI surfaces it as a warning. `results` carries every
 check — the ones that passed, the ones that were skipped (with a reason), and
 the ones that were not run after a fatal failure — while `summary` provides the
 per-suite rollup (see [Per-suite summaries](#per-suite-summaries)).
@@ -244,7 +251,7 @@ interface ProblemDetail {
 ```json
 {
   "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
+  "verifiableCredential": { "...the credential you passed in, unchanged..." },
   "results": [
     { "id": "cryptographic.core.context-exists", "suite": "core",   "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
     { "id": "cryptographic.core.vc-context",     "suite": "core",   "outcome": { "status": "success", "message": "..." } },
@@ -656,10 +663,15 @@ Presentation verification does two things:
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.
 
-`verified` is `true` only if both the presentation and all embedded credentials
-pass.
+`verified` is `true` when no **fatal** presentation check failed and every
+embedded credential is itself `verified`. The same checks are advisory here as
+for a single credential (`trust.registry.issuer`, `recognition.profile`,
+`cryptographic.status.list-issuer`, the Open Badges checks, and any check of
+your own that leaves `fatal` unset): an embedded credential whose only failure
+is advisory is `verified: true`, and so, on its account, is the presentation.
 
-The parsed VP is returned as `verifiablePresentation`, mirroring the wire-level
+The VP is returned as `verifiablePresentation` — the object you passed in,
+unchanged — mirroring the wire-level
 property name so callers (and downstream systems whose templates reach into
 result objects by property path) can reach it without carrying the original
 input separately.
@@ -1132,7 +1144,7 @@ small migrations:
   - `PresentationVerificationResult.allResults` removed — replace with
     `flattenPresentationResults(result)`.
   - `PresentationVerificationResult.verifiablePresentation` added — new field
-    carrying the parsed VP.
+    carrying the VP you passed in, unchanged.
 
 - **Default cache isolation:** two `createVerifier()` calls without an explicit
   `cacheService` no longer share a process-wide cache. To preserve the previous

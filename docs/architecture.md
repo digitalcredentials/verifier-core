@@ -181,8 +181,8 @@ caller's original object is what the suites verify (see the invariant in `src/ve
 The credential is `unknown` on entry — callers don't need to pre-validate.
 
 **Context.** Each `verifyCredential` / `verifyPresentation` call builds an internal
-`VerificationContext` from the verifier's long-lived services plus per-call inputs (the parsed
-credential or presentation, optional `additionalSuites`, optional `registries` override, optional
+`VerificationContext` from the verifier's long-lived services plus per-call inputs (the caller's
+original credential or presentation object — Zod gates it, it is never rewritten — optional `additionalSuites`, optional `registries` override, optional
 `challenge` / `domain` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
 not a public composition point. Because `documentLoader` and `cacheService` live on the verifier,
 they're shared across every call on the same instance — this is what makes batch verification
