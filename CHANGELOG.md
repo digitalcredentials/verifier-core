@@ -32,8 +32,7 @@ not run after a fatal failure.
 - Pure `foldCheckResults` helper and `computeId` namespace builder, both
   exported from the package barrel.
 - New consumer doc at `docs/api/verification-results.md` covering the result
-  shape, the `id` namespace, a UI rendering recipe, and a prompt-ready appendix
-  for downstream UIs.
+  shape, the `id` namespace, and a UI rendering recipe.
 - `timing?: boolean` flag on `VerifierConfig`, `VerifyCredentialCall`, and
   `VerifyPresentationCall`. When true, every `CheckResult`, every
   `SuiteSummary`, and every top-level

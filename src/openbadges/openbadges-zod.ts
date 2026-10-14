@@ -14,13 +14,12 @@
  *   fail the whole credential and silently skip the check. Callers filter at
  *   the point of use.
  *
- * These shapes are **not** exported from the submodule barrel in this plan —
- * they are an internal implementation detail of the checks. A future effort can
- * promote them (or a curated subset) to the public surface if it would be
- * useful for consumer business logic.
+ * These shapes are **not** exported from the submodule barrel — they are an
+ * internal implementation detail of the checks. A future effort can promote
+ * them (or a curated subset) to the public surface if it would be useful for
+ * consumer business logic.
  *
- * Shape coverage tracks what every check planned in the
- * 2026-04-18-openbadges-module plan needs to read:
+ * Shape coverage tracks what each check needs to read:
  *
  * - `Obv3ResultShape`            — `result-ref`, `achieved-level`,
  *                                  `missing-result-status`
@@ -33,9 +32,9 @@
  *
  * ## Why these are kept alongside the strict `Obv3p0OpenBadgeCredentialSchema`
  *
- * The 2026-04-18 P-C plan introduced a strict envelope schema in
- * `schemas/classes-v3p0.ts` and `schemas/openbadge-credential-v3p0.ts` that
- * validates an OB 3.0 credential top-to-bottom. That schema powers the
+ * `schemas/classes-v3p0.ts` and `schemas/openbadge-credential-v3p0.ts` hold a
+ * strict envelope schema that validates an OB 3.0 credential
+ * top-to-bottom. That schema powers the
  * recognition pipeline (`obv3p0Recognizer`) and the public
  * `recognition.profile` check.
  *

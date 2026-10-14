@@ -5,9 +5,9 @@
  * Called from `verifier.ts` after `runSuites` returns and after
  * the recognition payload has been lifted onto the result. The
  * helper has no I/O, no async, and no service dependencies — it
- * is safe to call from any context (incl. consumers recomputing
- * summaries after appending late results, e.g.
- * dcc-transaction-service's async OpenBadges merge).
+ * is safe to call from any context, including consumers
+ * recomputing summaries after appending results that arrived
+ * later (an asynchronous OpenBadges merge, say).
  *
  * `results[]` is the raw input, unchanged: every check that ran,
  * was skipped, or was not run after a fatal failure.

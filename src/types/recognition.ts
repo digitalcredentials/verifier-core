@@ -8,8 +8,6 @@
  * applies-true match's normalized form on
  * {@link CredentialVerificationResult.normalizedVerifiableCredential}
  * + {@link CredentialVerificationResult.recognizedProfile}.
- *
- * @see `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/00-design.md`
  */
 
 import type { ProblemDetail } from './problem-detail.js';

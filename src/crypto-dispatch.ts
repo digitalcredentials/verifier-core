@@ -1,9 +1,9 @@
 /**
  * Shared crypto-service dispatch.
  *
- * Presentation proofs, credential proofs, and (after the status-check
- * rewrite) status-list-credential proofs all resolve through this helper
- * against the same `CryptoService[]`. Callers own their problem types:
+ * Presentation proofs, credential proofs, and status-list-credential
+ * proofs all resolve through this helper against the same
+ * `CryptoService[]`. Callers own their problem types:
  * the helper reports a neutral outcome so a bad signature on a credential
  * and a bad signature on its status list credential stay distinct
  * diagnostics.

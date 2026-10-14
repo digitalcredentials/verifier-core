@@ -1,8 +1,6 @@
 /**
- * Spec for the Phase-2 OB 3.0 envelope schema.
- *
- * Asserts the contract documented in
- * `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/02-envelope-and-date-discriminator.md`.
+ * Spec for the OB 3.0 envelope schema, including the cross-field
+ * VCDM v1/v2 date discriminator (`issuanceDate` vs `validFrom`).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -219,9 +217,9 @@ describe('parseObv3p0OpenBadgeCredential (envelope)', () => {
     });
 
     it('omits instance for whole-document problems (none expected at this layer)', () => {
-      // Sanity: every problem we currently raise has a path. Future
-      // changes that introduce root-level refines should leave
-      // `instance` undefined per the design's policy.
+      // Sanity: every problem we currently raise has a path. A
+      // root-level refine added later should leave `instance`
+      // undefined rather than point at the document root.
       const cred = clone(obv3p0OpenBadgeSpecConforming);
       cred.id = 'not-an-iri';
 

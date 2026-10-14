@@ -1,5 +1,6 @@
 /**
- * Pins the headline performance claim of P-A: a single {@link createVerifier}
+ * Pins the verifier's headline performance claim: a single
+ * {@link createVerifier}
  * instance shares its long-lived caches across calls. In particular, an
  * issuer registry lookup that requires an HTTP fetch happens once per
  * registry URL — subsequent verifications for the same issuer hit the
@@ -137,7 +138,7 @@ describe('Verifier cache sharing', () => {
     expect(http.callsTo(REGISTRY_URL)).toBe(2);
   });
 
-  describe('status list URL routing through httpGetService (P-E)', () => {
+  describe('status list URL routing through httpGetService', () => {
     const STATUS_LIST_URL = 'https://example.test/status/list-pe';
 
     /** Same-shape VC as `makeCredential`, but adds a BitstringStatusListEntry. */
@@ -173,13 +174,13 @@ describe('Verifier cache sharing', () => {
         credential: makeRevocableCredential('urn:uuid:status-once-1')
       });
 
-      // Pre-P-E this was 2 (DataIntegrityCryptoService.checkStatus + statusSuite).
-      // Post-P-E only statusSuite fetches the list.
+      // Only statusSuite fetches the list: the proof path passes a no-op
+      // `checkStatus`, so there is no second fetch from there.
       expect(http.callsTo(STATUS_LIST_URL)).toBe(1);
     });
   });
 
-  describe('document loader memoization per HttpGetService (P-E)', () => {
+  describe('document loader memoization per HttpGetService', () => {
     it('returns the same DocumentLoader for the same HttpGetService instance', () => {
       const fake: HttpGetService = FakeHttpGetService({});
       const a = defaultDocumentLoaderFor(fake);

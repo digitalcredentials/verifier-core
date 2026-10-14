@@ -849,8 +849,8 @@ embeds its suite's phase, so re-tagging a built-in suite would rename every
 check in it: changing either is a breaking change.
 
 See [`docs/api/verification-results.md`](./docs/api/verification-results.md) for
-the full reference (phase model, `SuiteSummary` fields, `id` namespace, UI
-rendering recipe, and a prompt-ready appendix for downstream UIs).
+the full reference (phase model, `SuiteSummary` fields, `id` namespace, and a UI
+rendering recipe).
 
 ## Capturing timing data
 
@@ -871,7 +871,7 @@ console.log(result.summary[0].timing!.durationMs);
 Per-check timings ride on every row of `results[]`, and the per-suite rollup
 lives on `summary[i].timing`. See
 [`docs/api/timing.md`](./docs/api/timing.md) for the full reference, granularity
-table, recipes, and a prompt-ready appendix.
+table, and recipes.
 
 ## Pluggable clock (`TimeService`)
 
@@ -1044,9 +1044,9 @@ for (const credResult of presResult.credentialResults) {
 }
 ```
 
-This is the recommended advanced integration shape for services like
-`dcc-transaction-service` that verify a presentation up front and then inspect
-each embedded credential's profile to drive downstream business logic. If
+This is the recommended advanced integration shape for a service that verifies
+a presentation up front and then inspects each embedded credential's profile to
+drive downstream business logic. If
 performance matters, you're verifying high volumes of credentials, you want to
 show partial results to a user for verification in progress, or you have
 specific requirements for the verification process, this advanced integration

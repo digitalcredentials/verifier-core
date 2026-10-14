@@ -1,11 +1,10 @@
 /**
  * Spec-conforming VCDM v2 OB 3.0 OpenBadgeCredential fixture.
  *
- * Designed to round-trip through every schema phase of the
- * 2026-04-18-openbadges-recognizer-and-subchecks plan: every
+ * Designed to round-trip through every OB 3.0 class schema: every
  * required envelope, profile, achievement, subject, and result
- * field is present so later phases can assert on the same fixture
- * without amendment.
+ * field is present, so a spec for any one class can assert against
+ * this fixture without amending it.
  *
  * Authored as a `.ts` module (rather than `.json`) to match the
  * existing fixture convention in this repo

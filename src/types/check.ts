@@ -7,7 +7,7 @@
  * iterates suites and assembles a flat `CheckResult[]` report.
  *
  * @see {@link ../run-suites.ts} for orchestration
- * @see {@link ../defaults.ts} for the default suite ordering
+ * @see {@link ../default-suites.ts} for the default suite ordering
  */
 
 import type { ProblemDetail } from './problem-detail.js';

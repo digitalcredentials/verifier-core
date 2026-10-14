@@ -1,8 +1,7 @@
 /**
  * End-to-end spec for the recognition pipeline through `createVerifier`.
  *
- * Asserts the contract documented in
- * `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/00-design.md`:
+ * Asserts the recognition contract:
  *
  * - With no `recognizers` configured, `recognition.profile` emits
  *   skipped and the result has no `normalizedVerifiableCredential`

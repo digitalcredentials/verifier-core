@@ -7,7 +7,7 @@
  *    dynamic `import('@digitalcredentials/verifier-core/openbadges')`
  *    catches typos in `exports` and missing re-exports in
  *    `src/openbadges/index.ts`.
- * 2. **Default-path invariant (Q2).** A vanilla
+ * 2. **Default-path invariant.** A vanilla
  *    `createVerifier()` against a real OB credential emits zero
  *    OB-related `CheckResult` entries.
  * 3. **Opt-in path emits OB findings.** Adding `openBadgesSuite`
@@ -118,7 +118,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     expect(ACHIEVEMENT_TYPE_EXT_PREFIX).toBe('ext:');
   });
 
-  it('runs no OB checks by default (Q2 invariant)', async () => {
+  it('runs no OB checks by default', async () => {
     const verifier = createVerifier(fakeVerified);
     const result = await verifier.verifyCredential({
       credential: cloneCredential()

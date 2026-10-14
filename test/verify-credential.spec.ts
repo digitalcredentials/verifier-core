@@ -535,13 +535,13 @@ describe('verifyCredential', () => {
     });
   });
 
-  // P-E regression: revoked credentials must fail with the failure
-  // sourced from the status suite, not the proof suite. We exercise this
-  // through the same code path createVerifier uses (defaultSuites +
-  // runSuites + hasFatalFailures). FakeCryptoService verifies both the
-  // credential proof and the unsigned factory status-list credential so
-  // the contract being pinned is the aggregation, not real cryptography.
-  describe('revoked credential sourcing (P-E)', () => {
+  // Revoked credentials must fail with the failure sourced from the
+  // status suite, not the proof suite. We exercise this through the same
+  // code path createVerifier uses (defaultSuites + runSuites +
+  // hasFatalFailures). FakeCryptoService verifies both the credential
+  // proof and the unsigned factory status-list credential so the contract
+  // being pinned is the aggregation, not real cryptography.
+  describe('revoked credential sourcing', () => {
     it('flips verified to false via status.bitstring (not proof.signature) when status list marks the index revoked', async () => {
       const listUrl = 'https://factory.test/status/list-revoked-pe';
       const slCred = await StatusListCredentialFactory({

@@ -1,6 +1,5 @@
 /**
- * Spec for the suite-phase filter (Phase 10 of the
- * 2026-04-18-openbadges-recognizer-and-subchecks plan).
+ * Spec for the suite-phase filter.
  *
  * Coverage:
  *

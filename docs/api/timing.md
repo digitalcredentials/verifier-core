@@ -3,11 +3,8 @@
 > Consumer reference for the optional `timing` flag and the
 > `TaskTiming` data carried on every result when it is enabled.
 >
-> **Audience.** Performance / observability work in
-> `dcc-transaction-service`, `skills-verifier`, and any future
-> client building on `verifier-core`. The §9 LLM-prompt
-> appendix is written to be copy-pasted as the seed of an LLM
-> prompt for client-side instrumentation code-gen.
+> **Audience.** Performance and observability work in any client
+> building on `verifier-core`.
 
 ## Table of Contents
 
@@ -19,7 +16,6 @@
 6. [Parse-failure behavior](#parse-failure-behavior)
 7. [Recipes](#recipes)
 8. [`TimeService` reference](#timeservice-reference)
-9. [Prompt-ready appendix](#prompt-ready-appendix)
 
 ## Overview
 
@@ -245,75 +241,3 @@ verifier built on a `FakeTimeService` decides both at the pinned
 moment. Signature clock-skew windows and key rotation belong
 there too. Read it from `VerificationContext.timeService` inside
 `execute()`.
-
-## Prompt-ready appendix
-
-> Drop this section verbatim into an LLM prompt for client-side
-> instrumentation code-gen.
-
-`@digitalcredentials/verifier-core` v2 emits optional
-`TaskTiming` data on every result when constructed with
-`timing: true`:
-
-```ts
-import { createVerifier } from '@digitalcredentials/verifier-core';
-const verifier = createVerifier({ timing: true });
-const result = await verifier.verifyPresentation({ presentation });
-```
-
-Every result then carries a `timing: TaskTiming` field at three
-levels:
-
-```ts
-interface TaskTiming {
-  startedAt: string;            // ISO 8601 wall-clock
-  endedAt: string;              // ISO 8601 wall-clock
-  durationMs: number;           // monotonic, fractional ms
-  events?: ReadonlyArray<TaskTiming & { name: string }>; // reserved
-}
-
-// Per-check (every row in results[] when timing: true):
-result.results[i].timing
-// Per-suite (always present in summary[] when timing: true):
-result.summary[i].timing
-// Top-level inclusive wrapper:
-result.timing
-// In verifyPresentation results, each embedded VC also has:
-result.credentialResults[i].timing
-```
-
-Invariants (always hold when `timing: true`):
-
-1. `endedAt >= startedAt` for every `TaskTiming`.
-2. `durationMs >= 0` for every `TaskTiming`.
-3. Top-level `result.timing.durationMs >= max(s.timing.durationMs for s in result.summary)`.
-4. `verifyPresentation` top-level `result.timing.durationMs >= cr.timing.durationMs` for every `cr in result.credentialResults`.
-5. Per-suite `timing.durationMs == sum(child timing.durationMs)`.
-6. Per-suite `timing.startedAt == min(child startedAt)`,
-   per-suite `timing.endedAt == max(child endedAt)`.
-
-Use `durationMs` for any sort / sum / comparison (it comes
-from a monotonic clock); use `startedAt` / `endedAt` only for
-log correlation and human-readable timelines.
-
-A "verification time breakdown" UI from a presentation result:
-
-```ts
-function buildBreakdown(result: PresentationVerificationResult) {
-  const totalMs = result.timing!.durationMs;
-  return {
-    totalMs,
-    presentationOnlyMs: result.summary
-      .reduce((a, s) => a + (s.timing?.durationMs ?? 0), 0),
-    credentials: result.credentialResults.map(cr => ({
-      id: cr.verifiableCredential.id,
-      totalMs: cr.timing!.durationMs,
-      bySuite: cr.summary.map(s => ({
-        suite: s.id,
-        durationMs: s.timing!.durationMs,
-        fatalFailureAt: s.fatalFailureAt,
-      })),
-    })),
-  };
-}
-```

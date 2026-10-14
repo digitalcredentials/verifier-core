@@ -33,14 +33,14 @@
  * not name, and a `.transform` can rewrite scalars into arrays. Either change
  * alters the canonicalized N-Quads, which makes a valid proof fail as
  * `INVALID_SIGNATURE` — a failure that looks like a bad credential and is
- * actually a bug here. That is not hypothetical: a spec-legal
- * `issuer.image.caption` was once dropped by a nested issuer image schema
- * and rejected production Open Badges credentials.
+ * actually a bug here. A nested issuer image schema that drops a spec-legal
+ * `issuer.image.caption`, for instance, rejects Open Badges credentials that
+ * are perfectly valid.
  *
  * Returning the original object also matters downstream, because consumers
- * re-verify `result.verifiableCredential` (the async Open Badges pass in
- * dcc-transaction-service does exactly this). Handing them a rewritten copy
- * makes the second pass fail where the first passed.
+ * re-verify `result.verifiableCredential` — an asynchronous second Open
+ * Badges pass, say. Handing them a rewritten copy makes that pass fail where
+ * the first passed.
  *
  * Suites must therefore tolerate raw JSON-LD shapes rather than assume
  * normalization: `@context` and `type` may each be a string or an array.

@@ -15,10 +15,9 @@
  *  - `events` — reserved for an ordered series of sub-events
  *    captured from inside one task (e.g. `signature.verify`,
  *    `documentLoader.load`, `statusList.fetch`). No built-in
- *    capture writes to this field today; a future plan may
- *    add a hook on `VerificationContext` for checks to push
- *    sub-events. Recursive so a sub-event can have its own
- *    sub-events.
+ *    capture writes to this field today; a future hook on
+ *    `VerificationContext` could let checks push sub-events.
+ *    Recursive so a sub-event can have its own sub-events.
  *
  * @see ../../docs/api/timing.md for usage patterns.
  */

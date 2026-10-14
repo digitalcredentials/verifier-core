@@ -1,10 +1,7 @@
 /**
- * Spec for the Phase-4 OB 3.0 `Profile` class schema and the
- * `ProfileRefField()` builder, plus its backfill into
+ * Spec for the OB 3.0 `Profile` class schema and the
+ * `ProfileRefField()` builder, plus its use in
  * `credential.issuer`.
- *
- * Asserts the contract documented in
- * `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/04-profile-and-profileref.md`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -154,7 +151,8 @@ describe('credential.issuer (backfilled ProfileRefField)', () => {
     // when neither branch advances past structural matching — the
     // string-IRI branch is rejected immediately (input is an object)
     // and the Profile branch fails at the missing required `type`.
-    // This matches the plan's "appropriate parent path" allowance.
+    // Attribution to the parent path is accurate enough here: the
+    // failure is "this issuer value fits neither form".
     assertMalformedAt(result, '/issuer');
   });
 

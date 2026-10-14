@@ -628,7 +628,7 @@ by `summary[]`, a per-suite rollup. The rollup is computed by a pure helper — 
 that append late results and want to recompute their summaries.
 
 See [`docs/api/verification-results.md`](api/verification-results.md) for the full reference,
-including the `id` namespace, rendering recipes, and the LLM prompt appendix for downstream UIs.
+including the `id` namespace and rendering recipes.
 
 Both shapes use the suite-based `CheckResult[]` model. Each `CheckResult` carries a discriminated
 `CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag) and,
@@ -743,8 +743,8 @@ without network dependencies, and composable — consumers wire in exactly the b
   recursion guard.
 - **`RegistryHandler` is a port.** Callers can override or extend the per-type handler map by
   passing `registryHandlers` on `VerifierConfig`.
-- **No dynamic imports in `src/`.** The proof suite is statically wired; recursion through the
-  verifier replaced the old dynamic-import seam from `vc-recognition-handler` into `verify-suite`.
+- **No dynamic imports in `src/`.** The proof suite is statically wired, and `vc-recognition-handler`
+  reaches the verifier through an injected thunk rather than by importing `verify-suite` at runtime.
 
 ### What's not yet hexagonal
 
@@ -752,7 +752,8 @@ without network dependencies, and composable — consumers wire in exactly the b
   implementation embeds `@digitalcredentials/vc` directly inside `DataIntegrityCryptoService`.
   Replacing the default crypto service requires understanding the LD-Proofs / Data Integrity
   internals. The default crypto service verifies signatures only — credential status checking
-  is the sole responsibility of the status suite (P-E, 2026-04-19).
+  is the sole responsibility of the status suite, so the status list is fetched once per
+  verification and one answer, not two, is reported for a credential's status.
 - **Status suite** still consumes `@digitalcredentials/vc-bitstring-status-list` for purpose
   matching, list type, bitstring decoding, and index reading. The list's validity dates are
   checked by `@digitalcredentials/vc` inside the crypto service, with its proof, and issuer

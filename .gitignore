@@ -112,9 +112,6 @@ jspm_packages/
 /.vscode
 .cursor
 
-# local development notes
-docs/plans 
-
 # Output
 dist
 

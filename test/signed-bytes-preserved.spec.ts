@@ -32,8 +32,9 @@ const offlineHttpGetService = {
 const documentLoader = defaultDocumentLoaderFor(offlineHttpGetService as never);
 
 /**
- * The issuer image `caption` is the load-bearing field: it is signed, and it is
- * the key the old schema dropped.
+ * The issuer image `caption` is the load-bearing field: it is signed, and it
+ * is exactly the kind of key a nested object schema drops when it does not
+ * name it.
  */
 const credentialTemplate = (issuerDid: string): Record<string, unknown> => ({
   '@context': [
@@ -128,9 +129,8 @@ describe('signed bytes survive verification', () => {
   });
 
   it('returns the credential as issued, so a second pass can re-verify it', async () => {
-    // dcc-transaction-service re-verifies `verifiableCredential` in its
-    // asynchronous Open Badges pass. A rewritten copy fails there even though
-    // the synchronous pass succeeded.
+    // Consumers re-verify `verifiableCredential` in a later pass. A
+    // rewritten copy fails there even though the first pass succeeded.
     const result = await verifier().verifyCredential({
       credential: signedCredential,
       phases: ['cryptographic']
