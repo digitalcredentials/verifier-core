@@ -10,8 +10,8 @@ import type { VerifiablePresentation } from '../src/schemas/presentation.js';
 
 function mkCheck(suite: string, checkId: string): CheckResult {
   return {
+    id: `cryptographic.${suite}.${checkId}`,
     suite,
-    check: checkId,
     outcome: { status: 'success', message: 'ok' }
   };
 }
@@ -101,13 +101,16 @@ describe('flattenPresentationResults', () => {
     expect(
       flat.slice(6).map(e => (e as { credentialIndex: number }).credentialIndex)
     ).toEqual([2]);
-    expect(flat.slice(1, 3).map(e => e.result.check)).toEqual(['c0-0', 'c0-1']);
-    expect(flat.slice(3, 6).map(e => e.result.check)).toEqual([
-      'c1-0',
-      'c1-1',
-      'c1-2'
+    expect(flat.slice(1, 3).map(e => e.result.id)).toEqual([
+      'cryptographic.core.c0-0',
+      'cryptographic.core.c0-1'
     ]);
-    expect(flat[6].result.check).toBe('c2-0');
+    expect(flat.slice(3, 6).map(e => e.result.id)).toEqual([
+      'cryptographic.core.c1-0',
+      'cryptographic.status.c1-1',
+      'cryptographic.core.c1-2'
+    ]);
+    expect(flat[6].result.id).toBe('cryptographic.registry.c2-0');
   });
 
   it('credentialIndex i matches credentialResults[i].results in order (index stability)', () => {

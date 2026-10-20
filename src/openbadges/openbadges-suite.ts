@@ -16,9 +16,9 @@
  *   for consumers who want full OB coverage and accept the schema
  *   suite's network cost.
  *
- * None of these are part of the verifier's default suite set; the
- * 2026-04-18 plan ([Q2](../../docs/plans/2026-04-18-openbadges-module/00-questions.md#q2-default-path-behavior))
- * makes OpenBadges verification fully opt-in. To enable:
+ * None of these are part of the verifier's default suite set:
+ * OpenBadges verification is fully opt-in, so a caller who does not
+ * ask for it pays none of its cost. To enable:
  *
  * @example
  * ```ts

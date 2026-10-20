@@ -49,7 +49,7 @@ const credentialTemplate = (issuerDid: string): Record<string, unknown> => ({
 });
 
 function signatureResult(results: CheckResult[]): CheckResult | undefined {
-  return results.find(r => r.check === 'proof.signature');
+  return results.find(r => r.id === 'cryptographic.proof.signature');
 }
 
 describe('unsignedPresentation with the default crypto service', () => {
@@ -76,8 +76,7 @@ describe('unsignedPresentation with the default crypto service', () => {
   const verify = (presentation: unknown, unsignedPresentation?: boolean) =>
     createVerifier({
       httpGetService: offlineHttpGetService as never,
-      documentLoader,
-      verbose: true
+      documentLoader
     }).verifyPresentation({
       presentation,
       challenge: CHALLENGE,

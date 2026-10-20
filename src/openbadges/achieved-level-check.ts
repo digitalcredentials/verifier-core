@@ -27,7 +27,7 @@ import { formatJsonPointer } from '../util/json-pointer.js';
  * - The credential has no `achievement.resultDescription[]` (nothing
  *   to validate against).
  *
- * Out of scope (intentional non-flagging — see plan Phase 3):
+ * Out of scope (intentional non-flagging):
  * - A `Result` that carries `achievedLevel` but is missing
  *   `resultDescription` entirely. This is a different rule
  *   ("missing reference"); the `result-ref` check only flags

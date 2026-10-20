@@ -80,21 +80,20 @@ describe('Foundation types', () => {
   });
 
   describe('CheckResult', () => {
-    it('tags outcome with suite and check ids', () => {
+    it('tags outcome with suite and check id', () => {
       const result: CheckResult = {
-        check: 'core.proof-exists',
+        id: 'cryptographic.core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' }
       };
       expect(result.suite).toBe('core');
-      expect(result.check).toBe('core.proof-exists');
+      expect(result.id).toBe('cryptographic.core.proof-exists');
       expect(result.outcome.status).toBe('success');
     });
 
-    it('accepts an optional namespaced id', () => {
+    it('requires a namespaced id', () => {
       const result: CheckResult = {
         id: 'cryptographic.core.proof-exists',
-        check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' }
       };
@@ -109,7 +108,6 @@ describe('Foundation types', () => {
         phase: 'cryptographic',
         suite: 'core',
         status: 'success',
-        verified: true,
         message: '4 of 4 checks passed',
         counts: { passed: 4, failed: 0, skipped: 0 }
       };
@@ -117,13 +115,12 @@ describe('Foundation types', () => {
       expect(summary.counts.passed).toBe(4);
     });
 
-    it('records fatalFailureAt when the suite halted mid-run', () => {
+    it('records fatalFailureAt when a check in the suite failed fatally', () => {
       const summary: SuiteSummary = {
         id: 'cryptographic.proof',
         phase: 'cryptographic',
         suite: 'proof',
         status: 'failure',
-        verified: false,
         message: '1 of 3 checks failed (0 passed)',
         counts: { passed: 0, failed: 1, skipped: 0 },
         fatalFailureAt: 'proof.signature'
@@ -138,7 +135,6 @@ describe('Foundation types', () => {
         phase,
         suite: 'custom',
         status: 'success',
-        verified: true,
         message: '1 of 1 checks passed',
         counts: { passed: 1, failed: 0, skipped: 0 }
       };
@@ -154,7 +150,6 @@ describe('Foundation types', () => {
         phase: 'recognition',
         suite: 'recognition',
         status: 'skipped',
-        verified: true,
         message: 'no recognizer matched',
         counts: { passed: 0, failed: 0, skipped: 1 }
       };
@@ -185,20 +180,20 @@ describe('Foundation types', () => {
     });
   });
 
-  describe('verbose flag', () => {
-    it('is accepted on VerifierConfig and per-call args', () => {
-      const config: VerifierConfig = { verbose: true };
-      const credCall: VerifyCredentialCall = {
-        credential: {},
-        verbose: false
-      };
-      const presCall: VerifyPresentationCall = {
-        presentation: {},
+  describe('verbose option (removed)', () => {
+    it('is rejected by the config and the per-call arg types', () => {
+      const config: VerifierConfig = { phases: ['cryptographic'] };
+      const credCall: VerifyCredentialCall = { credential: {} };
+      const presCall: VerifyPresentationCall = { presentation: {} };
+      expect(config.phases).toEqual(['cryptographic']);
+      expect(credCall.credential).toEqual({});
+      expect(presCall.presentation).toEqual({});
+
+      const verifier = publicApi.createVerifier({
+        // @ts-expect-error every check is always returned; the option is gone.
         verbose: true
-      };
-      expect(config.verbose).toBe(true);
-      expect(credCall.verbose).toBe(false);
-      expect(presCall.verbose).toBe(true);
+      });
+      expect(typeof verifier.verifyCredential).toBe('function');
     });
   });
 

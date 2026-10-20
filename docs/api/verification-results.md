@@ -1,85 +1,86 @@
 # Verification results
 
 > Consumer reference for `CredentialVerificationResult` and
-> `PresentationVerificationResult`. Covers result folding (default since
-> v2.0.0), the `id` namespace, the `SuiteSummary` rollup, the verbose
-> escape hatch, and a UI rendering recipe.
+> `PresentationVerificationResult`. Covers the `results[]` array, the
+> `id` namespace, the `SuiteSummary` rollup (new in v2.0.0), and a UI
+> rendering recipe.
 >
-> **Audience.** UI/integration teams building on top of `verifier-core`,
-> primarily `dcc-transaction-service`. The §9 prompt-ready appendix is
-> written to be copy-pasted as the seed of an LLM prompt.
+> **Audience.** UI and integration teams building on top of
+> `verifier-core`.
 >
 > **See also.** For per-check / per-suite / per-call timing data
 > on every result, see [`timing.md`](./timing.md).
 
 ## Table of Contents
 
-1. [Overview — folded vs verbose](#overview)
+1. [Overview](#overview)
+   - [The top-level verdict](#the-top-level-verdict)
    - [Check payloads](#check-payloads)
 2. [Presentation vs credential scopes](#presentation-vs-credential-scopes)
 3. [Phase model](#phase-model)
 4. [`SuiteSummary` reference](#suitesummary-reference)
 5. [`id` namespace reference](#id-namespace-reference)
 6. [UI rendering recipe](#ui-rendering-recipe)
-7. [Verbose mode](#verbose-mode)
-8. [Backwards compatibility](#backwards-compatibility)
-9. [Prompt-ready appendix](#prompt-ready-appendix)
+7. [Backwards compatibility](#backwards-compatibility)
 
 ## Overview
 
-A successful single-credential verification, **folded** (the default
-since v2.0.0):
+`results[]` carries **every** check: the ones that passed, the ones that
+were skipped (with the reason), and the ones that were not run because an
+earlier fatal failure halted the pipeline. `summary[]`, new in v2.0.0, is
+the per-suite rollup over those rows.
+
+### The top-level verdict
+
+`verified` is `true` when no **fatal** check failed. For a presentation it
+also requires every embedded credential to be `verified`.
+
+Some checks are **advisory** (non-fatal), and an advisory failure never
+flips `verified`:
+
+- `trust.registry.issuer`
+- `recognition.profile`
+- `cryptographic.status.list-issuer`
+- the Open Badges checks — the semantic `schema.obv3.*` checks and the
+  Open Badges JSON-schema check
+- any caller-supplied check that leaves `fatal` unset
+
+So a credential whose only failing check is the registry lookup is
+`verified: true`, while its `trust.registry` summary has
+`status: 'failure'` and no `fatalFailureAt`. A UI that wants to show
+"issuer not registered" reads the summary rows, not `verified`; see
+[§6 UI rendering recipe](#ui-rendering-recipe).
+
+A successful single-credential verification:
 
 ```jsonc
 {
   "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
-  "results": [],                      // empty: no failures, no explicit skips
-  "summary": [
-    { "id": "cryptographic.core",     "phase": "cryptographic",
-      "suite": "core",     "status": "success", "verified": true,
-      "message": "4 of 4 checks passed",
-      "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
-    { "id": "recognition",            "phase": "recognition",
-      "suite": "recognition", "status": "skipped", "verified": true,
-      "message": "1 of 1 check skipped",
-      "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
-    { "id": "cryptographic.proof",    "phase": "cryptographic",
-      "suite": "proof",   "status": "success", "verified": true,
-      "message": "1 of 1 check passed",
-      "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-    { "id": "cryptographic.status",   "phase": "cryptographic",
-      "suite": "status",  "status": "skipped", "verified": true,
-      "message": "1 of 1 check skipped",
-      "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
-    { "id": "trust.registry",         "phase": "trust",
-      "suite": "registry","status": "success", "verified": true,
-      "message": "1 of 1 check passed",
-      "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
-  ]
-}
-```
-
-The same verification with `verbose: true`:
-
-```jsonc
-{
-  "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
+  "verifiableCredential": { "...the credential you passed in, unchanged..." },
   "results": [
     { "id": "cryptographic.core.context-exists",
-      "suite": "core", "check": "core.context-exists",
+      "suite": "core",
       "outcome": { "status": "success", "message": "..." },
       "fatal": true },
-    { "id": "cryptographic.core.vc-context",      /* ... */ },
-    { "id": "cryptographic.core.vc-structure",    /* ... */ },
-    { "id": "cryptographic.core.credential-id",   /* ... */ },
-    { "id": "cryptographic.core.proof-exists",    /* ... */ },
-    { "id": "recognition.profile",                /* skipped: no recognizers configured */ },
-    { "id": "cryptographic.proof.signature",      /* ... */ },
-    { "id": "cryptographic.status.bitstring",     /* skipped: no credentialStatus */ },
+    { "id": "cryptographic.core.vc-context",      /* success */ },
+    { "id": "cryptographic.core.vc-structure",    /* success */ },
+    { "id": "cryptographic.core.credential-id",   /* success */ },
+    { "id": "cryptographic.core.proof-exists",    /* success */ },
+    { "id": "recognition.profile",
+      "suite": "recognition",
+      "outcome": { "status": "skipped",
+                   "reason": "no recognizer matched" } },
+    { "id": "cryptographic.proof.signature",      /* success */ },
+    { "id": "cryptographic.status.bitstring",
+      "suite": "status",
+      "outcome": { "status": "skipped",
+                   "reason": "Credential has no credentialStatus." } },
+    { "id": "cryptographic.status.list-issuer",
+      "suite": "status",
+      "outcome": { "status": "skipped",
+                   "reason": "No status list was checked." } },
     { "id": "trust.registry.issuer",
-      "suite": "registry", "check": "registry.issuer",
+      "suite": "registry",
       "outcome": {
         "status": "success",
         "message": "Issuer found in registry: DCC Sandbox Registry",
@@ -95,9 +96,34 @@ The same verification with `verbose: true`:
       },
       "fatal": false }
   ],
-  "summary": [ /* identical to the folded summary above */ ]
+  "summary": [
+    { "id": "cryptographic.core",     "phase": "cryptographic",
+      "suite": "core",     "status": "success",
+      "message": "5 of 5 checks passed",
+      "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
+    { "id": "recognition",            "phase": "recognition",
+      "suite": "recognition", "status": "skipped",
+      "message": "1 of 1 check skipped",
+      "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
+    { "id": "cryptographic.proof",    "phase": "cryptographic",
+      "suite": "proof",   "status": "success",
+      "message": "1 of 1 check passed",
+      "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
+    { "id": "cryptographic.status",   "phase": "cryptographic",
+      "suite": "status",  "status": "skipped",
+      "message": "2 of 2 checks skipped",
+      "counts": { "passed": 0, "failed": 0, "skipped": 2 } },
+    { "id": "trust.registry",         "phase": "trust",
+      "suite": "registry","status": "success",
+      "message": "1 of 1 check passed",
+      "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
+  ]
 }
 ```
+
+Render from `summary[]` and lazy-expand into `results[]`: the rollup is
+one row per suite, which is the shape a UI wants, and the detail rows are
+there whenever a user asks for them.
 
 ### Check payloads
 
@@ -115,20 +141,27 @@ own name contains `, ` cannot be recovered from it. `entity` is the
 registry's description of the issuer rather than the credential's
 description of itself, which makes it the display name to prefer.
 
-`dcc-legacy` and `oidf` matches carry an `entity`; `vc-recognition`
-matches do not yet. For `oidf` it is the `metadata` of the trust anchor's
-subordinate statement — `name` from `federation_entity.organization_name`,
-`url` from `homepage_uri`, `logo` from `logo_uri`, and the whole verified
-`metadata` under `raw` — read only from a statement that has just
-verified, on a cache hit as well as on a fresh fetch. Note that an OIDF
-`logo_uri` may be a `data:` URI carrying the image itself rather than a
-link to it, so `entity.logo` can be large, and it is cached along with the
-rest of the lookup.
+Matches from every registry type carry an `entity`. For `oidf` it is the
+`metadata` of the trust anchor's subordinate statement — `name` from
+`federation_entity.organization_name`, `url` from `homepage_uri`, `logo`
+from `logo_uri`, and the whole verified `metadata` under `raw` — read only
+from a statement that has just verified, on a cache hit as well as on a
+fresh fetch. Note that an OIDF `logo_uri` may be a `data:` URI carrying
+the image itself rather than a link to it, so `entity.logo` can be large,
+and it is cached along with the rest of the lookup.
 
-Because folding drops successes from `results`, a consumer that wants the
-payload of a check that *passed* needs `verbose: true`. A failing
-`registry.issuer` appears in the folded `results` with its payload either
-way.
+For `vc-recognition` it is the recognition credential's
+`credentialSubject` entry naming the issuer — `name`, `url` and `logo`
+from the entry's members of those names, and the whole entry under `raw` —
+read only from a credential that has verified, on a cache hit as well as
+on a fresh fetch. Each of the three is set only where the entry's value is
+a string, so an entry whose `name` is a language map carries no
+`entity.name`; that value, and anything else the entry holds such as an
+`image`, remains readable through `raw`.
+
+The payload rides on the `registry.issuer` row in `results[]` whether the
+check passed or failed, so a consumer reading registry matches does not
+have to treat the two cases differently.
 
 ## Presentation vs credential scopes
 
@@ -230,15 +263,14 @@ interface SuiteSummary {
   phase: SuiteSummaryPhase;       // SuitePhase | 'unknown'
   /** Suite id (matches VerificationSuite.id). */
   suite: string;
+  /** Computed from counts alone; says nothing about whether a failure was fatal. */
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-  /** Convenience: `status !== 'failure' && status !== 'mixed'`. */
-  verified: boolean;
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   /**
-   * The fully-qualified id of the fatal check that short-circuited
-   * the suite, if any. Absent when the suite ran to completion or
-   * skipped without entering a fatal state.
+   * The fully-qualified id of the check in this suite that failed
+   * fatally, if one did. At most one suite per subject carries it,
+   * and that suite is why the subject is not verified.
    */
   fatalFailureAt?: string;
 }
@@ -263,24 +295,63 @@ interface SuiteSummary {
 
 > Singular `check` is used when `n === 1`.
 
-### Per-status badge recommendations
+### `status` values
 
-| `status` | Glyph | Color | Meaning |
-|----------|-------|-------|---------|
-| `success` | ✓ | green | Every check that ran in this suite passed |
-| `failure` | ✗ | red   | Every check in this suite failed (or only failures + skips) |
-| `mixed`   | ⚠ | amber | Both passes and failures in the same suite |
-| `skipped` | — | gray  | Suite was acknowledged but produced no run checks |
+| `status` | Meaning |
+|----------|---------|
+| `success` | Every check that ran in this suite passed |
+| `failure` | At least one check failed and none passed (skips allowed) |
+| `mixed`   | At least one check failed and at least one passed |
+| `skipped` | No check in this suite ran |
 
-`verified === false` iff `status === 'failure' || status === 'mixed'`. A
-top-level `result.verified` is the AND of every credential's
-`result.verified` AND no presentation-level fatal failures.
+`status` is computed from `counts` alone. It does not say whether a
+failure was fatal: a suite whose only failure is a non-fatal check
+(for example `trust.registry.issuer`) has `status: 'failure'` inside a
+result whose `verified` is still `true`.
+
+### Fatal failures and `verified`
+
+A fatal failure halts every later check for the subject, so a subject
+has at most one, and at most one of its summaries carries
+`fatalFailureAt`. That gives one invariant to rely on:
+
+> A credential's `verified` is `false` exactly when one of its
+> `summary[]` entries has `fatalFailureAt`.
+
+The same holds for a presentation's own checks and its `summary[]`; the
+presentation's `verified` additionally requires every
+`credentialResults[i].verified`.
+
+There is deliberately no per-suite `verified`: the only verdicts are
+the result-level `verified` fields.
+
+### Per-suite badge recommendations
+
+Colour a suite by `fatalFailureAt` first and `status` second, so a
+non-fatal failure never reads as red inside a verified credential:
+
+| Condition | Glyph | Color | Meaning |
+|-----------|-------|-------|---------|
+| `fatalFailureAt` is set | ✗ | red | This suite's failure is why the subject is not verified |
+| `status` is `failure` or `mixed`, no `fatalFailureAt` | ⚠ | amber | Warning: a non-fatal check failed; `verified` is unaffected |
+| `status === 'success'` | ✓ | green | Every check that ran passed |
+| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier fatal failure) |
 
 ## `id` namespace reference
 
 Every `CheckResult` has an `id` of the form
-`<phase>.<suite>.<localPart>`. Every `SuiteSummary` has the matching
-`<phase>.<suite>` prefix (no trailing local part). Built-in ids:
+`<phase>.<suite>.<localPart>` — the suite runner sets it on every row
+it emits, so it is always there. Every `SuiteSummary` has the matching
+`<phase>.<suite>` prefix (no trailing local part).
+
+> **Stable for 2.x.** Check ids and the built-in suites' `phase` tags
+> are API. Because an id embeds its suite's phase, re-tagging a
+> built-in suite renames every check in it — so changing either a
+> check id or a built-in phase tag is a breaking change, not a
+> refactor.
+
+Every id the default suites, the parse-failure path and the
+`/openbadges` suites can produce:
 
 ```
 cryptographic.core
@@ -294,24 +365,36 @@ cryptographic.proof
   cryptographic.proof.signature
 cryptographic.status
   cryptographic.status.bitstring
+  cryptographic.status.list-issuer
 trust.registry
   trust.registry.issuer
 recognition
   recognition.profile
+cryptographic.parsing                           (parse failures only)
+  cryptographic.parsing.envelope
 semantic.openbadges                             (openBadgesSuite)
+  semantic.openbadges.applies
   semantic.openbadges.schema.obv3.result-ref
   semantic.openbadges.schema.obv3.achieved-level
   semantic.openbadges.schema.obv3.missing-result-status
   semantic.openbadges.schema.obv3.unknown-achievement-type
   semantic.openbadges.schema.obv3.json
 semantic.openbadges.semantic                    (openBadgesSemanticSuite)
+  semantic.openbadges.semantic.applies
   semantic.openbadges.semantic.schema.obv3.result-ref
   semantic.openbadges.semantic.schema.obv3.achieved-level
   semantic.openbadges.semantic.schema.obv3.missing-result-status
   semantic.openbadges.semantic.schema.obv3.unknown-achievement-type
 semantic.openbadges.schema                      (openBadgesSchemaSuite)
+  semantic.openbadges.schema.applies
   semantic.openbadges.schema.schema.obv3.json
 ```
+
+The three `*.applies` rows appear only when the suite was queued
+explicitly via `additionalSuites` and its predicate rejected the
+credential, or when that predicate threw; see rule 5 below. A suite
+supplied by a consumer without a `phase` tag produces ids beginning
+`unknown.` (e.g. `unknown.my-suite.my-check`).
 
 ### Computation rules
 
@@ -340,9 +423,10 @@ package barrel) builds these strings. Rules:
 
 Two consequences worth remembering when consuming:
 
-- **A failing summary's children always start with `summary.id + '.'`.**
-  Filter `cr.results` with that prefix to find the failure detail rows
-  for a given summary entry. (See §6 step 3.)
+- **A summary's children always start with `summary.id + '.'`.**
+  Filter `cr.results` with that prefix to find the detail rows for a
+  given summary entry; narrow by `outcome.status` when you want only the
+  failures, since passes and skips share the prefix. (See §6 step 3.)
 - **Suite ids do not need to match phases.** The OB suites all live
   under phase `'semantic'`, but their checks still carry their
   authored ids (e.g. `schema.obv3.result-ref`), so the resulting ids
@@ -350,9 +434,6 @@ Two consequences worth remembering when consuming:
   prefix-stable.
 
 ## UI rendering recipe
-
-Reproduces the layout described in
-[`docs/plans/2026-04-18-suite-result-folding/00-ui-use-case.md`](../plans/2026-04-18-suite-result-folding/00-ui-use-case.md).
 
 ```ts
 import type {
@@ -387,244 +468,81 @@ function groupByPhase(cr: CredentialVerificationResult) {
   return groups;
 }
 
-// 3. For a failing phase row, find detail (the failure CheckResult entries)
+// 3. For a failing phase row, find detail (the failure CheckResult entries).
+//    `results[]` holds passes and skips under the same prefix, so filter
+//    by status as well.
 function failureDetail(
   cr: CredentialVerificationResult,
   failing: SuiteSummary,
 ) {
-  return cr.results.filter(r => r.id?.startsWith(failing.id + '.'));
+  return cr.results.filter(
+    r => r.id.startsWith(failing.id + '.') && r.outcome.status === 'failure',
+  );
 }
 
 // 4. Recognized profile label (from the recognition pipeline)
 function profileLabel(cr: CredentialVerificationResult) {
   return cr.recognizedProfile; // e.g. 'obv3p0.openbadge', or undefined
 }
+
+// 5. Badge for one suite (or the worst of a phase's suites).
+//    Check `fatalFailureAt` before `status`: a non-fatal failure is a
+//    warning, not an error.
+type Badge = 'error' | 'warning' | 'ok' | 'none';
+function suiteBadge(s: SuiteSummary): Badge {
+  if (s.fatalFailureAt !== undefined) return 'error';
+  if (s.status === 'failure' || s.status === 'mixed') return 'warning';
+  return s.status === 'success' ? 'ok' : 'none';
+}
 ```
 
-A presentation with two credentials where one passes and one fails
-trust gets rendered as:
+A presentation with two credentials — the first failing only advisory
+checks, the second failing a fatal one — gets rendered as:
 
 ```
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
-├─ Credential 1 (obv3p0.openbadge): ✓
+├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
 │   ├─ cryptographic ✓ (4 + 1 + 1 = 6 checks passed)
-│   ├─ trust         ✓
+│   ├─ trust         ⚠ (1 of 1 check failed — advisory)
+│   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓
-│   └─ semantic      ✓ (5 of 5 checks passed)   [openBadgesSuite]
+│   └─ semantic      ⚠ (1 of 5 checks failed, 4 passed — advisory)
+│       └─ semantic.openbadges.schema.obv3.result-ref — Invalid Result Reference
 └─ Credential 2 (obv3p0.openbadge): ✗
-    ├─ cryptographic ✓
-    ├─ trust         ✗ (1 of 1 check failed)
-    │   └─ trust.registry.issuer — Issuer Not Registered
+    ├─ cryptographic ✗ (1 of 1 check failed)
+    │   └─ cryptographic.proof.signature — Invalid Signature
+    ├─ trust         — (not run after fatal)
     ├─ recognition   ✓
-    └─ semantic      ⚠ (1 of 5 checks failed, 4 passed)
-        └─ semantic.openbadges.schema.obv3.result-ref — Invalid Result Reference
+    └─ semantic      — (not run after fatal)
 ```
+
+Credential 1 shows the rule from
+[§1 The top-level verdict](#the-top-level-verdict): the registry and
+Open Badges checks are advisory, so their failures leave
+`credentialResults[0].verified === true` even though those two suites
+report `status: 'failure'` and `'mixed'`. Neither carries
+`fatalFailureAt`, so they render as warnings (amber), not errors. Only
+credential 2's fatal signature failure makes the presentation's own
+`verified` false. A UI that hid advisory failures because the verdict
+was `true` would be hiding exactly what a user wants to know, so render
+them — just not as a failed verdict. A phase takes the most severe
+badge of its suites.
 
 The `└─` rows under each failing phase row come from `failureDetail()`.
 Lazy-expand them — most users only want the verdict + per-phase status.
 
-## Verbose mode
-
-`verbose: true` restores the pre-v2.0.0 result shape on `results[]`
-(every check that ran is included, with `id` populated). `summary[]`
-is unchanged.
-
-| Where | Wins |
-|-------|------|
-| `createVerifier({ verbose: true })` | Instance default |
-| `verifier.verifyCredential({ credential, verbose: true })` | Per-call (overrides instance default) |
-| `verifyCredential({ credential, verbose: true })` | Standalone wrapper |
-| `verifier.verifyPresentation({ presentation, verbose: true })` | VP and every embedded VC inherit the flag |
-
-When to use it:
-
-- Triage of an unexpected `verified: false` outcome — see exactly
-  which checks ran and what they returned.
-- Persisted audit dumps where the full check sequence is part of the
-  record.
-- Debugger / browser dev-tools snapshots while wiring a new UI.
-
-When _not_ to use it:
-
-- Production happy-path responses. The folded shape is dramatically
-  smaller and exactly what a UI needs.
-
 ## Backwards compatibility
 
-- **Deprecated.** `CheckResult.check` and `CheckResult.suite` are
-  marked `@deprecated`. Use `CheckResult.id` instead. Removal target:
-  the major after v2.0.0.
-- **`flattenPresentationResults`** is unchanged. In folded mode the
-  array it returns is naturally smaller (failures + explicit skips
-  only). Use it as the "give me one array of every relevant check"
-  escape hatch when you don't want to walk
+- **Removed.** `CheckResult.check` is gone. Use `CheckResult.id`.
+  `CheckResult.suite` stays: it is how rows are grouped, it matches
+  `SuiteSummary.suite`, and it cannot be recovered from `id`, because
+  a suite id may itself contain dots.
+- **`flattenPresentationResults`** is unchanged. Use it as the "give me
+  one array of every check" escape hatch when you don't want to walk
   `credentialResults[].results`.
-- **Migration recipe for code that filtered/found by `check` or
-  `suite`:**
-  - Easiest: pass `verbose: true` and keep your existing assertions.
-  - Cleanest: switch to `id` and prefix-matching against the summary
-    rollup. See §6 step 3 for the canonical pattern.
-
-## Prompt-ready appendix
-
-Copy the fenced block below as the seed of an LLM prompt for the
-dcc-transaction-service UI implementation.
-
-> Given the JSON shape and `SuiteSummary` type below, produce a React
-> component that renders a presentation verification result. Group
-> per-credential summaries by phase
-> (`cryptographic` → `trust` → `recognition` → `semantic` → `unknown`).
-> Show failure detail rows (from `results[]` filtered by `id` prefix)
-> under the failing phase row, lazy-expanded.
->
-> The result is the return value of
-> `verifier.verifyPresentation({ presentation })` from
-> `@digitalcredentials/verifier-core` (v2.0.0+). The folded result
-> shape is the default; `results[]` carries only failures and
-> explicit `<suite>.applies` skips. Pass `verbose: true` to get
-> every check.
-
----
-
-**Folded JSON example.**
-
-```jsonc
-{
-  "verified": false,
-  "verifiablePresentation": { /* parsed VP */ },
-  "presentationResults": [],
-  "summary": [
-    { "id": "cryptographic.proof", "phase": "cryptographic",
-      "suite": "proof", "status": "success", "verified": true,
-      "message": "1 of 1 check passed",
-      "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
-  ],
-  "credentialResults": [
-    {
-      "verified": true,
-      "verifiableCredential": { /* good VC */ },
-      "recognizedProfile": "obv3p0.openbadge",
-      "results": [],
-      "summary": [
-        { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "verified": true,
-          "message": "4 of 4 checks passed",
-          "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
-        { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "verified": true,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "verified": true,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "success", "verified": true,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
-      ]
-    },
-    {
-      "verified": false,
-      "verifiableCredential": { /* bad VC */ },
-      "recognizedProfile": "obv3p0.openbadge",
-      "results": [
-        { "id": "trust.registry.issuer",
-          "suite": "registry", "check": "registry.issuer",
-          "outcome": { "status": "failure", "problems": [
-            { "type": "https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED",
-              "title": "Issuer Not Registered",
-              "detail": "Issuer DID not in any registry." }
-          ],
-          "payload": { "matches": [], "uncheckedRegistries": [] }},
-          "fatal": false }
-      ],
-      "summary": [
-        { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "verified": true,
-          "message": "4 of 4 checks passed",
-          "counts": { "passed": 4, "failed": 0, "skipped": 0 } },
-        { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "verified": true,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "verified": true,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "failure", "verified": false,
-          "message": "1 of 1 check failed",
-          "counts": { "passed": 0, "failed": 1, "skipped": 0 } }
-      ]
-    }
-  ]
-}
-```
-
-**`SuiteSummary` type.**
-
-```ts
-type SuiteSummaryPhase =
-  | 'cryptographic'
-  | 'trust'
-  | 'recognition'
-  | 'semantic'
-  | 'unknown';
-
-interface SuiteSummary {
-  id: string;
-  phase: SuiteSummaryPhase;
-  suite: string;
-  status: 'success' | 'failure' | 'skipped' | 'mixed';
-  verified: boolean;
-  message: string;
-  counts: { passed: number; failed: number; skipped: number };
-  fatalFailureAt?: string;
-}
-```
-
-**Grouping snippet.**
-
-```ts
-const PHASE_ORDER: SuiteSummary['phase'][] = [
-  'cryptographic',
-  'trust',
-  'recognition',
-  'semantic',
-  'unknown',
-];
-
-function groupByPhase(cr: CredentialVerificationResult) {
-  const groups = new Map<SuiteSummary['phase'], SuiteSummary[]>();
-  for (const phase of PHASE_ORDER) groups.set(phase, []);
-  for (const s of cr.summary) groups.get(s.phase)!.push(s);
-  return groups;
-}
-
-function failureDetail(
-  cr: CredentialVerificationResult,
-  failing: SuiteSummary,
-) {
-  return cr.results.filter(r => r.id?.startsWith(failing.id + '.'));
-}
-```
-
-**Layout reference.**
-
-```
-Presentation: ✗ (1 of 2 credentials verified)
-├─ VP signature: ✓
-├─ Credential 1 (obv3p0.openbadge): ✓
-│   ├─ cryptographic ✓
-│   ├─ trust         ✓
-│   ├─ recognition   ✓
-│   └─ semantic      ✓
-└─ Credential 2 (obv3p0.openbadge): ✗
-    ├─ cryptographic ✓
-    ├─ trust         ✗ (1 of 1 check failed)
-    │   └─ trust.registry.issuer — Issuer Not Registered
-    ├─ recognition   ✓
-    └─ semantic      ✓
-```
+- **Migration recipe for code that filtered/found by the removed
+  `check` field, or by `suite`:** switch to `id` and prefix-matching
+  against the summary
+  rollup, narrowing by `outcome.status`. See §6 step 3 for the
+  canonical pattern.

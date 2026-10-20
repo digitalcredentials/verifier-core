@@ -10,9 +10,9 @@
  * `OpenBadgesProblemTypes`.
  *
  * Wire URIs use the same `https://www.w3.org/TR/vc-data-model#…`
- * placeholder host as the rest of the catalog. See
- * `docs/plans/2026-04-17-architecture-readiness-review/draft-ob-spec-issue-problem-details-registry.md`
- * for why we treat these as opaque keys until a real registry exists.
+ * placeholder host as the rest of the catalog. No registry of Open
+ * Badges problem types exists yet, so consumers should treat these
+ * as opaque keys and match on them exactly.
  */
 
 export const Obv3ProblemTypes = {

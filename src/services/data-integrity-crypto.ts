@@ -25,11 +25,11 @@ import { isVerificationMethodMessage } from '../util/verification-method-message
  * for any VC with `credentialStatus`; this no-op satisfies that
  * required signature without performing any real status work.
  *
- * Real status verification is owned by `statusSuite`
- * (`src/suites/status/bitstring-status-check.ts`). See plan
- * `docs/plans/2026-04-19-route-via-http-and-dedupe-status-check/`
- * for the rationale (P-E: status is owned solely by the status
- * suite, no double-check from the proof path).
+ * Real status verification is owned solely by `statusSuite`
+ * (`src/suites/status/bitstring-status-check.ts`), so the proof
+ * path must not check status a second time: a double check would
+ * fetch the status list twice and could report two different
+ * answers for one credential.
  */
 const noopCheckStatus = async (): Promise<{ verified: true; results: [] }> => ({
   verified: true,

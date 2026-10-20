@@ -7,8 +7,7 @@
  * passed explicitly via a verify call's `additionalSuites` (or
  * composed into a custom suite).
  *
- * Surface follows the design in
- * `docs/plans/2026-04-18-openbadges-module/00-design.md`:
+ * The surface is:
  *
  * - **Suites** (most common entry point):
  *   {@link openBadgesSuite}, {@link openBadgesSemanticSuite},

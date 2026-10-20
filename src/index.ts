@@ -112,4 +112,3 @@ export type { DataIntegrityCryptoConfig } from './services/data-integrity-crypto
 export { flattenPresentationResults } from './flatten-presentation-results.js';
 export type { FlattenedCheckResult } from './flatten-presentation-results.js';
 export { foldCheckResults, computeId } from './fold-results.js';
-export type { FoldOptions } from './fold-results.js';

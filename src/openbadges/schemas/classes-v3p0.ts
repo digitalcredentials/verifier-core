@@ -79,13 +79,13 @@ export function ImageField() {
  * Required: `id` (IRI; DIDs accepted), `type` (must include
  * `'Profile'`).
  *
- * In-scope optional fields per the design (Q4.c): `name`, `url`,
- * `description`, `image`, `email`. Email validation is light
- * (`@`-presence) — full RFC-5321 conformance is out of scope.
+ * Optional fields in scope: `name`, `url`, `description`,
+ * `image`, `email`. Email validation is light (`@`-presence) —
+ * full RFC-5321 conformance is out of scope.
  *
  * Recursive Profile-typed fields (e.g. `parentOrg`) stay
  * passthrough; supporting them needs `z.lazy()` and is out of
- * scope per the parent plan's Q4.c.
+ * scope.
  *
  * `id` uses {@link IriString} rather than `z.string().url()` so
  * `did:`-prefixed identifiers (the most common issuer form) are
@@ -219,10 +219,10 @@ export type Obv3p0ResultDescription = z.infer<
  *
  * **Note**: `Result.resultDescription` is a string IRI cross-
  * referencing an entry in `Achievement.resultDescription[]`. The
- * existing `obv3-result-ref-check` (refactored in Phase 8 to use
- * the normalized form) verifies that the reference resolves;
- * this schema only validates that the field is a syntactically
- * valid URL string.
+ * `schema.obv3.result-ref` check verifies that the reference
+ * resolves, parsing with the tolerant shapes in
+ * `openbadges-zod.ts` rather than this schema; this schema only
+ * validates that the field is a syntactically valid URL string.
  *
  * Backfilled into {@link Obv3p0AchievementSubjectSchema}.`result[]`.
  */
@@ -265,9 +265,9 @@ const Obv3p0CriteriaSchema = z
  * - `creator` — Profile (normalized via {@link ProfileRefField}).
  * - `image` — Image (normalized via {@link ImageField}).
  * - `resultDescription[]` — array of
- *   {@link Obv3p0ResultDescriptionSchema} (Phase 7).
+ *   {@link Obv3p0ResultDescriptionSchema}.
  *
- * Wired into `AchievementSubject.achievement` in Phase 6.
+ * Reached from `AchievementSubject.achievement`.
  */
 export const Obv3p0AchievementSchema = z
   .object({
@@ -289,9 +289,8 @@ export type Obv3p0Achievement = z.infer<typeof Obv3p0AchievementSchema>;
  * Open Badges 3.0 §B.1.12 — IdentityObject (file-local).
  *
  * Used inside `AchievementSubject.identifier[]` entries. Kept
- * light per Q4.c — passthrough with a required `type`
- * discriminator. Full hashed-identity validation (§9.3) is out of
- * scope.
+ * light — passthrough with a required `type` discriminator. Full
+ * hashed-identity validation (§9.3) is out of scope.
  */
 const Obv3p0IdentityObjectSchema = z
   .object({
@@ -313,7 +312,7 @@ const Obv3p0IdentityObjectSchema = z
  * `/credentialSubject` once backfilled into the envelope.
  *
  * Optional in scope: `result[]` (array of
- * {@link Obv3p0ResultSchema}, Phase 7), `image` (normalized via
+ * {@link Obv3p0ResultSchema}), `image` (normalized via
  * {@link ImageField}), `identifier[]` (entries kept light per the
  * IdentityObject note above).
  */

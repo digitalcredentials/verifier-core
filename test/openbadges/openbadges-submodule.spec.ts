@@ -7,7 +7,7 @@
  *    dynamic `import('@digitalcredentials/verifier-core/openbadges')`
  *    catches typos in `exports` and missing re-exports in
  *    `src/openbadges/index.ts`.
- * 2. **Default-path invariant (Q2).** A vanilla
+ * 2. **Default-path invariant.** A vanilla
  *    `createVerifier()` against a real OB credential emits zero
  *    OB-related `CheckResult` entries.
  * 3. **Opt-in path emits OB findings.** Adding `openBadgesSuite`
@@ -67,11 +67,8 @@ function cloneCredential(): Record<string, unknown> {
   return structuredClone(sampleAchievementCredential);
 }
 
-// Verbose verifier so OB check ids surface in `results[]`
-// regardless of outcome; folded mode hides successes.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
@@ -121,7 +118,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     expect(ACHIEVEMENT_TYPE_EXT_PREFIX).toBe('ext:');
   });
 
-  it('runs no OB checks by default (Q2 invariant)', async () => {
+  it('runs no OB checks by default', async () => {
     const verifier = createVerifier(fakeVerified);
     const result = await verifier.verifyCredential({
       credential: cloneCredential()
@@ -147,12 +144,16 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     });
 
     const obSuiteResults = result.results.filter(r => r.suite === 'openbadges');
-    const checkIds = new Set(obSuiteResults.map(r => r.check));
-    expect(checkIds).toContain('schema.obv3.result-ref');
-    expect(checkIds).toContain('schema.obv3.achieved-level');
-    expect(checkIds).toContain('schema.obv3.missing-result-status');
-    expect(checkIds).toContain('schema.obv3.unknown-achievement-type');
-    expect(checkIds).toContain('schema.obv3.json');
+    const checkIds = new Set(obSuiteResults.map(r => r.id));
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.result-ref');
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.achieved-level');
+    expect(checkIds).toContain(
+      'semantic.openbadges.schema.obv3.missing-result-status'
+    );
+    expect(checkIds).toContain(
+      'semantic.openbadges.schema.obv3.unknown-achievement-type'
+    );
+    expect(checkIds).toContain('semantic.openbadges.schema.obv3.json');
 
     const failures = obSuiteResults.filter(r => r.outcome.status === 'failure');
     expect(failures, JSON.stringify(failures, null, 2)).toHaveLength(0);
@@ -172,7 +173,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     });
 
     const achievedLevelResult = result.results.find(
-      r => r.check === 'schema.obv3.achieved-level'
+      r => r.id === 'semantic.openbadges.semantic.schema.obv3.achieved-level'
     );
     expect(achievedLevelResult?.outcome.status).toBe('failure');
 
@@ -203,7 +204,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
 
     const obSuiteResults = result.results.filter(r => r.suite === 'openbadges');
     expect(obSuiteResults).toHaveLength(1);
-    expect(obSuiteResults[0].check).toBe('openbadges.applies');
+    expect(obSuiteResults[0].id).toBe('semantic.openbadges.applies');
     expect(obSuiteResults[0].outcome.status).toBe('skipped');
     if (obSuiteResults[0].outcome.status === 'skipped') {
       expect(obSuiteResults[0].outcome.reason).toBe(

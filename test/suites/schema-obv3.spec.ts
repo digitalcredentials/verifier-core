@@ -62,7 +62,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('skipped');
     });
 
@@ -80,7 +80,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('success');
     });
 
@@ -101,7 +101,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('success');
     });
 
@@ -121,7 +121,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('failure');
       if (schemaCheck?.outcome.status === 'failure') {
         expect(schemaCheck.outcome.problems[0].type).toBe(
@@ -151,7 +151,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('success');
     });
 
@@ -179,7 +179,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('success');
     });
 
@@ -194,7 +194,7 @@ describe('OBv3 Schema Suite', () => {
         context
       );
 
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      const schemaCheck = results.find(r => r.id === 'unknown.schema.obv3.json');
       expect(schemaCheck?.outcome.status).toBe('failure');
       if (schemaCheck?.outcome.status === 'failure') {
         expect(schemaCheck.outcome.problems[0].type).toBe(
@@ -217,7 +217,7 @@ describe('OBv3 Schema Suite', () => {
         createSubject(cred),
         context
       );
-      return results.find(r => r.check === 'schema.obv3.json')?.outcome;
+      return results.find(r => r.id === 'unknown.schema.obv3.json')?.outcome;
     };
 
     it('compiles a known schema once per fetchJson, even without a cacheService', async () => {

@@ -20,13 +20,11 @@ import type { TimeService } from './time-service.js';
  * wall-clock and performance reads can interleave without
  * skewing each other's expected values in tests.
  *
- * Diverges from the skills-verifier `FakeTimeService` (which
- * passes `performanceNowMs()` through to real
- * `performance.now()`) on purpose: verifier-core uses
- * `performanceNowMs()` to populate `TaskTiming.durationMs`,
- * and shape-only duration assertions are a poor substitute
- * for the deterministic exact-value assertions consumers
- * actually want when verifying timing rollup math.
+ * `performanceNowMs()` is counted rather than passed through
+ * to the real `performance.now()` on purpose: it populates
+ * `TaskTiming.durationMs`, and shape-only duration assertions
+ * are a poor substitute for the deterministic exact-value
+ * assertions that timing rollup math needs.
  */
 export function FakeTimeService(
   opts: {

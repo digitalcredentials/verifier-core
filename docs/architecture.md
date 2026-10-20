@@ -181,8 +181,8 @@ caller's original object is what the suites verify (see the invariant in `src/ve
 The credential is `unknown` on entry — callers don't need to pre-validate.
 
 **Context.** Each `verifyCredential` / `verifyPresentation` call builds an internal
-`VerificationContext` from the verifier's long-lived services plus per-call inputs (the parsed
-credential or presentation, optional `additionalSuites`, optional `registries` override, optional
+`VerificationContext` from the verifier's long-lived services plus per-call inputs (the caller's
+original credential or presentation object — Zod gates it, it is never rewritten — optional `additionalSuites`, optional `registries` override, optional
 `challenge` / `domain` / `unsignedPresentation` for VPs). The context is the seam the suites consume; it is
 not a public composition point. Because `documentLoader` and `cacheService` live on the verifier,
 they're shared across every call on the same instance — this is what makes batch verification
@@ -310,7 +310,7 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { suite, check, outcome, fatal?, timing? }
+CheckResult: { id, suite, outcome, fatal?, timing? }
 ```
 
 `timing` is opt-in: present on every `CheckResult`,
@@ -326,9 +326,9 @@ break when the flag is left at its default (`false`). See
 - **`fatal`** on a check means a failure halts every remaining check for the subject, in that
   suite and in all later suites: once the subject is known to be invalid, later checks would
   only report misleading follow-on failures or do needless network I/O. Each check that would
-  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`
-  (visible with `verbose: true`), so the report stays complete. Suites that would not have run
-  anyway (phase filter, `applies` false) stay silent.
+  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`,
+  so the report stays complete. Suites that would not have run anyway (phase filter, `applies`
+  false) stay silent.
 - **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
   `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
   yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
@@ -552,7 +552,7 @@ VerifierConfig                       (long-lived deps: http, cache, crypto, regi
           → VerificationSuite[]
             → VerificationCheck.execute(subject, context)
               → CheckOutcome (success | failure | skip)
-                → CheckResult (suite, check, outcome, fatal?, timing?)
+                → CheckResult (id, suite, outcome, fatal?, timing?)
         → CredentialVerificationResult                  ({ verified, verifiableCredential, results })
 ```
 
@@ -579,10 +579,12 @@ up **`RegistryCheckPayload`** — `matches` and `uncheckedRegistries`. A `Regist
 `logo`, and the untouched `raw` entry). Because the lookup stops at the first registry that
 matches unless run with `exhaustive`, `matches` normally holds at most one entry. The registry
 check returns the payload on its outcome, on success and on failure; a handler supplies the
-`entity` on its `found` result. The `dcc-legacy` and `oidf` handlers fill one in; the
-`vc-recognition` handler does not yet. The OIDF entity is the verified subordinate statement's
-`metadata` — read only after that statement verifies, on a cache hit as well as on a fresh
-fetch — and its `logo` may be a large `data:` URI, cached with the rest of the lookup.
+`entity` on its `found` result, and every built-in handler fills one in. The OIDF entity is the
+verified subordinate statement's `metadata` — read only after that statement verifies, on a cache
+hit as well as on a fresh fetch — and its `logo` may be a large `data:` URI, cached with the rest
+of the lookup. The `vc-recognition` entity is the recognised `credentialSubject` entry, likewise
+read only from a credential that has verified: `name`, `url` and `logo` come from the entry's
+members of those names where they are strings, and the whole entry is `raw`.
 
 A lookup result cached by an earlier version, in the shape that predates `matches`, is treated as
 a cache miss rather than an error: the issuer is looked up again and the current shape is cached
@@ -617,17 +619,16 @@ over it.
 }
 ```
 
-### Result folding
+### Per-suite summaries
 
-Since v2.0.0, `results[]` (on both result types, and on each embedded `credentialResults[i]`)
-carries only failures and explicit `<suite>.applies` skips by default; the per-suite rollup lives in
-`summary[]`. Pass `verbose: true` (on the verifier or per call) to restore the legacy "every check"
-shape on `results[]`. The folding itself is implemented as a pure helper — `foldCheckResults` /
-`computeId` in `src/fold-results.ts` — and is also exported from the package barrel for consumers
-that append late results and want to re-fold.
+`results[]` (on both result types, and on each embedded `credentialResults[i]`) carries every
+check that ran, was skipped, or was not run after a fatal failure. Since v2.0.0 it is accompanied
+by `summary[]`, a per-suite rollup. The rollup is computed by a pure helper — `foldCheckResults` /
+`computeId` in `src/fold-results.ts` — which is also exported from the package barrel for consumers
+that append late results and want to recompute their summaries.
 
 See [`docs/api/verification-results.md`](api/verification-results.md) for the full reference,
-including the `id` namespace, rendering recipes, and the LLM prompt appendix for downstream UIs.
+including the `id` namespace and rendering recipes.
 
 Both shapes use the suite-based `CheckResult[]` model. Each `CheckResult` carries a discriminated
 `CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag) and,
@@ -742,8 +743,8 @@ without network dependencies, and composable — consumers wire in exactly the b
   recursion guard.
 - **`RegistryHandler` is a port.** Callers can override or extend the per-type handler map by
   passing `registryHandlers` on `VerifierConfig`.
-- **No dynamic imports in `src/`.** The proof suite is statically wired; recursion through the
-  verifier replaced the old dynamic-import seam from `vc-recognition-handler` into `verify-suite`.
+- **No dynamic imports in `src/`.** The proof suite is statically wired, and `vc-recognition-handler`
+  reaches the verifier through an injected thunk rather than by importing `verify-suite` at runtime.
 
 ### What's not yet hexagonal
 
@@ -751,7 +752,8 @@ without network dependencies, and composable — consumers wire in exactly the b
   implementation embeds `@digitalcredentials/vc` directly inside `DataIntegrityCryptoService`.
   Replacing the default crypto service requires understanding the LD-Proofs / Data Integrity
   internals. The default crypto service verifies signatures only — credential status checking
-  is the sole responsibility of the status suite (P-E, 2026-04-19).
+  is the sole responsibility of the status suite, so the status list is fetched once per
+  verification and one answer, not two, is reported for a credential's status.
 - **Status suite** still consumes `@digitalcredentials/vc-bitstring-status-list` for purpose
   matching, list type, bitstring decoding, and index reading. The list's validity dates are
   checked by `@digitalcredentials/vc` inside the crypto service, with its proof, and issuer

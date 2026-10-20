@@ -51,7 +51,7 @@ describe('Proof Verification Suite', () => {
       const results = await runSuites([proofSuite], subject, context);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('proof.signature');
+      expect(results[0].id).toBe('cryptographic.proof.signature');
       expect(results[0].outcome.status).toBe('success');
       if (results[0].outcome.status === 'success') {
         expect(results[0].outcome.message).toBe('Fake verification passed.');
@@ -133,7 +133,7 @@ describe('Proof Verification Suite', () => {
       const results = await runSuites([proofSuite], subject, context);
 
       expect(results).toHaveLength(1);
-      expect(results[0].check).toBe('proof.signature');
+      expect(results[0].id).toBe('cryptographic.proof.signature');
       expect(results[0].outcome.status).toBe('success');
     });
 

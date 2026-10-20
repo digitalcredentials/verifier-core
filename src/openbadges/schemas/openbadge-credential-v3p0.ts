@@ -1,13 +1,13 @@
 /**
  * Strict Zod schema for the OB 3.0 OpenBadgeCredential envelope.
  *
- * Phase-2 scope: top-level envelope only. Inner classes
- * (`AchievementSubject`, `Achievement`, `Profile`, `Image`,
- * `Result`, etc.) stay `passthrough` and are filled in by Phases
- * 3–7. The cross-field VCDM v1/v2 date discriminator
- * (`issuanceDate` vs `validFrom`) lives here.
- *
- * @see `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/02-envelope-and-date-discriminator.md`
+ * This module owns the top-level envelope: the `@context` array,
+ * `id`, `type`, `issuer`, `image`, the date fields, and the
+ * cross-field VCDM v1/v2 date discriminator (`issuanceDate` vs
+ * `validFrom`). Inner classes (`AchievementSubject`,
+ * `Achievement`, `Profile`, `Image`, `Result`, etc.) are defined
+ * in `classes-v3p0.ts` and composed in here, so a credential
+ * validates top-to-bottom.
  */
 
 import { z } from 'zod';
@@ -50,8 +50,7 @@ const TypeField = JsonLdTypeField(['VerifiableCredential']).superRefine(
  * this, `tsc --declaration` runs into TS7056 ("inferred type
  * exceeds the maximum length the compiler will serialize")
  * because the union/refine layers compound across every nested
- * class schema (Phase 7 was the straw that broke the camel's
- * back). Runtime behavior is unaffected; consumers narrow
+ * class schema. Runtime behavior is unaffected; consumers narrow
  * `Obv3p0OpenBadgeCredential` (typed as a permissive record
  * below) at use, typically via `recognizedProfile`.
  */

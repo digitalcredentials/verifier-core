@@ -7,7 +7,7 @@
  * iterates suites and assembles a flat `CheckResult[]` report.
  *
  * @see {@link ../run-suites.ts} for orchestration
- * @see {@link ../defaults.ts} for the default suite ordering
+ * @see {@link ../default-suites.ts} for the default suite ordering
  */
 
 import type { ProblemDetail } from './problem-detail.js';
@@ -50,28 +50,22 @@ export interface CheckResult {
    * Dot-separated namespaced id — `<phase>.<suite>.<localPart>`
    * (e.g. `"cryptographic.proof.signature"`). When `phase === suite`
    * the duplicate segment collapses (e.g. `"recognition.profile"`).
+   * A suite with no `phase` produces ids beginning `"unknown."`.
    *
-   * Computed by the verifier post-`runSuites`. Prefer this over the
-   * legacy `check` / `suite` pair when consuming results.
+   * Set by `runSuites` on every row it emits. This is the identity
+   * to match on.
    *
-   * Optional today for backwards compatibility with hand-constructed
-   * `CheckResult` literals; will become required in a future major.
+   * Check ids are API: they are fixed for 2.x, and because an id
+   * embeds its suite's `phase`, re-tagging a built-in suite's phase
+   * renames its checks and is a breaking change.
    */
-  id?: string;
+  id: string;
 
   /**
-   * @deprecated Use {@link CheckResult.id}. Will be removed in the
-   * major release after the one that introduced `id`.
-   *
-   * Qualified check id, e.g. `"core.proof-exists"`.
-   */
-  check: string;
-
-  /**
-   * @deprecated Use {@link CheckResult.id}. Will be removed in the
-   * major release after the one that introduced `id`.
-   *
-   * Suite id this check belongs to, e.g. `"core"`.
+   * Suite id this check belongs to, e.g. `"core"`; mirrors
+   * {@link SuiteSummary.suite} and is how rows are grouped into
+   * summaries. Not recoverable from {@link CheckResult.id}, because
+   * suite names may themselves contain dots.
    */
   suite: string;
 

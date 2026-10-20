@@ -5,11 +5,26 @@ import { VerifiableCredential } from '../schemas/credential.js';
 import { VerifiablePresentation } from '../schemas/presentation.js';
 
 export interface CredentialVerificationResult {
-  /** True if no check returned a failure outcome. */
+  /**
+   * True if no *fatal* check returned a failure outcome.
+   *
+   * Advisory (non-fatal) checks never flip it: `registry.issuer`,
+   * `recognition.profile`, `status.list-issuer`, the Open Badges
+   * checks (the semantic `schema.obv3.*` checks and the Open
+   * Badges JSON-schema check), and any caller-supplied check that
+   * leaves `fatal` unset. So a credential whose only failing check
+   * is the registry lookup is `verified: true`, with
+   * `status: 'failure'` and no `fatalFailureAt` on its
+   * `trust.registry` summary — read {@link summary} to surface
+   * advisory failures. `verified` is `false` exactly when one of
+   * the summaries carries {@link SuiteSummary.fatalFailureAt}.
+   */
   verified: boolean;
 
   /**
-   * The Zod-parsed credential that was verified.
+   * The credential that was verified: the caller's original
+   * object, returned as it came in. Zod gates the input but does
+   * not normalize it, so nothing here is rewritten.
    *
    * Field name matches the W3C / VCALM property name so the
    * verification result can be spread directly into a VCALM
@@ -43,21 +58,18 @@ export interface CredentialVerificationResult {
   recognizedProfile?: string;
 
   /**
-   * Flat array of check results.
-   *
-   * In the default (`verbose: false`) mode this carries only
-   * failures and explicitly-emitted skips — successes are folded
-   * away into the per-suite rollup on {@link summary}. Pass
-   * `verbose: true` on `VerifierConfig` (or per-call) to receive
-   * every check that ran.
+   * Flat array of check results: every check that ran, every
+   * check that was skipped (with its reason), and every check
+   * that was not run because an earlier fatal failure halted the
+   * pipeline (reason starting `Not run: `). A check that passed
+   * and a check that never ran are therefore distinguishable.
    */
   results: CheckResult[];
 
   /**
-   * Per-suite rollup of every (phase, suite) that ran. Always
-   * populated regardless of `verbose`. Primary surface for UI
-   * rendering; lazy-expand into {@link results} for failure
-   * detail. See {@link SuiteSummary}.
+   * Per-suite rollup of every (phase, suite) that ran. Primary
+   * surface for UI rendering; lazy-expand into {@link results}
+   * for per-check detail. See {@link SuiteSummary}.
    */
   summary: SuiteSummary[];
 
@@ -85,14 +97,21 @@ export interface CredentialVerificationResult {
 }
 
 export interface PresentationVerificationResult {
-  /** True if no failures in presentation checks or any credential checks. */
+  /**
+   * True if no *fatal* presentation check failed and every
+   * embedded credential is itself `verified`. Advisory
+   * (non-fatal) failures never flip it; see
+   * {@link CredentialVerificationResult.verified} for which
+   * checks are advisory.
+   */
   verified: boolean;
 
   /**
-   * The Zod-parsed presentation that was verified.
+   * The presentation that was verified: the caller's original
+   * object, returned as it came in.
    *
    * Mirror of {@link CredentialVerificationResult.verifiableCredential}.
-   * Allows VCALM consumers to reach the parsed VP via the documented
+   * Allows VCALM consumers to reach the VP via the documented
    * `results.<step>.verifiablePresentation.…` JSONata path without
    * carrying the original input separately.
    */
@@ -100,7 +119,7 @@ export interface PresentationVerificationResult {
 
   /**
    * Check results from presentation-level verification (VP
-   * signature). Honors the `verbose` flag the same way
+   * signature). Carries every check, the same way
    * {@link CredentialVerificationResult.results} does.
    */
   presentationResults: CheckResult[];
@@ -112,7 +131,7 @@ export interface PresentationVerificationResult {
    * Per-suite rollup of presentation-level checks (i.e. the
    * suites that produced {@link presentationResults}). Per-credential
    * rollups live on each {@link credentialResults} entry's own
-   * `summary`. Always populated regardless of `verbose`.
+   * `summary`.
    */
   summary: SuiteSummary[];
 

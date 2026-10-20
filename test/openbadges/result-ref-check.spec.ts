@@ -29,7 +29,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('skipped');
   });
 
@@ -59,7 +61,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('success');
     if (refCheck?.outcome.status === 'success') {
       expect(refCheck.outcome.message).toContain(
@@ -79,7 +83,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('success');
   });
 
@@ -109,7 +115,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('failure');
     if (refCheck?.outcome.status === 'failure') {
       expect(refCheck.outcome.problems[0].type).toBe(
@@ -158,7 +166,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('failure');
     if (refCheck?.outcome.status === 'failure') {
       expect(refCheck.outcome.problems).toHaveLength(1);
@@ -212,7 +222,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('failure');
     if (refCheck?.outcome.status === 'failure') {
       const instances = refCheck.outcome.problems.map(p => p.instance);
@@ -253,7 +265,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('success');
   });
 
@@ -281,7 +295,9 @@ describe('OBv3 result-ref check', () => {
       buildTestContext()
     );
 
-    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    const refCheck = results.find(
+      r => r.id === 'unknown.openbadges.result-ref.schema.obv3.result-ref'
+    );
     expect(refCheck?.outcome.status).toBe('failure');
     if (refCheck?.outcome.status === 'failure') {
       expect(refCheck.outcome.problems[0].type).toBe(

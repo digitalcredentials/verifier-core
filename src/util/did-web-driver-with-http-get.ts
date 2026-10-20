@@ -1,8 +1,8 @@
 /**
  * did:web resolution using caller-provided {@link HttpGetService} so DID document
- * fetches share the same cache as JSON-LD context loads (e.g. Keyv in
- * transaction-service). The stock {@link DidWebDriver} uses
- * `@digitalcredentials/http-client` and bypasses that cache.
+ * fetches share the same cache as JSON-LD context loads (a Keyv-backed
+ * cache in a long-running service, say). The stock {@link DidWebDriver}
+ * uses `@digitalcredentials/http-client` and bypasses that cache.
  *
  * Fragment dereference logic matches `@digitalcredentials/did-method-web`
  * `getNode` (suite context map aligned with that package).

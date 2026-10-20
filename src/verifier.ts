@@ -33,14 +33,14 @@
  * not name, and a `.transform` can rewrite scalars into arrays. Either change
  * alters the canonicalized N-Quads, which makes a valid proof fail as
  * `INVALID_SIGNATURE` — a failure that looks like a bad credential and is
- * actually a bug here. That is not hypothetical: a spec-legal
- * `issuer.image.caption` was once dropped by a nested issuer image schema
- * and rejected production Open Badges credentials.
+ * actually a bug here. A nested issuer image schema that drops a spec-legal
+ * `issuer.image.caption`, for instance, rejects Open Badges credentials that
+ * are perfectly valid.
  *
  * Returning the original object also matters downstream, because consumers
- * re-verify `result.verifiableCredential` (the async Open Badges pass in
- * dcc-transaction-service does exactly this). Handing them a rewritten copy
- * makes the second pass fail where the first passed.
+ * re-verify `result.verifiableCredential` — an asynchronous second Open
+ * Badges pass, say. Handing them a rewritten copy makes that pass fail where
+ * the first passed.
  *
  * Suites must therefore tolerate raw JSON-LD shapes rather than assume
  * normalization: `@context` and `type` may each be a string or an array.
@@ -82,7 +82,8 @@ import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
 import { coreSuite } from './suites/core/index.js';
 import { proofSuite } from './suites/proof/index.js';
-import { computeId, foldCheckResults } from './fold-results.js';
+import { foldCheckResults } from './fold-results.js';
+import { computeId } from './compute-id.js';
 import {
   defaultHttpGetService,
   createDefaultCacheService,
@@ -108,7 +109,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const constructorRegistries = config.registries;
   const recognizers = config.recognizers ?? [];
   const constructorPhases = config.phases;
-  const constructorVerbose = config.verbose;
   const constructorTiming = config.timing;
   const timeService: TimeService = config.timeService ?? RealTimeService();
 
@@ -177,10 +177,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       const recognized = extractRecognition(rawChecks);
 
-      populateCheckIds(rawChecks, suites);
-
-      const verbose = call.verbose ?? constructorVerbose ?? false;
-      const folded = foldCheckResults(rawChecks, suites, { verbose });
+      const folded = foldCheckResults(rawChecks, suites);
 
       const result: CredentialVerificationResult = {
         verified: !hasFatalFailures(rawChecks),
@@ -248,13 +245,9 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         { explicitSuiteIds, phases: effectivePhases }
       );
 
-      populateCheckIds(rawPresentationChecks, presentationSuites);
-
-      const verbose = call.verbose ?? constructorVerbose ?? false;
       const foldedPresentation = foldCheckResults(
         rawPresentationChecks,
-        presentationSuites,
-        { verbose }
+        presentationSuites
       );
 
       const credentials = extractCredentialsFrom(presentation);
@@ -267,7 +260,6 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
               additionalSuites: call.additionalSuites,
               registries: call.registries,
               phases: call.phases,
-              verbose,
               // Propagate explicitly so embedded credentials inherit
               // the presentation-level decision; otherwise the
               // recursive call would re-evaluate from
@@ -344,25 +336,6 @@ function hasFatalFailures(results: CheckResult[]): boolean {
 }
 
 /**
- * Populate `id` on every `CheckResult` using {@link computeId} so
- * folded summaries and verbose-mode consumers both see the
- * dot-separated namespace. Mutates each result in place; called
- * after `runSuites` returns and before {@link foldCheckResults}.
- */
-function populateCheckIds(
-  checks: CheckResult[],
-  suites: VerificationSuite[]
-): void {
-  const phaseBySuiteId = new Map<string, SuitePhase | undefined>();
-  for (const s of suites) {
-    phaseBySuiteId.set(s.id, s.phase);
-  }
-  for (const c of checks) {
-    c.id = computeId(phaseBySuiteId.get(c.suite), c.suite, c.check);
-  }
-}
-
-/**
  * Apply the auto-include rule for phase requests: if `'semantic'`
  * is requested without `'recognition'`, add `'recognition'` so
  * semantic checks have access to the normalized credential form
@@ -397,7 +370,7 @@ function expandPhases(
 function extractRecognition(
   results: CheckResult[]
 ): { profile: string; normalized: unknown } | undefined {
-  const result = results.find(r => r.check === 'recognition.profile');
+  const result = results.find(r => r.id === 'recognition.profile');
   if (!result || result.outcome.status !== 'success') {
     return undefined;
   }
@@ -410,7 +383,7 @@ function extractRecognition(
 
 /**
  * Synthetic suite definition used solely so the parse-error
- * `CheckResult` folds into a meaningful `SuiteSummary`. Tagged
+ * `CheckResult` rolls up into a meaningful `SuiteSummary`. Tagged
  * `'cryptographic'` so UI sections that group by phase show
  * structural failures alongside other foundational checks.
  */
@@ -433,12 +406,11 @@ function parseErrorResult(
   timeService: TimeService | undefined
 ): CheckResult {
   const result: CheckResult = {
+    id: computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope'),
     suite: 'parsing',
-    check: 'parsing.envelope',
     outcome: { status: 'failure', problems: [problem] },
     fatal: true
   };
-  result.id = computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope');
   if (timeService !== undefined) {
     // Parse failures short-circuit before any check runs, so the
     // synthetic `parsing.envelope` check is the only thing the
@@ -462,17 +434,15 @@ function parseErrorResult(
 /**
  * Build the one-entry `summary[]` that accompanies every
  * parse-error result. The single check is always a fatal failure,
- * so the summary always has `status: 'failure'`,
- * `verified: false`. We surface the parse error in `results[]`
- * regardless of `verbose` (a parse error is unusable without it).
+ * so the summary always has `status: 'failure'` and
+ * `fatalFailureAt: 'cryptographic.parsing.envelope'`.
  *
- * Folds in `verbose: true` so the parse-error check survives;
  * `foldCheckResults` rolls per-check timing into the summary, so
  * the suite-level `timing` propagates here too when the call ran
  * with `timing: true`.
  */
 function parseErrorSummary(check: CheckResult): SuiteSummary[] {
-  const folded = foldCheckResults([check], [PARSING_SUITE], { verbose: true });
+  const folded = foldCheckResults([check], [PARSING_SUITE]);
   return folded.summaries;
 }
 

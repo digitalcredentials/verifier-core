@@ -48,7 +48,7 @@ function wrapped(...messages: string[]): unknown {
 }
 
 function signatureProblem(results: CheckResult[]): ProblemDetail | undefined {
-  const signature = results.find(r => r.check === 'proof.signature');
+  const signature = results.find(r => r.id === 'cryptographic.proof.signature');
   expect(signature, 'proof.signature result present').toBeDefined();
   expect(signature?.outcome.status).toBe('failure');
   return signature?.outcome.status === 'failure'
@@ -187,8 +187,7 @@ describe('verification method errors (signed offline)', () => {
   const verifier = () =>
     createVerifier({
       httpGetService: offlineHttpGetService,
-      documentLoader: bundledLoader,
-      verbose: true
+      documentLoader: bundledLoader
     });
 
   it('reports an issuer that is not the verification method controller as VERIFICATION_METHOD_ERROR', async () => {

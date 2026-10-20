@@ -1,16 +1,15 @@
 /**
  * Test-only helper that assembles a {@link VerificationContext} with
- * sensible defaults — equivalent to the old `buildContext()` from
- * `src/defaults.ts` (deleted in P-A phase 4).
+ * sensible defaults.
  *
  * Production code does not use this; the public path is
  * `createVerifier(...)`. Suite unit tests use it because they exercise
  * a single suite against a hand-built context, not the full pipeline.
  *
- * Precedence matches the post-P-E production factory: explicit
- * overrides win, otherwise the document loader and JSON fetcher are
- * always derived from the effective `httpGetService` (default or
- * override). No "first-time caller bypass" branch.
+ * Precedence matches `createVerifier`: explicit overrides win,
+ * otherwise the document loader and JSON fetcher are always derived
+ * from the effective `httpGetService` (default or override), so a
+ * test's injected HTTP service sees every fetch.
  */
 
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';

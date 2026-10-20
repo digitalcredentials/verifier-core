@@ -1,8 +1,7 @@
 /**
  * End-to-end spec for the recognition pipeline through `createVerifier`.
  *
- * Asserts the contract documented in
- * `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/00-design.md`:
+ * Asserts the recognition contract:
  *
  * - With no `recognizers` configured, `recognition.profile` emits
  *   skipped and the result has no `normalizedVerifiableCredential`
@@ -19,12 +18,8 @@ import { obv3p0Recognizer } from '../src/openbadges/recognizers.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 import { sampleAchievementCredential } from './openbadges/fixtures/sample-achievement-credential.js';
 
-// Verbose verifier so the `recognition.profile` check is visible
-// in `results[]` regardless of outcome (folded mode hides
-// successes / non-applies skips).
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('verifier recognition pipeline', () => {
@@ -35,7 +30,7 @@ describe('verifier recognition pipeline', () => {
     });
 
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('skipped');
     expect(result.normalizedVerifiableCredential).toBe(undefined);
@@ -55,7 +50,7 @@ describe('verifier recognition pipeline', () => {
     expect(result.normalizedVerifiableCredential).toBeDefined();
 
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('success');
   });
@@ -82,7 +77,7 @@ describe('verifier recognition pipeline', () => {
     expect(result.recognizedProfile).toBe(undefined);
     expect(result.normalizedVerifiableCredential).toBe(undefined);
     const recognition = result.results.find(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognition?.outcome.status).toBe('skipped');
   });

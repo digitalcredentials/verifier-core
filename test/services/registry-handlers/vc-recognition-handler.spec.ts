@@ -63,7 +63,15 @@ describe('lookupVcRecognition', () => {
     );
     expect(result).toEqual({
       status: 'found',
-      registryName: 'Recognition List'
+      registryName: 'Recognition List',
+      entity: {
+        name: 'Example Tech',
+        raw: {
+          id: 'did:web:university.example',
+          type: 'RecognizedEntity',
+          name: 'Example Tech'
+        }
+      }
     });
   });
 
@@ -80,7 +88,120 @@ describe('lookupVcRecognition', () => {
     const result = await lookupVcRecognition('did:key:single', registry, ctx);
     expect(result).toEqual({
       status: 'found',
-      registryName: 'Recognition List'
+      registryName: 'Recognition List',
+      entity: { raw: { id: 'did:key:single', type: 'RecognizedEntity' } }
+    });
+  });
+
+  it('carries the entry url and logo when they are strings', async () => {
+    const vc = buildVc({
+      credentialSubject: [
+        {
+          id: 'did:web:university.example',
+          name: 'Example Tech',
+          url: 'https://university.example',
+          logo: 'https://university.example/logo.png',
+          image: { id: 'https://university.example/seal.png' }
+        }
+      ]
+    });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) })
+    });
+    const result = await lookupVcRecognition(
+      'did:web:university.example',
+      registry,
+      ctx
+    );
+    expect(result).toEqual({
+      status: 'found',
+      registryName: 'Recognition List',
+      entity: {
+        name: 'Example Tech',
+        url: 'https://university.example',
+        logo: 'https://university.example/logo.png',
+        raw: {
+          id: 'did:web:university.example',
+          name: 'Example Tech',
+          url: 'https://university.example',
+          logo: 'https://university.example/logo.png',
+          image: { id: 'https://university.example/seal.png' }
+        }
+      }
+    });
+  });
+
+  it('returns an entity with no name when the entry has none', async () => {
+    const vc = buildVc({
+      credentialSubject: [
+        { id: 'did:web:university.example', type: 'RecognizedEntity' }
+      ]
+    });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) })
+    });
+    const result = await lookupVcRecognition(
+      'did:web:university.example',
+      registry,
+      ctx
+    );
+    expect(result).toEqual({
+      status: 'found',
+      registryName: 'Recognition List',
+      entity: {
+        raw: { id: 'did:web:university.example', type: 'RecognizedEntity' }
+      }
+    });
+  });
+
+  it('omits name, url and logo that are not strings', async () => {
+    const entry = {
+      id: 'did:web:university.example',
+      name: { en: 'Example Tech', fr: 'Exemple Tech' },
+      url: { id: 'https://university.example' },
+      logo: ['https://university.example/logo.png']
+    };
+    const vc = buildVc({ credentialSubject: [entry] });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) })
+    });
+    const result = await lookupVcRecognition(
+      'did:web:university.example',
+      registry,
+      ctx
+    );
+    expect(result).toEqual({
+      status: 'found',
+      registryName: 'Recognition List',
+      entity: { raw: entry }
+    });
+  });
+
+  it('returns the same entity on a lookup served from the cache', async () => {
+    const vc = buildVc();
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) })
+    });
+    const first = await lookupVcRecognition(
+      'did:web:university.example',
+      registry,
+      ctx
+    );
+    const second = await lookupVcRecognition(
+      'did:web:university.example',
+      registry,
+      ctx
+    );
+    expect(second).toEqual(first);
+    expect(second).toMatchObject({
+      entity: {
+        name: 'Example Tech',
+        raw: {
+          id: 'did:web:university.example',
+          type: 'RecognizedEntity',
+          name: 'Example Tech'
+        }
+      }
     });
   });
 

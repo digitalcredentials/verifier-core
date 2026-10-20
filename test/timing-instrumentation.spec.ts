@@ -19,8 +19,7 @@ import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 const BASE_DATE_MS = new Date('2026-01-01T00:00:00Z').getTime();
 
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 describe('timing instrumentation', () => {
@@ -48,7 +47,7 @@ describe('timing instrumentation', () => {
       const result = await verifier.verifyCredential({ credential });
       expect(result.results.length).toBeGreaterThan(0);
       for (const c of result.results) {
-        expect(c.timing, `${c.id ?? c.check} missing timing`).toBeDefined();
+        expect(c.timing, `${c.id} missing timing`).toBeDefined();
       }
     });
 
@@ -159,16 +158,15 @@ describe('timing instrumentation', () => {
       }
     });
 
-    it('survives non-verbose folding (suite timing present even when results[] is empty)', async () => {
+    it('rolls up to every suite summary, including all-passing suites', async () => {
       const verifier = createVerifier({
         cryptoServices: [FakeCryptoService({ verified: true })],
         timing: true,
         timeService: FakeTimeService()
-        // verbose: false (default)
       });
       const credential = CredentialFactory({ version: 'v1', credential: {} });
       const result = await verifier.verifyCredential({ credential });
-      expect(result.results).toEqual([]);
+      expect(result.results.length).toBeGreaterThan(0);
       expect(result.summary.length).toBeGreaterThan(0);
       for (const s of result.summary) {
         expect(s.timing).toBeDefined();

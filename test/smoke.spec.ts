@@ -18,7 +18,7 @@ import { v2didWebWithValidStatus } from './fixtures/v2-did-web-with-valid-status
 import { v2DoubleSigWithValidStatus } from './fixtures/v2-double-sig-with-valid-status.js';
 
 function listIssuerOutcome(result: CredentialVerificationResult) {
-  return result.results.find(r => r.check === 'status.list-issuer')?.outcome;
+  return result.results.find(r => r.id === 'cryptographic.status.list-issuer')?.outcome;
 }
 
 describe('smoke (golden credentials, real crypto + loader)', () => {
@@ -34,8 +34,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
 
   it('v2WithValidStatus — BitstringStatusList valid', async () => {
     const result = await verifyCredential({
-      credential: v2WithValidStatus,
-      verbose: true
+      credential: v2WithValidStatus
     });
     expect(result.verified).toBe(true);
     expect(listIssuerOutcome(result)?.status).toBe('success');
@@ -43,8 +42,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
 
   it('v2EddsaWithValidStatus — EdDSA RDFC-2022 Data Integrity', async () => {
     const result = await verifyCredential({
-      credential: v2EddsaWithValidStatus,
-      verbose: true
+      credential: v2EddsaWithValidStatus
     });
     expect(result.verified).toBe(true);
     expect(listIssuerOutcome(result)?.status).toBe('success');
@@ -57,8 +55,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
 
   it('v2didWebWithValidStatus — did:web issuer, list signed by a did:key', async () => {
     const result = await verifyCredential({
-      credential: v2didWebWithValidStatus,
-      verbose: true
+      credential: v2didWebWithValidStatus
     });
     // The list's signer is not the issuer: a warning, not a failure.
     expect(result.verified).toBe(true);
@@ -73,8 +70,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
 
   it('v2DoubleSigWithValidStatus — dual Ed25519 + EdDSA proofs', async () => {
     const result = await verifyCredential({
-      credential: v2DoubleSigWithValidStatus,
-      verbose: true
+      credential: v2DoubleSigWithValidStatus
     });
     expect(result.verified).toBe(true);
     expect(listIssuerOutcome(result)?.status).toBe('success');
@@ -90,7 +86,7 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
     tampered.credentialSubject = cs;
     const result = await verifyCredential({ credential: tampered });
     expect(result.verified).toBe(false);
-    const sigCheck = result.results.find(r => r.check === 'proof.signature');
+    const sigCheck = result.results.find(r => r.id === 'cryptographic.proof.signature');
     expect(sigCheck?.outcome.status).toBe('failure');
   });
 });

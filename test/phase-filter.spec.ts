@@ -1,6 +1,5 @@
 /**
- * Spec for the suite-phase filter (Phase 10 of the
- * 2026-04-18-openbadges-recognizer-and-subchecks plan).
+ * Spec for the suite-phase filter.
  *
  * Coverage:
  *
@@ -42,12 +41,9 @@ import { sampleAchievementCredential } from './openbadges/fixtures/sample-achiev
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 
 // Phase-filter integration tests inspect every suite that ran via
-// `result.results.map(r => r.suite)`. Use a verbose verifier so
-// successful suites still appear in `results[]`; folded mode would
-// hide them.
+// `result.results.map(r => r.suite)`.
 const fakeVerified = {
-  cryptoServices: [FakeCryptoService({ verified: true })],
-  verbose: true
+  cryptoServices: [FakeCryptoService({ verified: true })]
 };
 
 const fakeCtx: VerificationContext = {
@@ -249,7 +245,7 @@ describe('createVerifier — phase filter integration', () => {
     });
 
     const recognitionResults = result.results.filter(
-      r => r.check === 'recognition.profile'
+      r => r.id === 'recognition.profile'
     );
     expect(recognitionResults).toHaveLength(1);
   });

@@ -1,4 +1,7 @@
-import type { VcRecognitionEntityIdentityRegistry } from '../../types/registry.js';
+import type {
+  RegistryEntity,
+  VcRecognitionEntityIdentityRegistry
+} from '../../types/registry.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import { DEFAULT_TTL_MS, resolveTtl, ttlFromValidUntil } from './cache-ttl.js';
 import type {
@@ -18,6 +21,11 @@ import type {
  * for the recognition credential itself — that prevents infinite
  * recursion when the recognition VC's own issuer is also looked up
  * through a recognition registry.
+ *
+ * A match carries the recognised `credentialSubject` entry as its entity.
+ * It is read only from a credential that has verified, on the fresh path
+ * and on a cache hit alike, so it is always the recognition issuer's
+ * signed description of the issuer.
  *
  * @see https://w3c.github.io/vc-recognition/
  */
@@ -76,10 +84,39 @@ async function lookupVcRecognitionForRegistry(
     credential = loaded;
   }
 
-  if (!subjectContainsDid(credential, did)) {
+  const entry = findSubjectEntry(credential, did);
+  if (!entry) {
     return { status: 'not-found' };
   }
-  return { status: 'found', registryName: registry.name };
+  return {
+    status: 'found',
+    registryName: registry.name,
+    entity: entityFromEntry(entry)
+  };
+}
+
+/**
+ * The registry's record of the issuer, read from the recognised
+ * `credentialSubject` entry: its name, homepage and logo as the entry
+ * gives them, plus the whole entry, so a consumer can read fields this
+ * shape does not name.
+ *
+ * Only members that are strings are named, because a recognition
+ * credential's subject is arbitrary JSON-LD — a `name` may be a language
+ * map, and is then readable only through `raw`.
+ */
+function entityFromEntry(entry: Record<string, unknown>): RegistryEntity {
+  const entity: RegistryEntity = { raw: entry };
+  if (typeof entry.name === 'string') {
+    entity.name = entry.name;
+  }
+  if (typeof entry.url === 'string') {
+    entity.url = entry.url;
+  }
+  if (typeof entry.logo === 'string') {
+    entity.logo = entry.logo;
+  }
+  return entity;
 }
 
 function cacheKeyForVcRecognitionUrl(url: string): string {
@@ -118,24 +155,20 @@ function getIssuerId(credential: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function subjectContainsDid(
+/** The `credentialSubject` entry recognising `did`, if there is one. */
+function findSubjectEntry(
   credential: Record<string, unknown>,
   did: string
-): boolean {
+): Record<string, unknown> | undefined {
   const subject = credential.credentialSubject;
   if (subject === undefined || subject === null) {
-    return false;
+    return undefined;
   }
-  if (Array.isArray(subject)) {
-    return subject.some(
-      entry =>
-        entry !== null &&
-        typeof entry === 'object' &&
-        (entry as { id?: unknown }).id === did
-    );
-  }
-  if (typeof subject === 'object') {
-    return (subject as { id?: unknown }).id === did;
-  }
-  return false;
+  const entries = Array.isArray(subject) ? subject : [subject];
+  return entries.find(
+    entry =>
+      entry !== null &&
+      typeof entry === 'object' &&
+      (entry as { id?: unknown }).id === did
+  ) as Record<string, unknown> | undefined;
 }

@@ -13,7 +13,7 @@
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
   - [Network policy of the built-in HTTP service](#network-policy-of-the-built-in-http-service)
 - [Custom Suites](#custom-suites)
-- [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
+- [Per-suite summaries](#per-suite-summaries)
 - [Capturing timing data](#capturing-timing-data)
 - [Pluggable clock (TimeService)](#pluggable-clock-timeservice)
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
@@ -125,8 +125,7 @@ configuration (`trustAnchorEC`) for `oidf`.
 
 `entity` is the registry's description of the issuer, not the credential's
 description of itself, so it is the display name to prefer — the credential
-cannot alter it. `dcc-legacy` and `oidf` registries populate it;
-`vc-recognition` matches carry no `entity` yet.
+cannot alter it. Every registry type populates it.
 
 For `oidf`, the `entity` is the `metadata` of the trust anchor's subordinate
 statement: `name` from `federation_entity.organization_name`, `url` from
@@ -137,8 +136,17 @@ time. An OIDF `logo_uri` may be a `data:` URI holding the image itself rather
 than a link to it, so `entity.logo` can be large, and it is cached along with
 the rest of the lookup.
 
+For `vc-recognition`, the `entity` is the recognition credential's
+`credentialSubject` entry that names the issuer: `name`, `url` and `logo` from
+the entry's members of those names, and the whole entry as `raw`. Each of the
+three is set only where the entry's value is a string, so an entry whose `name`
+is a language map carries no `entity.name` and the value stays readable through
+`raw`, as does anything else the entry holds. The credential is verified before
+its subject is read, on a cache hit as well as on a fresh fetch.
+
 ```typescript
-const outcome = result.results.find(r => r.check === 'registry.issuer')?.outcome;
+const outcome = result.results.find(r => r.id === 'trust.registry.issuer')
+  ?.outcome;
 const payload = outcome?.payload as RegistryCheckPayload | undefined;
 const displayName = payload?.matches[0]?.entity?.name;
 ```
@@ -175,7 +183,6 @@ interface VerifyCredentialOptions {
   // Pipeline controls:
   recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
   phases?: SuitePhase[]; // Run only the suites tagged with these phases
-  verbose?: boolean; // Keep every check that ran in `results[]`
   timing?: boolean; // Attach `timing` to every check, suite, and the result
 
   // Service overrides (otherwise sensible defaults are used):
@@ -207,11 +214,17 @@ interface CredentialVerificationResult {
 }
 ```
 
-`verified` is `true` when no check returned a failure. By default (since v2.0.0)
-`results` carries only failures and explicit `<suite>.applies` skips, while
-`summary` provides the per-suite rollup (see
-[Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)). Pass
-`verbose: true` to receive every check that ran in `results`.
+`verified` is `true` when no **fatal** check returned a failure. Some checks are
+advisory: `trust.registry.issuer`, `recognition.profile`,
+`cryptographic.status.list-issuer`, the Open Badges checks (the semantic
+`schema.obv3.*` checks and the Open Badges JSON-schema check), and any check of
+your own that leaves `fatal` unset. An advisory failure never flips `verified`,
+so a credential whose only failing check is the registry lookup is still
+`verified: true` — its `trust.registry` summary carries `status: 'failure'` and
+no `fatalFailureAt`, which is how a UI surfaces it as a warning. `results` carries every
+check — the ones that passed, the ones that were skipped (with a reason), and
+the ones that were not run after a fatal failure — while `summary` provides the
+per-suite rollup (see [Per-suite summaries](#per-suite-summaries)).
 
 Each `CheckResult` contains a discriminated `CheckOutcome`:
 
@@ -238,17 +251,18 @@ interface ProblemDetail {
 ```json
 {
   "verified": true,
-  "verifiableCredential": { "...parsed credential..." },
+  "verifiableCredential": { "...the credential you passed in, unchanged..." },
   "results": [
-    { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
-    { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.vc-structure",   "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.credential-id",  "outcome": { "status": "success", "message": "..." } },
-    { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
-    { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
-    { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
-    { "suite": "status", "check": "status.list-issuer",  "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
-    { "suite": "registry", "check": "registry.issuer",   "outcome": {
+    { "id": "cryptographic.core.context-exists", "suite": "core",   "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
+    { "id": "cryptographic.core.vc-context",     "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.vc-structure",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.credential-id",  "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "cryptographic.core.proof-exists",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
+    { "id": "recognition.profile", "suite": "recognition", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
+    { "id": "cryptographic.proof.signature",     "suite": "proof",  "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "id": "cryptographic.status.bitstring",    "suite": "status", "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
+    { "id": "cryptographic.status.list-issuer",  "suite": "status", "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
+    { "id": "trust.registry.issuer", "suite": "registry",   "outcome": {
       "status": "success",
       "message": "Issuer found in registry: DCC Sandbox Registry",
       "payload": {
@@ -277,26 +291,46 @@ interface ProblemDetail {
 
 An invalid signature is fatal — it means any part of the credential could have
 been tampered with, so every later check for the credential, in any suite, is
-halted. With `verbose: true`, each check that would have run appears as
-`skipped` with reason `Not run: <check-id> failed`.
+halted. Each check that would have run appears as `skipped` with reason
+`Not run: <check-id> failed`.
 
 ```json
 {
   "verified": false,
   "results": [
     {
+      "id": "cryptographic.core.context-exists",
       "suite": "core",
-      "check": "core.context-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-context",
       "suite": "core",
-      "check": "core.proof-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-structure",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "cryptographic.core.credential-id",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "cryptographic.core.proof-exists",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "recognition.profile",
+      "suite": "recognition",
+      "outcome": { "status": "skipped", "reason": "no recognizer matched" }
+    },
+    {
+      "id": "cryptographic.proof.signature",
       "suite": "proof",
-      "check": "proof.signature",
       "outcome": {
         "status": "failure",
         "problems": [
@@ -309,24 +343,24 @@ halted. With `verbose: true`, each check that would have run appears as
       }
     },
     {
+      "id": "cryptographic.status.bitstring",
       "suite": "status",
-      "check": "status.bitstring",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
       }
     },
     {
+      "id": "cryptographic.status.list-issuer",
       "suite": "status",
-      "check": "status.list-issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
       }
     },
     {
+      "id": "trust.registry.issuer",
       "suite": "registry",
-      "check": "registry.issuer",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: proof.signature failed"
@@ -355,21 +389,46 @@ not fetched, and the check's message or skip reason names them.
   "verified": false,
   "results": [
     {
+      "id": "cryptographic.core.context-exists",
       "suite": "core",
-      "check": "core.context-exists",
       "outcome": { "status": "success", "message": "..." }
     },
     {
+      "id": "cryptographic.core.vc-context",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "cryptographic.core.vc-structure",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "cryptographic.core.credential-id",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "cryptographic.core.proof-exists",
+      "suite": "core",
+      "outcome": { "status": "success", "message": "..." }
+    },
+    {
+      "id": "recognition.profile",
+      "suite": "recognition",
+      "outcome": { "status": "skipped", "reason": "no recognizer matched" }
+    },
+    {
+      "id": "cryptographic.proof.signature",
       "suite": "proof",
-      "check": "proof.signature",
       "outcome": {
         "status": "success",
         "message": "Signature verified successfully."
       }
     },
     {
+      "id": "cryptographic.status.bitstring",
       "suite": "status",
-      "check": "status.bitstring",
       "outcome": {
         "status": "failure",
         "problems": [
@@ -382,8 +441,16 @@ not fetched, and the check's message or skip reason names them.
       }
     },
     {
+      "id": "cryptographic.status.list-issuer",
       "suite": "status",
-      "check": "status.list-issuer",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: status.bitstring failed"
+      }
+    },
+    {
+      "id": "trust.registry.issuer",
+      "suite": "registry",
       "outcome": {
         "status": "skipped",
         "reason": "Not run: status.bitstring failed"
@@ -403,8 +470,8 @@ with `STATUS_LIST_ISSUER_MISMATCH`:
 
 ```json
 {
+  "id": "cryptographic.status.list-issuer",
   "suite": "status",
-  "check": "status.list-issuer",
   "fatal": false,
   "outcome": {
     "status": "failure",
@@ -432,8 +499,8 @@ with no `credentialStatus` skips the status check:
 
 ```json
 {
+  "id": "cryptographic.status.bitstring",
   "suite": "status",
-  "check": "status.bitstring",
   "outcome": {
     "status": "skipped",
     "reason": "Credential has no credentialStatus."
@@ -548,7 +615,6 @@ interface VerifyPresentationOptions {
   // Pipeline controls:
   recognizers?: RecognizerSpec[]; // See "Credential recognition & two-pass verification"
   phases?: SuitePhase[]; // Run only the suites tagged with these phases
-  verbose?: boolean; // Keep every check that ran in `results[]`
   timing?: boolean; // Attach `timing` to every check, suite, and the result
 
   // Service overrides (otherwise sensible defaults are used):
@@ -580,7 +646,8 @@ interface PresentationVerificationResult {
 ```
 
 `presentationResults` and each embedded `credentialResults[i].results` follow
-the same folded-by-default shape as `verifyCredential`'s `results`. The
+the same shape as `verifyCredential`'s `results`: every check that ran, was
+skipped, or was not run after a fatal failure. The
 top-level `summary` rolls up the VP envelope's own suites; per-credential
 rollups live on `credentialResults[i].summary`.
 
@@ -596,10 +663,15 @@ Presentation verification does two things:
 2. **Verifies each embedded credential** — extracts credentials from the VP and
    runs `verifyCredential` on each. Results go in `credentialResults`.
 
-`verified` is `true` only if both the presentation and all embedded credentials
-pass.
+`verified` is `true` when no **fatal** presentation check failed and every
+embedded credential is itself `verified`. The same checks are advisory here as
+for a single credential (`trust.registry.issuer`, `recognition.profile`,
+`cryptographic.status.list-issuer`, the Open Badges checks, and any check of
+your own that leaves `fatal` unset): an embedded credential whose only failure
+is advisory is `verified: true`, and so, on its account, is the presentation.
 
-The parsed VP is returned as `verifiablePresentation`, mirroring the wire-level
+The VP is returned as `verifiablePresentation` — the object you passed in,
+unchanged — mirroring the wire-level
 property name so callers (and downstream systems whose templates reach into
 result objects by property path) can reach it without carrying the original
 input separately.
@@ -751,37 +823,43 @@ const result = await verifyCredential({
 Custom suites run after the default suites. Each check receives the same
 `VerificationSubject` and `VerificationContext` as built-in checks.
 
-## Verbose mode and folded summaries
+## Per-suite summaries
 
 Each `CredentialVerificationResult` and `PresentationVerificationResult` carries
-a `summary: SuiteSummary[]` rollup of per-suite outcomes. By default (since
-v2.0.0), `results[]` carries only failures and explicit `<suite>.applies` skips;
-pass `verbose: true` to keep every check in `results[]`.
+a `summary: SuiteSummary[]` rollup of per-suite outcomes alongside the full
+`results[]` list.
 
 ```ts
 const result = await verifier.verifyCredential({ credential });
-// result.summary[i] = { id, phase, suite, status, verified, message, counts, ... }
-// result.results[]  = failures + explicit skips only
+// result.summary[i] = { id, phase, suite, status, message, counts, fatalFailureAt?, ... }
+// result.results[]  = every check that ran, was skipped, or was not run,
+//                     each with its .id
 
-const verbose = await verifier.verifyCredential({ credential, verbose: true });
-// verbose.results[] carries every check that ran, with .id populated.
+// Detail rows for one summary entry — filter by status for just the failures.
+const failures = result.results.filter(
+  r => r.id.startsWith(result.summary[0].id + '.') &&
+       r.outcome.status === 'failure'
+);
 ```
 
-`verbose` is also accepted on `createVerifier(...)` as an instance default;
-per-call values win when both are set.
+Render from `summary[]` and lazy-expand into `results[]`.
+
+Check ids and the built-in suites' `phase` tags are fixed for 2.x. An id
+embeds its suite's phase, so re-tagging a built-in suite would rename every
+check in it: changing either is a breaking change.
 
 See [`docs/api/verification-results.md`](./docs/api/verification-results.md) for
-the full reference (phase model, `SuiteSummary` fields, `id` namespace, UI
-rendering recipe, and a prompt-ready appendix for downstream UIs).
+the full reference (phase model, `SuiteSummary` fields, `id` namespace, and a UI
+rendering recipe).
 
 ## Capturing timing data
 
 Every result can carry per-check, per-suite, and per-call `TaskTiming` data
 (wall-clock `startedAt` / `endedAt` plus a monotonic `durationMs`). Off by
-default; opt in via `timing: true` on `createVerifier(...)` or per-call. Mirrors
-`verbose`'s plumbing — per-call wins, and `verifyPresentation` propagates the
-flag into embedded `verifyCredential` calls so the top-level `result.timing` is
-an inclusive wrapper.
+default; opt in via `timing: true` on `createVerifier(...)` or per-call.
+Per-call wins, and `verifyPresentation` propagates the flag into embedded
+`verifyCredential` calls so the top-level `result.timing` is an inclusive
+wrapper.
 
 ```ts
 const verifier = createVerifier({ timing: true });
@@ -790,11 +868,10 @@ console.log(result.timing!.durationMs);
 console.log(result.summary[0].timing!.durationMs);
 ```
 
-In `verbose: false` mode (the default), individual `CheckResult.timing` entries
-fold away in `results[]`, but the per-suite `SuiteSummary.timing` survives in
-`summary[]` so suite-grain timing is never lost. See
+Per-check timings ride on every row of `results[]`, and the per-suite rollup
+lives on `summary[i].timing`. See
 [`docs/api/timing.md`](./docs/api/timing.md) for the full reference, granularity
-table, recipes, and a prompt-ready appendix.
+table, and recipes.
 
 ## Pluggable clock (`TimeService`)
 
@@ -967,9 +1044,9 @@ for (const credResult of presResult.credentialResults) {
 }
 ```
 
-This is the recommended advanced integration shape for services like
-`dcc-transaction-service` that verify a presentation up front and then inspect
-each embedded credential's profile to drive downstream business logic. If
+This is the recommended advanced integration shape for a service that verifies
+a presentation up front and then inspects each embedded credential's profile to
+drive downstream business logic. If
 performance matters, you're verifying high volumes of credentials, you want to
 show partial results to a user for verification in progress, or you have
 specific requirements for the verification process, this advanced integration
@@ -1067,7 +1144,7 @@ small migrations:
   - `PresentationVerificationResult.allResults` removed — replace with
     `flattenPresentationResults(result)`.
   - `PresentationVerificationResult.verifiablePresentation` added — new field
-    carrying the parsed VP.
+    carrying the VP you passed in, unchanged.
 
 - **Default cache isolation:** two `createVerifier()` calls without an explicit
   `cacheService` no longer share a process-wide cache. To preserve the previous

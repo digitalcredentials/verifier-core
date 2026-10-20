@@ -1,5 +1,5 @@
 /**
- * Spec for the Phase-6 OB 3.0 `AchievementSubject` (§B.1.3) class
+ * Spec for the OB 3.0 `AchievementSubject` (§B.1.3) class
  * schema, its **id-or-identifier[]** at-least-one refinement, and
  * its backfill into the top-level envelope's `credentialSubject`
  * slot.
@@ -119,7 +119,7 @@ describe('Obv3p0AchievementSubjectSchema (standalone)', () => {
     }
   });
 
-  it('passes result[] entries through unchanged (Phase 7 backfills)', () => {
+  it('passes result[] entries through unchanged', () => {
     const opaqueResult = {
       type: ['Result'],
       value: '95',

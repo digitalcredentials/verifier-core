@@ -1,5 +1,5 @@
 /**
- * Spec for the Phase-7 OB 3.0 result trio:
+ * Spec for the OB 3.0 result trio:
  * - RubricCriterionLevel (§B.1.18)
  * - ResultDescription (§B.1.17)
  * - Result (§B.1.16)
@@ -10,9 +10,9 @@
  * attribution for malformed nested entries when validated through
  * the envelope.
  *
- * Phase 7 closes out the strict envelope; Phase 8 will refactor
- * the existing OB semantic checks (achieved-level, result-ref) to
- * consume this normalized form via `recognizedProfile`.
+ * The OB semantic checks (achieved-level, result-ref) parse with
+ * the tolerant shapes in `openbadges-zod.ts` instead of this
+ * normalized form, so nothing here constrains them.
  */
 
 import { describe, it, expect } from 'vitest';

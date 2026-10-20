@@ -22,7 +22,9 @@ import {
   loadStatusList
 } from './status-lists.js';
 
-// Error patterns from constants/external.ts
+// Error strings raised by `@digitalcredentials/vc-bitstring-status-list`,
+// matched to classify its rejections. They are not part of that package's
+// typed surface, so they are pinned here as literals.
 const NOT_FOUND_ERROR = 'NotFoundError';
 const STATUS_TYPE_ERROR =
   'Status list credential type must include "BitstringStatusListCredential".';

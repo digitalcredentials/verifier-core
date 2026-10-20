@@ -50,31 +50,49 @@ function mkSuite(
   return { id, name: id, checks, phase: options.phase };
 }
 
+/**
+ * Phase each fixture suite in this file is tagged with, so `mkResult`
+ * can stamp the same `id` the suite runner would have. `custom` is
+ * deliberately absent: it stands for an untagged suite.
+ */
+const FIXTURE_PHASES: Record<string, SuitePhase | undefined> = {
+  core: 'cryptographic',
+  proof: 'cryptographic',
+  status: 'cryptographic',
+  alpha: 'cryptographic',
+  registry: 'trust',
+  recognition: 'recognition',
+  extra: 'semantic',
+  mix: 'semantic',
+  beta: 'semantic'
+};
+
 function mkResult(
   suite: string,
   check: string,
   status: 'success' | 'failure' | 'skipped',
   options: { fatal?: boolean; reason?: string } = {}
 ): CheckResult {
+  const id = computeId(FIXTURE_PHASES[suite], suite, check);
   if (status === 'success') {
     return {
+      id,
       suite,
-      check,
       outcome: { status: 'success', message: 'ok' },
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {})
     };
   }
   if (status === 'failure') {
     return {
+      id,
       suite,
-      check,
       outcome: { status: 'failure', problems: [stubProblem] },
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {})
     };
   }
   return {
+    id,
     suite,
-    check,
     outcome: { status: 'skipped', reason: options.reason ?? 'n/a' }
   };
 }
@@ -87,7 +105,7 @@ function mkNotRun(suite: string, check: string, haltedBy: string): CheckResult {
 }
 
 describe('foldCheckResults', () => {
-  it('1. all-pass: folds 4 successes into one summary, no results entries', () => {
+  it('1. all-pass: keeps 4 successes in results, rolls them into one summary', () => {
     const suite = mkSuite(
       'core',
       [
@@ -107,10 +125,14 @@ describe('foldCheckResults', () => {
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results).toHaveLength(0);
+    expect(results.map(r => r.id)).toEqual([
+      'cryptographic.core.a',
+      'cryptographic.core.b',
+      'cryptographic.core.c',
+      'cryptographic.core.d'
+    ]);
     expect(summaries).toHaveLength(1);
     expect(summaries[0].status).toBe('success');
-    expect(summaries[0].verified).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 4,
       failed: 0,
@@ -136,7 +158,8 @@ describe('foldCheckResults', () => {
 
     expect(results).toHaveLength(2);
     expect(summaries[0].status).toBe('failure');
-    expect(summaries[0].verified).toBe(false);
+    // Non-fatal failures: `status` reports them, `fatalFailureAt` does not.
+    expect(summaries[0].fatalFailureAt).toBeUndefined();
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 2,
@@ -145,7 +168,7 @@ describe('foldCheckResults', () => {
     expect(summaries[0].message).toBe('2 of 2 checks failed');
   });
 
-  it('3. mixed: 1 fail + 3 pass surfaces 1 failure, summary status="mixed"', () => {
+  it('3. mixed: 1 fail + 3 pass surfaces all 4, summary status="mixed"', () => {
     const suite = mkSuite(
       'core',
       [
@@ -165,10 +188,11 @@ describe('foldCheckResults', () => {
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results).toHaveLength(1);
-    expect(results[0].check).toBe('core.b');
+    expect(results).toHaveLength(4);
+    expect(results.filter(r => r.outcome.status === 'failure')).toHaveLength(1);
+    expect(results[1].id).toBe('cryptographic.core.b');
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].verified).toBe(false);
+    expect(summaries[0].fatalFailureAt).toBeUndefined();
     expect(summaries[0].counts).toEqual({
       passed: 3,
       failed: 1,
@@ -190,9 +214,8 @@ describe('foldCheckResults', () => {
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
     expect(results).toHaveLength(1);
-    expect(results[0].check).toBe('extra.applies');
+    expect(results[0].id).toBe('semantic.extra.applies');
     expect(summaries[0].status).toBe('skipped');
-    expect(summaries[0].verified).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 0,
@@ -223,10 +246,13 @@ describe('foldCheckResults', () => {
 
     const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results).toHaveLength(1);
-    expect(results[0].check).toBe('proof.b');
+    expect(results.map(r => r.id)).toEqual([
+      'cryptographic.proof.a',
+      'cryptographic.proof.b',
+      'cryptographic.proof.c',
+      'cryptographic.proof.d'
+    ]);
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].verified).toBe(false);
     expect(summaries[0].counts).toEqual({
       passed: 1,
       failed: 1,
@@ -286,7 +312,6 @@ describe('foldCheckResults', () => {
         'proof not run: core.context-exists failed'
       );
       expect(summaries[1].status).toBe('skipped');
-      expect(summaries[1].verified).toBe(true);
       expect(summaries[1].counts).toEqual({
         passed: 0,
         failed: 0,
@@ -295,10 +320,25 @@ describe('foldCheckResults', () => {
       expect(summaries[1].fatalFailureAt).toBeUndefined();
     });
 
-    it('does not surface not-run rows in non-verbose results', () => {
+    it('surfaces every not-run row alongside the failure', () => {
       const { results } = foldCheckResults(haltedChecks, [core, proof]);
 
-      expect(results.map(r => r.check)).toEqual(['core.context-exists']);
+      expect(results.map(r => r.id)).toEqual([
+        'cryptographic.core.context-exists',
+        'cryptographic.core.vc-context',
+        'cryptographic.core.credential-id',
+        'cryptographic.core.proof-exists',
+        'cryptographic.proof.signature'
+      ]);
+      expect(
+        results
+          .filter(r => r.outcome.status === 'skipped')
+          .every(
+            r =>
+              r.outcome.status === 'skipped' &&
+              r.outcome.reason.startsWith(NOT_RUN_REASON_PREFIX)
+          )
+      ).toBe(true);
     });
 
     it('keeps an ordinary skip out of both the ran and not-run counts', () => {
@@ -388,7 +428,7 @@ describe('foldCheckResults', () => {
     );
   });
 
-  it('10. verbose pass-through: results[] carries every check, ids populated lazily', () => {
+  it('10. pass-through: results[] is the raw input, unchanged', () => {
     const suite = mkSuite(
       'core',
       [
@@ -406,11 +446,9 @@ describe('foldCheckResults', () => {
       mkResult('core', 'core.d', 'success')
     ];
 
-    const { results, summaries } = foldCheckResults(checks, [suite], {
-      verbose: true
-    });
+    const { results, summaries } = foldCheckResults(checks, [suite]);
 
-    expect(results).toHaveLength(4);
+    expect(results).toEqual(checks);
     expect(summaries[0].status).toBe('mixed');
   });
 

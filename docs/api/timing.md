@@ -3,11 +3,8 @@
 > Consumer reference for the optional `timing` flag and the
 > `TaskTiming` data carried on every result when it is enabled.
 >
-> **Audience.** Performance / observability work in
-> `dcc-transaction-service`, `skills-verifier`, and any future
-> client building on `verifier-core`. The §10 LLM-prompt
-> appendix is written to be copy-pasted as the seed of an LLM
-> prompt for client-side instrumentation code-gen.
+> **Audience.** Performance and observability work in any client
+> building on `verifier-core`.
 
 ## Table of Contents
 
@@ -17,20 +14,18 @@
 4. [Granularity](#granularity)
 5. [Inclusive top-level convention](#inclusive-top-level-convention)
 6. [Parse-failure behavior](#parse-failure-behavior)
-7. [Folding caveat](#folding-caveat)
-8. [Recipes](#recipes)
-9. [`TimeService` reference](#timeservice-reference)
-10. [Prompt-ready appendix](#prompt-ready-appendix)
+7. [Recipes](#recipes)
+8. [`TimeService` reference](#timeservice-reference)
 
 ## Overview
 
 `verifier-core` can attach `TaskTiming` data to every
 `CheckResult`, every `SuiteSummary`, and every top-level
 `Credential|PresentationVerificationResult`. The feature is
-opt-in via a `timing: boolean` flag that mirrors the existing
-`verbose` flag's plumbing: settable on `VerifierConfig`,
-overridable per call, and automatically propagated from
-`verifyPresentation` into embedded `verifyCredential` calls.
+opt-in via a `timing: boolean` flag: settable on
+`VerifierConfig`, overridable per call, and automatically
+propagated from `verifyPresentation` into embedded
+`verifyCredential` calls.
 
 Cost when enabled: two `Date.now()`-equivalent reads and two
 `performance.now()`-equivalent reads per check, plus one of
@@ -66,11 +61,6 @@ into embedded `verifyCredential` calls automatically — every
 credential in `result.credentialResults[i]` shares the same
 `timing` decision, so the top-level call's `timing` is a true
 inclusive wrapper (see §5).
-
-Pairs naturally with `verbose: true` so per-check timings
-survive in `results[]`. Without verbose, individual
-`CheckResult.timing` entries fold away — but per-suite timing
-on `summary[]` still survives (see §7).
 
 ## The `TaskTiming` shape
 
@@ -113,8 +103,7 @@ monotonic clock — immune to wall-clock jumps (NTP, DST). Use
 | Per-call  | `result.timing` (and `presentationResult.timing`)           | Inclusive wrapper around the entire `verifyCredential` / `verifyPresentation` body             |
 
 Per-suite timing is computed by `foldCheckResults` from the
-per-check timings before checks are folded out of `results[]`,
-so it survives `verbose: false` consumption (see §7).
+per-check timings carried on `results[]`.
 
 ## Inclusive top-level convention
 
@@ -153,7 +142,7 @@ of the suite's own work.
 
 When a credential or presentation envelope fails to parse, the
 verifier short-circuits with a single synthetic
-`parsing.envelope` `CheckResult`. With `timing: true`, this
+`cryptographic.parsing.envelope` `CheckResult`. With `timing: true`, this
 synthetic check, its synthetic suite summary, and the top-level
 result all carry `timing` — same as a normal run:
 
@@ -161,7 +150,7 @@ result all carry `timing` — same as a normal run:
 {
   "verified": false,
   "results": [
-    { "id": "cryptographic.parsing.parsing.envelope",
+    { "id": "cryptographic.parsing.envelope",
       "outcome": { "status": "failure", "problems": [/* ... */] },
       "fatal": true,
       "timing": { "startedAt": "...", "endedAt": "...", "durationMs": 0.001 } }
@@ -177,23 +166,9 @@ result all carry `timing` — same as a normal run:
 This keeps the consumer's "extract timing from result" code
 path uniform across success and parse-failure outcomes.
 
-## Folding caveat
-
-`verbose: false` (the default) hides individual
-`CheckResult.timing` entries — they fold away into the
-per-suite rollup just like the checks themselves. Per-suite
-`SuiteSummary.timing` survives in `summary[]` and remains the
-canonical surface for non-verbose consumers.
-
-If you need per-check timing detail, opt into both:
-
-```ts
-const verifier = createVerifier({ timing: true, verbose: true });
-```
-
 ## Recipes
 
-### Slowest check (verbose mode)
+### Slowest check
 
 ```ts
 const slowestChecks = result.results
@@ -258,82 +233,11 @@ counter semantics and `seed` options (`baseDateMs`,
 `performanceTickMs`).
 
 The `TimeService` is the source of truth for any check that
-needs to ask "what time is it?". `proof.signature` already reads
-it to judge credential expiry (`validUntil` / `expirationDate`)
-and `status.bitstring` to judge status-list freshness, so a
+needs to ask "what time is it?". `cryptographic.proof.signature`
+already reads it to judge credential expiry (`validUntil` /
+`expirationDate`) and `cryptographic.status.bitstring` to judge
+status-list freshness, so a
 verifier built on a `FakeTimeService` decides both at the pinned
 moment. Signature clock-skew windows and key rotation belong
 there too. Read it from `VerificationContext.timeService` inside
 `execute()`.
-
-## Prompt-ready appendix
-
-> Drop this section verbatim into an LLM prompt for client-side
-> instrumentation code-gen.
-
-`@digitalcredentials/verifier-core` v2 emits optional
-`TaskTiming` data on every result when constructed with
-`timing: true`:
-
-```ts
-import { createVerifier } from '@digitalcredentials/verifier-core';
-const verifier = createVerifier({ timing: true });
-const result = await verifier.verifyPresentation({ presentation });
-```
-
-Every result then carries a `timing: TaskTiming` field at three
-levels:
-
-```ts
-interface TaskTiming {
-  startedAt: string;            // ISO 8601 wall-clock
-  endedAt: string;              // ISO 8601 wall-clock
-  durationMs: number;           // monotonic, fractional ms
-  events?: ReadonlyArray<TaskTiming & { name: string }>; // reserved
-}
-
-// Per-check (only in verbose: true mode):
-result.results[i].timing
-// Per-suite (always present in summary[] when timing: true):
-result.summary[i].timing
-// Top-level inclusive wrapper:
-result.timing
-// In verifyPresentation results, each embedded VC also has:
-result.credentialResults[i].timing
-```
-
-Invariants (always hold when `timing: true`):
-
-1. `endedAt >= startedAt` for every `TaskTiming`.
-2. `durationMs >= 0` for every `TaskTiming`.
-3. Top-level `result.timing.durationMs >= max(s.timing.durationMs for s in result.summary)`.
-4. `verifyPresentation` top-level `result.timing.durationMs >= cr.timing.durationMs` for every `cr in result.credentialResults`.
-5. Per-suite `timing.durationMs == sum(child timing.durationMs)`.
-6. Per-suite `timing.startedAt == min(child startedAt)`,
-   per-suite `timing.endedAt == max(child endedAt)`.
-
-Use `durationMs` for any sort / sum / comparison (it comes
-from a monotonic clock); use `startedAt` / `endedAt` only for
-log correlation and human-readable timelines.
-
-A "verification time breakdown" UI from a presentation result:
-
-```ts
-function buildBreakdown(result: PresentationVerificationResult) {
-  const totalMs = result.timing!.durationMs;
-  return {
-    totalMs,
-    presentationOnlyMs: result.summary
-      .reduce((a, s) => a + (s.timing?.durationMs ?? 0), 0),
-    credentials: result.credentialResults.map(cr => ({
-      id: cr.verifiableCredential.id,
-      totalMs: cr.timing!.durationMs,
-      bySuite: cr.summary.map(s => ({
-        suite: s.id,
-        durationMs: s.timing!.durationMs,
-        verified: s.verified,
-      })),
-    })),
-  };
-}
-```

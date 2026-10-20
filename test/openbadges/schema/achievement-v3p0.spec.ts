@@ -1,10 +1,10 @@
 /**
- * Spec for the Phase-5 OB 3.0 `Alignment` (§B.1.5) and
- * `Achievement` (§B.1.1) class schemas.
+ * Spec for the OB 3.0 `Alignment` (§B.1.5) and `Achievement`
+ * (§B.1.1) class schemas.
  *
- * Achievement is not yet wired into `AchievementSubject` (Phase 6
- * does that). These schemas are tested standalone via
- * `safeParse`. Path-based `instance` assertions verify that
+ * These schemas are tested standalone via `safeParse`; the
+ * envelope spec covers them in composition. Path-based
+ * `instance` assertions verify that
  * malformed nested entries (e.g. `alignment[1]`) carry accurate
  * JSON Pointers when run through Zod.
  */

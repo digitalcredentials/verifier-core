@@ -34,7 +34,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('skipped');
   });
@@ -59,7 +61,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('skipped');
   });
@@ -89,7 +93,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
@@ -131,7 +137,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
@@ -168,7 +176,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
@@ -209,7 +219,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {
@@ -253,7 +265,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
@@ -284,7 +298,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('success');
   });
@@ -314,7 +330,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('success');
     if (check?.outcome.status === 'success') {
@@ -357,7 +375,9 @@ describe('OBv3 missing-result-status check', () => {
     );
 
     const check = results.find(
-      r => r.check === 'schema.obv3.missing-result-status'
+      r =>
+        r.id ===
+        'unknown.openbadges.missing-result-status.schema.obv3.missing-result-status'
     );
     expect(check?.outcome.status).toBe('failure');
     if (check?.outcome.status === 'failure') {

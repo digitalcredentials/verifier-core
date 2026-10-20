@@ -1,10 +1,6 @@
 /**
- * Spec for the Phase-3 OB 3.0 `Image` class schema and the
- * `ImageField()` builder, plus its backfill into the top-level
- * credential `image` slot.
- *
- * Asserts the contract documented in
- * `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/03-image.md`.
+ * Spec for the OB 3.0 `Image` class schema and the `ImageField()`
+ * builder, plus its use in the top-level credential `image` slot.
  */
 
 import { describe, it, expect } from 'vitest';

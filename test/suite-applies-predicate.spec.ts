@@ -41,7 +41,10 @@ describe('VerificationSuite.applies predicate', () => {
 
     const results = await runSuites([suite], subject, ctx);
 
-    expect(results.map(r => r.check)).toEqual(['a', 'b']);
+    expect(results.map(r => r.id)).toEqual([
+      'unknown.gated.a',
+      'unknown.gated.b'
+    ]);
   });
 
   it('silently skips an unapplied suite when not in explicitSuiteIds', async () => {
@@ -59,7 +62,7 @@ describe('VerificationSuite.applies predicate', () => {
 
     const results = await runSuites([skipped, ran], subject, ctx);
 
-    expect(results.map(r => r.check)).toEqual(['y']);
+    expect(results.map(r => r.id)).toEqual(['unknown.ran.y']);
   });
 
   it('emits a synthetic <suite-id>.applies skipped result when in explicitSuiteIds', async () => {
@@ -76,7 +79,7 @@ describe('VerificationSuite.applies predicate', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].suite).toBe('explicit-skip');
-    expect(results[0].check).toBe('explicit-skip.applies');
+    expect(results[0].id).toBe('unknown.explicit-skip.applies');
     expect(results[0].outcome.status).toBe('skipped');
     if (results[0].outcome.status === 'skipped') {
       expect(results[0].outcome.reason).toMatch(/predicate/i);
@@ -115,6 +118,6 @@ describe('VerificationSuite.applies predicate', () => {
     const results = await runSuites([suite], subject, ctx);
 
     expect(results).toHaveLength(1);
-    expect(results[0].check).toBe('z');
+    expect(results[0].id).toBe('unknown.no-predicate.z');
   });
 });

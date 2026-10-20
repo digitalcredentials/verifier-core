@@ -14,13 +14,13 @@
  * Of those four, this catalog currently emits only PARSING_ERROR.
  * The other three are listed in the JSDoc above for awareness; we
  * may align synthesized tokens like INVALID_SIGNATURE onto
- * CRYPTOGRAPHIC_SECURITY_ERROR in a future deliberate refactor (out
- * of scope for P-D — see the design doc's non-goals).
+ * CRYPTOGRAPHIC_SECURITY_ERROR in a future deliberate refactor;
+ * doing so would change values consumers match on, so it is not
+ * done casually.
  *
  * **Synthesized placeholders** — temporary URIs we use until the
  * W3C VC working group publishes a wider error registry or we adopt
- * our own URN namespace (see the readiness review's Q9 for the
- * decision history). They reuse the same
+ * our own URN namespace. They reuse the same
  * `https://www.w3.org/TR/vc-data-model#…` prefix as a stable string
  * but are NOT defined by the spec; treat them as opaque keys.
  *

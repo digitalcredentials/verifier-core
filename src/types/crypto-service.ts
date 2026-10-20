@@ -3,7 +3,7 @@
  *
  * Implementations wrap concrete libraries (e.g. `@digitalcredentials/vc` for Data
  * Integrity). The proof suite dispatches to `CryptoService` instances from
- * `VerificationContext` (phase 2).
+ * `VerificationContext`.
  */
 
 import type { DocumentLoader } from './context.js';

@@ -1,19 +1,16 @@
 /**
- * Pure helper that folds a `CheckResult[]` (the raw
- * `runSuites` output) into a compact, UI-friendly
- * `{ results, summaries }` view.
+ * Pure helper that summarizes a `CheckResult[]` (the raw
+ * `runSuites` output) into a `{ results, summaries }` view.
  *
  * Called from `verifier.ts` after `runSuites` returns and after
  * the recognition payload has been lifted onto the result. The
  * helper has no I/O, no async, and no service dependencies — it
- * is safe to call from any context (incl. consumers refolding
- * after appending late results, e.g. dcc-transaction-service's
- * async OpenBadges merge).
+ * is safe to call from any context, including consumers
+ * recomputing summaries after appending results that arrived
+ * later (an asynchronous OpenBadges merge, say).
  *
- * In **non-verbose** mode (the default), `results[]` carries
- * only failures and explicit `<suite>.applies` skips; everything
- * else is folded into the per-suite rollup on `summaries[]`. In
- * **verbose** mode `results[]` is the raw input, unchanged.
+ * `results[]` is the raw input, unchanged: every check that ran,
+ * was skipped, or was not run after a fatal failure.
  *
  * `summaries[]` is always populated with one entry per (phase,
  * suite) that emitted at least one `CheckResult`. Suites that
@@ -30,23 +27,16 @@ import type {
   SuitePhase,
   VerificationSuite
 } from './types/check.js';
-import type { SuiteSummary, SuiteSummaryPhase } from './types/suite-summary.js';
+import type { SuiteSummary } from './types/suite-summary.js';
 import type { TaskTiming } from './types/timing.js';
 import { NOT_RUN_REASON_PREFIX } from './run-suites.js';
+import { computeId } from './compute-id.js';
 
-export interface FoldOptions {
-  /**
-   * If true, `results[]` carries every `CheckResult` from the
-   * input. If false (default), `results[]` carries only failures
-   * and explicit `<suite>.applies` skips.
-   */
-  verbose?: boolean;
-}
+export { computeId };
 
 export function foldCheckResults(
   checks: CheckResult[],
-  suites: VerificationSuite[],
-  opts: FoldOptions = {}
+  suites: VerificationSuite[]
 ): { results: CheckResult[]; summaries: SuiteSummary[] } {
   if (checks.length === 0 && suites.length === 0) {
     return { results: [], summaries: [] };
@@ -62,41 +52,7 @@ export function foldCheckResults(
     summaries.push(summarizeSuite(suiteId, phase, suiteChecks));
   }
 
-  const results = selectResultsForVerbosity(checks, opts.verbose === true);
-  return { results, summaries };
-}
-
-/**
- * Compute the dot-separated namespaced id for a single
- * `CheckResult` or `SuiteSummary`.
- *
- * Rules:
- *  - Strip the `<suite>.` prefix from `localCheckId` if present.
- *  - When `phase === suite`, collapse to a single segment.
- *  - When `phase` is missing, use `'unknown'`.
- *  - When `localCheckId` is empty (suite-summary case), drop the
- *    trailing segment.
- *
- * @example
- *   computeId('cryptographic', 'core', 'core.proof-exists')
- *     // → 'cryptographic.core.proof-exists'
- *   computeId('recognition', 'recognition', 'recognition.profile')
- *     // → 'recognition.profile'
- *   computeId('cryptographic', 'core', '')
- *     // → 'cryptographic.core'
- */
-export function computeId(
-  phase: SuitePhase | undefined,
-  suite: string,
-  localCheckId: string
-): string {
-  const phaseSeg: SuiteSummaryPhase = phase ?? 'unknown';
-  const localPart = localCheckId.startsWith(`${suite}.`)
-    ? localCheckId.slice(suite.length + 1)
-    : localCheckId;
-  const segments: string[] =
-    phaseSeg === suite ? [phaseSeg, localPart] : [phaseSeg, suite, localPart];
-  return segments.filter(Boolean).join('.');
+  return { results: checks, summaries };
 }
 
 // ----------------------------------------------------------------
@@ -154,19 +110,16 @@ function summarizeSuite(
   const fatalCheck = suiteChecks.find(
     c => c.fatal === true && c.outcome.status === 'failure'
   );
-  const fatalFailureAt = fatalCheck
-    ? (fatalCheck.id ?? computeId(phase, suiteId, fatalCheck.check))
-    : undefined;
+  const fatalFailureAt = fatalCheck?.id;
 
   const status = deriveStatus(counts);
-  const verified = counts.failed === 0;
 
   const message = formatMessage(
     suiteId,
     counts,
     notRunReasons(suiteChecks),
     fatalFailureAt !== undefined,
-    pickAppliesSkipReason(suiteChecks, suiteId)
+    pickAppliesSkipReason(suiteChecks, phase, suiteId)
   );
 
   const timing = rollupSuiteTiming(suiteChecks);
@@ -176,7 +129,6 @@ function summarizeSuite(
     phase: phase ?? 'unknown',
     suite: suiteId,
     status,
-    verified,
     message,
     counts,
     ...(fatalFailureAt !== undefined ? { fatalFailureAt } : {}),
@@ -199,9 +151,6 @@ function summarizeSuite(
  *    would also include any inter-check gap (e.g. event-loop
  *    yields in the orchestrator), which is not part of the
  *    suite's own work.
- *
- * Computed before checks are folded out of `results[]`, so the
- * rollup survives `verbose: false` consumers.
  */
 function rollupSuiteTiming(suiteChecks: CheckResult[]): TaskTiming | undefined {
   const timed = suiteChecks
@@ -251,6 +200,7 @@ function deriveStatus(counts: {
  */
 function pickAppliesSkipReason(
   suiteChecks: CheckResult[],
+  phase: SuitePhase | undefined,
   suiteId: string
 ): string | undefined {
   if (suiteChecks.length !== 1) {
@@ -260,7 +210,7 @@ function pickAppliesSkipReason(
   if (only.outcome.status !== 'skipped') {
     return undefined;
   }
-  if (only.check !== `${suiteId}.applies`) {
+  if (only.id !== computeId(phase, suiteId, `${suiteId}.applies`)) {
     return undefined;
   }
   return only.outcome.reason;
@@ -338,28 +288,4 @@ function formatMessage(
 
 function pluralCheck(n: number): 'check' | 'checks' {
   return n === 1 ? 'check' : 'checks';
-}
-
-/**
- * Choose which checks to surface in `results[]` based on
- * `verbose`. See module-level docs for the rules.
- */
-function selectResultsForVerbosity(
-  checks: CheckResult[],
-  verbose: boolean
-): CheckResult[] {
-  if (verbose) {
-    return checks;
-  }
-  return checks.filter(isFailureOrExplicitSkip);
-}
-
-function isFailureOrExplicitSkip(c: CheckResult): boolean {
-  if (c.outcome.status === 'failure') {
-    return true;
-  }
-  if (c.outcome.status === 'skipped' && c.check.endsWith('.applies')) {
-    return true;
-  }
-  return false;
 }
