@@ -164,7 +164,10 @@ A custom handler passed via `registryHandlers` can supply an `entity` on its
 ### verifyCredential
 
 ```typescript
-import { verifyCredential } from '@digitalcredentials/verifier-core';
+import {
+  verifyCredential,
+  type RegistryCheckPayload
+} from '@digitalcredentials/verifier-core';
 
 const result = await verifyCredential({
   credential, // The VC to verify (any version, passed as unknown)
@@ -1004,7 +1007,7 @@ part of the default suite list; consumers that want OB checks pass
 `openBadgesSuite` (or one of the bundled variants) via `additionalSuites` on a
 verify call.
 
-> [!IMPORTANT] If you were on `1.0.0-beta.x` and relied on `obv3SchemaSuite`
+> [!IMPORTANT] If you were on `1.0.0-beta.x` and relied on its schema check
 > running by default, you now need to opt in explicitly. The simplest migration
 > is to add `openBadgesSuite` to your verify call.
 
@@ -1234,51 +1237,112 @@ system, dependencies, and architectural direction — see
 
 ## Migration from earlier 1.0.0-beta.x
 
-This release tightens the public API surface. The following changes may require
-small migrations:
+2.0.0 is a rewrite. This section maps the last 1.x release, 1.0.0-beta.11, to
+2.0.0. `verifyCredential` and `verifyPresentation` keep their names; their
+options and results change. Check ids below are the `CheckResult.id` values (see
+[verification results](docs/api/verification-results.md)).
 
-- **Demoted from `index.ts`** — these symbols remain reachable via their module
-  paths (`@digitalcredentials/verifier-core/dist/...`) but are no longer part of
-  the published 1.0 surface: `runSuites`, `createRegistryLookup`,
-  `DEFAULT_TTL_MS`, `parseCacheControlMaxAge`, `resolveTtl`,
-  `ttlFromValidUntil`, `documentLoaderFromHttpGet`, `fetchJsonFromHttpGet`,
-  `extractCredentialsFrom`, `registryKeyHash`. Most callers should build
-  verifiers via `createVerifier(...)` rather than reach for these directly.
+### Options
 
-- **Result-shape changes:**
-  - `CredentialVerificationResult.credential` → `verifiableCredential`
-    (`s/\.credential\b/.verifiableCredential/` on accessor sites).
-  - `PresentationVerificationResult.allResults` removed — replace with
-    `flattenPresentationResults(result)`.
-  - `PresentationVerificationResult.verifiablePresentation` added — new field
-    carrying the VP you passed in, unchanged.
+| 1.0.0-beta.11                         | 2.0.0                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `knownDIDRegistries`                  | `registries: EntityIdentityRegistry[]` — the DCC known-registries list works unchanged  |
+| `reloadIssuerRegistry`                | Removed. Lookups are cached in the `cacheService`; reuse a `createVerifier` instance    |
+| `challenge` (default `'meaningless'`) | `challenge` (default `null`). A supplied challenge is always enforced                   |
+| `unsignedPresentation`                | Same name; it now only accepts a presentation with no proof                             |
+| —                                     | New: `domain`, `additionalSuites`, `phases`, `recognizers`, `timing`, service overrides |
 
-- **Default cache isolation:** two `createVerifier()` calls without an explicit
-  `cacheService` no longer share a process-wide cache. To preserve the previous
-  "shared" behavior, construct one `InMemoryCacheService` and pass it to each
-  verifier explicitly.
+### Credential result
 
-- **Legacy result types removed:** `VerificationResponse`,
-  `PresentationVerificationResponse`, and friends were already removed from
-  `index.ts` in `1.0.0-beta.11`; the type definitions are now gone too. Anyone
-  who needed the old shape can pin `1.0.0-beta.11` or earlier.
+| 1.0.0-beta.11 (`VerificationResponse`)         | 2.0.0 (`CredentialVerificationResult`)                                                                                 |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| —                                              | `verified`: `false` when any fatal check failed (bad signature, expired, revoked, …)                                   |
+| `credential`                                   | `verifiableCredential` — the object you passed in, unchanged                                                           |
+| `errors[]` (fatal: unparseable, bad signature) | `results[]` rows with `fatal: true` and `outcome.status: 'failure'`; details in `outcome.problems`                     |
+| `log[valid_signature]`                         | `cryptographic.proof.signature`                                                                                        |
+| `log[expiration]`                              | `cryptographic.proof.validity-period` (`CREDENTIAL_EXPIRED`, `CREDENTIAL_NOT_YET_VALID`)                               |
+| `log[revocation_status]`                       | `cryptographic.status.bitstring` (`CREDENTIAL_REVOKED`, `CREDENTIAL_SUSPENDED`)                                        |
+| `log[registered_issuer].valid`                 | `trust.registry.issuer` `outcome.status` (`success` / `failure`; non-fatal)                                            |
+| `log[registered_issuer].matchingIssuers[]`     | `trust.registry.issuer` `outcome.payload.matches[]`; `.issuer` → `.entity.raw`, with `.entity.name` / `.url` / `.logo` |
+| `log[registered_issuer].uncheckedRegistries[]` | `trust.registry.issuer` `outcome.payload.uncheckedRegistries[]`                                                        |
+| `additionalInformation[schema_check]`          | No default equivalent. The opt-in Open Badges schema suite reports a `schema.obv3.json` row                            |
+| —                                              | `summary[]`, one rollup per suite                                                                                      |
 
-- **`ProblemTypes` const map added:** built-in problem URIs are now importable
-  as `ProblemTypes.INVALID_SIGNATURE` etc. Existing literal-string comparisons
-  against `ProblemDetail.type` continue to work unchanged.
+A `log` step's `valid: true` becomes `outcome.status: 'success'`; `valid: false`
+becomes `'failure'` with `outcome.problems`. A check that did not apply is
+`'skipped'` with a `reason`.
 
-- **OBv3 verification is opt-in** — the OBv3 schema suite no longer runs by
-  default. Add `openBadgesSuite` (or one of its variants) via `additionalSuites`
-  on the verify call to restore previous behavior. See the
-  [Open Badges 3.0 verification](#open-badges-30-verification-opt-in-submodule)
-  section for details.
+### Presentation result
 
-- **OBv3 problem-type rename** — `OBV3_INVALID_RESULT_REFERENCE` (and other OB
-  problems mirrored on `ProblemTypes`) moved out of the core catalog into
-  `OpenBadgesProblemTypes` in the `/openbadges` submodule, and the wire URIs
-  shifted from `…#OBV3_*` to `…#OB_*`. Callers comparing literal strings against
-  `ProblemDetail.type` need to update the affected literals; callers using the
-  constants should switch to the new module.
+| 1.0.0-beta.11 (`PresentationVerificationResponse`) | 2.0.0 (`PresentationVerificationResult`)                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| —                                                  | `verified`: the presentation and every credential in it passed              |
+| —                                                  | `verifiablePresentation` — the object you passed in, unchanged              |
+| `presentationResult.signature: 'valid'`            | `presentationResults` row `cryptographic.proof.signature` with `'success'`  |
+| `presentationResult.signature: 'invalid'`          | that row with `'failure'`                                                   |
+| `presentationResult.signature: 'unsigned'`         | that row with `'skipped'`, its `reason` saying the presentation is unsigned |
+| `credentialResults[]`                              | `credentialResults[]`, each a `CredentialVerificationResult`                |
+| `errors[]`                                         | `verified: false`, with the failing rows in `presentationResults`           |
+
+`flattenPresentationResults(result)` lists every row of a presentation and its
+credentials in one array.
+
+### Before and after
+
+1.0.0-beta.11:
+
+```javascript
+const result = await verifyCredential({ credential, knownDIDRegistries });
+if (result.errors) {
+  console.log('fatal:', result.errors[0].message);
+} else {
+  const step = id => result.log.find(s => s.id === id);
+  console.log('signature ok:', step('valid_signature').valid);
+  console.log('not expired:', step('expiration').valid);
+  const match = step('registered_issuer').matchingIssuers[0];
+  console.log('issuer:', match?.issuer.federation_entity?.organization_name);
+}
+```
+
+2.0.0:
+
+```typescript
+import {
+  verifyCredential,
+  type RegistryCheckPayload
+} from '@digitalcredentials/verifier-core';
+
+const result = await verifyCredential({ credential, registries });
+const row = (id: string) => result.results.find(r => r.id === id);
+console.log('verified:', result.verified);
+console.log(
+  'signature ok:',
+  row('cryptographic.proof.signature')?.outcome.status === 'success'
+);
+console.log(
+  'not expired:',
+  row('cryptographic.proof.validity-period')?.outcome.status === 'success'
+);
+const registry = row('trust.registry.issuer')?.outcome;
+const payload =
+  registry && registry.status !== 'skipped'
+    ? (registry.payload as RegistryCheckPayload | undefined)
+    : undefined;
+console.log('issuer:', payload?.matches[0]?.entity?.name);
+for (const r of result.results) {
+  if (r.outcome.status === 'failure')
+    console.log(r.id, r.outcome.problems[0].title);
+}
+```
+
+### Open Badges
+
+1.x checked Open Badges 3.0 credentials, and any listed `credentialSchema`,
+against JSON Schema by default. 2.0 does not. Add `openBadgesSuite` from
+`@digitalcredentials/verifier-core/openbadges` to `additionalSuites` to check
+Open Badges credentials (see
+[Open Badges 3.0 verification](#open-badges-30-verification-opt-in-submodule)).
+JSON Schema validation of other credential types is not included.
 
 ## Install
 
