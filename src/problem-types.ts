@@ -74,6 +74,14 @@ export const ProblemTypes = {
   /** Synthesized — proof verification raised an error before reaching a verdict. */
   PROOF_VERIFICATION_ERROR:
     'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+  /**
+   * Synthesized — a proof was not checked: no registered suite supports
+   * its type or cryptosuite, or it was made for a different proof
+   * purpose. Beside a proof that verified, it is a warning
+   * (`proof.unsupported-proofs`); alone, the document has no proof this
+   * verifier can check.
+   */
+  PROOF_UNSUPPORTED: 'https://www.w3.org/TR/vc-data-model#PROOF_UNSUPPORTED',
   /** Synthesized — a `did:web` document could not be fetched. */
   DID_WEB_UNRESOLVED: 'https://www.w3.org/TR/vc-data-model#DID_WEB_UNRESOLVED',
   /** Synthesized — HTTP error during signature/issuer resolution. */
