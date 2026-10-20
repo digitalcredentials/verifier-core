@@ -110,7 +110,6 @@ describe('Foundation types', () => {
         phase: 'cryptographic',
         suite: 'core',
         status: 'success',
-        hasFailures: false,
         message: '4 of 4 checks passed',
         counts: { passed: 4, failed: 0, skipped: 0 }
       };
@@ -118,13 +117,12 @@ describe('Foundation types', () => {
       expect(summary.counts.passed).toBe(4);
     });
 
-    it('records fatalFailureAt when the suite halted mid-run', () => {
+    it('records fatalFailureAt when a check in the suite failed fatally', () => {
       const summary: SuiteSummary = {
         id: 'cryptographic.proof',
         phase: 'cryptographic',
         suite: 'proof',
         status: 'failure',
-        hasFailures: true,
         message: '1 of 3 checks failed (0 passed)',
         counts: { passed: 0, failed: 1, skipped: 0 },
         fatalFailureAt: 'proof.signature'
@@ -139,7 +137,6 @@ describe('Foundation types', () => {
         phase,
         suite: 'custom',
         status: 'success',
-        hasFailures: false,
         message: '1 of 1 checks passed',
         counts: { passed: 1, failed: 0, skipped: 0 }
       };
@@ -155,7 +152,6 @@ describe('Foundation types', () => {
         phase: 'recognition',
         suite: 'recognition',
         status: 'skipped',
-        hasFailures: false,
         message: 'no recognizer matched',
         counts: { passed: 0, failed: 0, skipped: 1 }
       };

@@ -14,11 +14,14 @@ not run after a fatal failure.
   `@interop/ecdsa-multikey`. `defaultCryptoSuites()` now registers three suites:
   Ed25519Signature2020, EdDSA RDFC-2022, and ECDSA RDFC-2019.
 - `SuiteSummary` type and `summary: SuiteSummary[]` field on
-  `CredentialVerificationResult` and `PresentationVerificationResult`. Each
-  entry carries `hasFailures: boolean` — true when any check in that suite
-  failed. It is not called `verified`: only the top-level `verified` is a
-  verdict ("no fatal check failed"), and a non-fatal failure sets
-  `hasFailures` on a suite inside a result that is still `verified: true`.
+  `CredentialVerificationResult` and `PresentationVerificationResult`. A
+  summary has no `verified` field: the only verdict is the result-level
+  `verified` ("no fatal check failed"). `status` comes from the suite's
+  counts, so a non-fatal failure shows as `status: 'failure'` or `'mixed'`
+  inside a result that is still `verified: true`. The one suite whose check
+  failed fatally carries `fatalFailureAt`, and a result is unverified exactly
+  when one of its summaries has it; UIs should colour that suite as an error
+  and other failing suites as warnings.
 - Required `id: string` field on `CheckResult` — dot-separated
   `<phase>.<suite>.<localPart>` namespace, set by the suite runner on every
   row it emits (including not-run rows and synthetic `<suite>.applies`

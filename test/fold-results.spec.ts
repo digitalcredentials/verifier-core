@@ -136,7 +136,6 @@ describe('foldCheckResults', () => {
     ]);
     expect(summaries).toHaveLength(1);
     expect(summaries[0].status).toBe('success');
-    expect(summaries[0].hasFailures).toBe(false);
     expect(summaries[0].counts).toEqual({
       passed: 4,
       failed: 0,
@@ -162,7 +161,8 @@ describe('foldCheckResults', () => {
 
     expect(results).toHaveLength(2);
     expect(summaries[0].status).toBe('failure');
-    expect(summaries[0].hasFailures).toBe(true);
+    // Non-fatal failures: `status` reports them, `fatalFailureAt` does not.
+    expect(summaries[0].fatalFailureAt).toBeUndefined();
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 2,
@@ -195,7 +195,7 @@ describe('foldCheckResults', () => {
     expect(results.filter(r => r.outcome.status === 'failure')).toHaveLength(1);
     expect(results[1].check).toBe('core.b');
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].hasFailures).toBe(true);
+    expect(summaries[0].fatalFailureAt).toBeUndefined();
     expect(summaries[0].counts).toEqual({
       passed: 3,
       failed: 1,
@@ -219,7 +219,6 @@ describe('foldCheckResults', () => {
     expect(results).toHaveLength(1);
     expect(results[0].check).toBe('extra.applies');
     expect(summaries[0].status).toBe('skipped');
-    expect(summaries[0].hasFailures).toBe(false);
     expect(summaries[0].counts).toEqual({
       passed: 0,
       failed: 0,
@@ -257,7 +256,6 @@ describe('foldCheckResults', () => {
       'proof.d'
     ]);
     expect(summaries[0].status).toBe('mixed');
-    expect(summaries[0].hasFailures).toBe(true);
     expect(summaries[0].counts).toEqual({
       passed: 1,
       failed: 1,
@@ -317,7 +315,6 @@ describe('foldCheckResults', () => {
         'proof not run: core.context-exists failed'
       );
       expect(summaries[1].status).toBe('skipped');
-      expect(summaries[1].hasFailures).toBe(false);
       expect(summaries[1].counts).toEqual({
         passed: 0,
         failed: 0,

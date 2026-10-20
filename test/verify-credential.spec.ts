@@ -282,6 +282,43 @@ describe('verifyCredential', () => {
       expect(result.verified).toBe(false);
       const customResult = result.results.find(r => r.suite === 'custom');
       expect(customResult?.outcome.status).toBe('failure');
+      const customSummary = result.summary.find(s => s.suite === 'custom');
+      expect(customSummary?.fatalFailureAt).toBe('unknown.custom.fatal-check');
+    });
+
+    it('a custom non-fatal failure fails its suite but leaves verified true', async () => {
+      const warningCheck: VerificationCheck = {
+        id: 'custom.warning-check',
+        name: 'Warning Check',
+        fatal: false,
+        execute: async (): Promise<CheckOutcome> => ({
+          status: 'failure',
+          problems: [
+            {
+              type: 'https://www.w3.org/TR/vc-data-model#CUSTOM_ERROR',
+              title: 'Custom Warning',
+              detail: 'This custom check always fails'
+            }
+          ]
+        })
+      };
+
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        additionalSuites: [
+          { id: 'custom', name: 'Custom Suite', checks: [warningCheck] }
+        ],
+        ...fakeVerified
+      });
+
+      expect(result.verified).toBe(true);
+      const customSummary = result.summary.find(s => s.suite === 'custom');
+      expect(customSummary?.status).toBe('failure');
+      expect(customSummary?.fatalFailureAt).toBeUndefined();
+      expect(result.summary.some(s => s.fatalFailureAt !== undefined)).toBe(
+        false
+      );
     });
 
     it('a custom check that throws yields a CHECK_ERROR result, not a rejection', async () => {
@@ -582,7 +619,7 @@ describe('verifyCredential', () => {
       });
 
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
+      expect(result.summary.every(s => s.counts.failed === 0)).toBe(true);
       const ids = new Set(result.summary.map(s => s.id));
       expect(ids).toContain('cryptographic.core');
       expect(ids).toContain('cryptographic.proof');
@@ -617,7 +654,9 @@ describe('verifyCredential', () => {
       ).toBe(true);
       const proofSummary = result.summary.find(s => s.suite === 'proof');
       expect(['failure', 'mixed']).toContain(proofSummary?.status);
-      expect(proofSummary?.hasFailures).toBe(true);
+      expect(proofSummary?.fatalFailureAt).toBe(
+        'cryptographic.proof.signature'
+      );
     });
 
     it('parse error: result has one summary entry tagged cryptographic.parsing', async () => {

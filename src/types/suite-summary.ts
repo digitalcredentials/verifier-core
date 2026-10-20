@@ -57,24 +57,13 @@ export interface SuiteSummary {
    *  - `'success'` — every check that ran returned `success`.
    *  - `'failure'` — every check that ran returned `failure`.
    *  - `'mixed'`   — at least one `failure` and at least one
-   *    non-`failure` (`success` or `skipped`).
+   *    `success`. A suite whose only non-failures are skips is
+   *    `'failure'`.
    *  - `'skipped'` — no check ran (suite predicate returned false,
    *    every check was filtered out by `appliesTo`, or every check
    *    was halted by an earlier fatal failure).
    */
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-
-  /**
-   * True iff at least one child check returned `'failure'`,
-   * whether or not that check was fatal.
-   *
-   * Deliberately not called `verified`: the only `verified` in a
-   * result is the top-level one, which means "no fatal check
-   * failed" across the whole subject. A suite with a non-fatal
-   * failure has `hasFailures: true` inside a `verified: true`
-   * result, and that is not a contradiction.
-   */
-  hasFailures: boolean;
 
   /**
    * Human-readable rollup message. Conventions:
@@ -95,10 +84,23 @@ export interface SuiteSummary {
   counts: { passed: number; failed: number; skipped: number };
 
   /**
-   * Set when a fatal check failure halted the suite mid-run;
-   * carries the failing check's `id`. `counts.passed` and
-   * `counts.failed` reflect what actually executed before the
-   * halt; the halted checks count as `skipped`.
+   * The `id` of the check in this suite that failed fatally, if
+   * one did. A fatal failure halts every later check for the
+   * subject, so at most one suite per subject carries this field,
+   * and the subject's `verified` is `false` exactly when one of
+   * its summaries does. `counts.passed` and `counts.failed`
+   * reflect what actually executed before the halt; the halted
+   * checks count as `skipped`.
+   *
+   * `status` is computed from counts alone and does not say
+   * whether a failure was fatal: a suite whose only failure is
+   * non-fatal has `status: 'failure'` or `'mixed'` inside a
+   * `verified: true` result. Render such a suite as a warning,
+   * and reserve error styling for the suite with
+   * `fatalFailureAt`.
+   *
+   * There is deliberately no per-suite `verified`: the only
+   * verdict in a result is the top-level `verified`.
    */
   fatalFailureAt?: string;
 

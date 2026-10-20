@@ -811,7 +811,7 @@ a `summary: SuiteSummary[]` rollup of per-suite outcomes alongside the full
 
 ```ts
 const result = await verifier.verifyCredential({ credential });
-// result.summary[i] = { id, phase, suite, status, hasFailures, message, counts, ... }
+// result.summary[i] = { id, phase, suite, status, message, counts, fatalFailureAt?, ... }
 // result.results[]  = every check that ran, was skipped, or was not run,
 //                     each with its .id
 

@@ -78,23 +78,23 @@ A successful single-credential verification:
   ],
   "summary": [
     { "id": "cryptographic.core",     "phase": "cryptographic",
-      "suite": "core",     "status": "success", "hasFailures": false,
+      "suite": "core",     "status": "success",
       "message": "5 of 5 checks passed",
       "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
     { "id": "recognition",            "phase": "recognition",
-      "suite": "recognition", "status": "skipped", "hasFailures": false,
+      "suite": "recognition", "status": "skipped",
       "message": "1 of 1 check skipped",
       "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
     { "id": "cryptographic.proof",    "phase": "cryptographic",
-      "suite": "proof",   "status": "success", "hasFailures": false,
+      "suite": "proof",   "status": "success",
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
     { "id": "cryptographic.status",   "phase": "cryptographic",
-      "suite": "status",  "status": "skipped", "hasFailures": false,
+      "suite": "status",  "status": "skipped",
       "message": "2 of 2 checks skipped",
       "counts": { "passed": 0, "failed": 0, "skipped": 2 } },
     { "id": "trust.registry",         "phase": "trust",
-      "suite": "registry","status": "success", "hasFailures": false,
+      "suite": "registry","status": "success",
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
   ]
@@ -235,19 +235,14 @@ interface SuiteSummary {
   phase: SuiteSummaryPhase;       // SuitePhase | 'unknown'
   /** Suite id (matches VerificationSuite.id). */
   suite: string;
+  /** Computed from counts alone; says nothing about whether a failure was fatal. */
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-  /**
-   * True iff at least one check in this suite failed —
-   * `status === 'failure' || status === 'mixed'`. Deliberately not
-   * called `verified`: only the top-level `verified` is a verdict.
-   */
-  hasFailures: boolean;
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   /**
-   * The fully-qualified id of the fatal check that short-circuited
-   * the suite, if any. Absent when the suite ran to completion or
-   * skipped without entering a fatal state.
+   * The fully-qualified id of the check in this suite that failed
+   * fatally, if one did. At most one suite per subject carries it,
+   * and that suite is why the subject is not verified.
    */
   fatalFailureAt?: string;
 }
@@ -272,20 +267,47 @@ interface SuiteSummary {
 
 > Singular `check` is used when `n === 1`.
 
-### Per-status badge recommendations
+### `status` values
 
-| `status` | Glyph | Color | Meaning |
-|----------|-------|-------|---------|
-| `success` | ✓ | green | Every check that ran in this suite passed |
-| `failure` | ✗ | red   | Every check in this suite failed (or only failures + skips) |
-| `mixed`   | ⚠ | amber | Both passes and failures in the same suite |
-| `skipped` | — | gray  | Suite was acknowledged but produced no run checks |
+| `status` | Meaning |
+|----------|---------|
+| `success` | Every check that ran in this suite passed |
+| `failure` | At least one check failed and none passed (skips allowed) |
+| `mixed`   | At least one check failed and at least one passed |
+| `skipped` | No check in this suite ran |
 
-`hasFailures === true` iff `status === 'failure' || status === 'mixed'`.
-It is a per-suite fact, not a verdict: a non-fatal failure sets it on a
-suite inside a result whose top-level `verified` is still `true`. The
-top-level `result.verified` is the AND of every credential's
-`result.verified` AND no presentation-level fatal failures.
+`status` is computed from `counts` alone. It does not say whether a
+failure was fatal: a suite whose only failure is a non-fatal check
+(for example `trust.registry.issuer`) has `status: 'failure'` inside a
+result whose `verified` is still `true`.
+
+### Fatal failures and `verified`
+
+A fatal failure halts every later check for the subject, so a subject
+has at most one, and at most one of its summaries carries
+`fatalFailureAt`. That gives one invariant to rely on:
+
+> A credential's `verified` is `false` exactly when one of its
+> `summary[]` entries has `fatalFailureAt`.
+
+The same holds for a presentation's own checks and its `summary[]`; the
+presentation's `verified` additionally requires every
+`credentialResults[i].verified`.
+
+There is deliberately no per-suite `verified`: the only verdicts are
+the result-level `verified` fields.
+
+### Per-suite badge recommendations
+
+Colour a suite by `fatalFailureAt` first and `status` second, so a
+non-fatal failure never reads as red inside a verified credential:
+
+| Condition | Glyph | Color | Meaning |
+|-----------|-------|-------|---------|
+| `fatalFailureAt` is set | ✗ | red | This suite's failure is why the subject is not verified |
+| `status` is `failure` or `mixed`, no `fatalFailureAt` | ⚠ | amber | Warning: a non-fatal check failed; `verified` is unaffected |
+| `status === 'success'` | ✓ | green | Every check that ran passed |
+| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier fatal failure) |
 
 ## `id` namespace reference
 
@@ -434,27 +456,45 @@ function failureDetail(
 function profileLabel(cr: CredentialVerificationResult) {
   return cr.recognizedProfile; // e.g. 'obv3p0.openbadge', or undefined
 }
+
+// 5. Badge for one suite (or the worst of a phase's suites).
+//    Check `fatalFailureAt` before `status`: a non-fatal failure is a
+//    warning, not an error.
+type Badge = 'error' | 'warning' | 'ok' | 'none';
+function suiteBadge(s: SuiteSummary): Badge {
+  if (s.fatalFailureAt !== undefined) return 'error';
+  if (s.status === 'failure' || s.status === 'mixed') return 'warning';
+  return s.status === 'success' ? 'ok' : 'none';
+}
 ```
 
-A presentation with two credentials where one passes and one fails
-trust gets rendered as:
+A presentation with two credentials, one verified with warnings and
+one not verified, gets rendered as:
 
 ```
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
 ├─ Credential 1 (obv3p0.openbadge): ✓
-│   ├─ cryptographic ✓ (4 + 1 + 1 = 6 checks passed)
-│   ├─ trust         ✓
+│   ├─ cryptographic ✓
+│   ├─ trust         ⚠ (1 of 1 check failed)
+│   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓
-│   └─ semantic      ✓ (5 of 5 checks passed)   [openBadgesSuite]
+│   └─ semantic      ⚠ (1 of 5 checks failed, 4 passed)   [openBadgesSuite]
+│       └─ semantic.openbadges.schema.obv3.result-ref — Invalid Result Reference
 └─ Credential 2 (obv3p0.openbadge): ✗
-    ├─ cryptographic ✓
-    ├─ trust         ✗ (1 of 1 check failed)
-    │   └─ trust.registry.issuer — Issuer Not Registered
+    ├─ cryptographic ✗ (proof: 1 of 1 check failed; status: not run)
+    │   └─ cryptographic.proof.signature — Credential Expired
+    ├─ trust         — (registry not run: proof.signature failed)
     ├─ recognition   ✓
-    └─ semantic      ⚠ (1 of 5 checks failed, 4 passed)
-        └─ semantic.openbadges.schema.obv3.result-ref — Invalid Result Reference
+    └─ semantic      — (not run: proof.signature failed)
 ```
+
+Credential 1 is verified: its registry and Open Badges checks are
+non-fatal, so their failures are warnings (amber), not errors.
+Credential 2 is not verified because `proof.signature` failed fatally;
+its proof suite carries `fatalFailureAt: "cryptographic.proof.signature"`,
+and every later check was not run. A phase takes the most severe badge
+of its suites.
 
 The `└─` rows under each failing phase row come from `failureDetail()`.
 Lazy-expand them — most users only want the verdict + per-phase status.
@@ -485,7 +525,9 @@ dcc-transaction-service UI implementation.
 > (`cryptographic` → `trust` → `recognition` → `semantic` → `unknown`).
 > Show failure detail rows (from `results[]` filtered by `id` prefix
 > **and** `outcome.status === 'failure'`) under the failing phase row,
-> lazy-expanded.
+> lazy-expanded. Colour a suite red only when it has `fatalFailureAt`;
+> a suite with failures but no `fatalFailureAt` is a warning (amber),
+> because non-fatal failures leave `verified` true.
 >
 > The result is the return value of
 > `verifier.verifyPresentation({ presentation })` from
@@ -508,47 +550,14 @@ dcc-transaction-service UI implementation.
   ],
   "summary": [
     { "id": "cryptographic.proof", "phase": "cryptographic",
-      "suite": "proof", "status": "success", "hasFailures": false,
+      "suite": "proof", "status": "success",
       "message": "1 of 1 check passed",
       "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
   ],
   "credentialResults": [
     {
       "verified": true,
-      "verifiableCredential": { /* good VC */ },
-      "recognizedProfile": "obv3p0.openbadge",
-      "results": [
-        { "id": "cryptographic.core.context-exists",  /* success */ },
-        { "id": "cryptographic.core.vc-context",      /* success */ },
-        { "id": "cryptographic.core.vc-structure",    /* success */ },
-        { "id": "cryptographic.core.credential-id",   /* success */ },
-        { "id": "cryptographic.core.proof-exists",    /* success */ },
-        { "id": "recognition.profile",                /* success */ },
-        { "id": "cryptographic.proof.signature",      /* success */ },
-        { "id": "trust.registry.issuer",              /* success */ }
-      ],
-      "summary": [
-        { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "hasFailures": false,
-          "message": "5 of 5 checks passed",
-          "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
-        { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "hasFailures": false,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "hasFailures": false,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
-        { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "success", "hasFailures": false,
-          "message": "1 of 1 check passed",
-          "counts": { "passed": 1, "failed": 0, "skipped": 0 } }
-      ]
-    },
-    {
-      "verified": false,
-      "verifiableCredential": { /* bad VC */ },
+      "verifiableCredential": { /* VC from an unregistered issuer */ },
       "recognizedProfile": "obv3p0.openbadge",
       "results": [
         { "id": "cryptographic.core.context-exists",  /* success */ },
@@ -570,21 +579,69 @@ dcc-transaction-service UI implementation.
       ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",
-          "suite": "core",  "status": "success", "hasFailures": false,
+          "suite": "core",  "status": "success",
           "message": "5 of 5 checks passed",
           "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
         { "id": "recognition", "phase": "recognition",
-          "suite": "recognition", "status": "success", "hasFailures": false,
+          "suite": "recognition", "status": "success",
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
         { "id": "cryptographic.proof", "phase": "cryptographic",
-          "suite": "proof", "status": "success", "hasFailures": false,
+          "suite": "proof", "status": "success",
           "message": "1 of 1 check passed",
           "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
+        // Non-fatal failure: status "failure", but no fatalFailureAt
+        // and the credential is still verified. Render as a warning.
         { "id": "trust.registry", "phase": "trust",
-          "suite": "registry", "status": "failure", "hasFailures": true,
+          "suite": "registry", "status": "failure",
           "message": "1 of 1 check failed",
           "counts": { "passed": 0, "failed": 1, "skipped": 0 } }
+      ]
+    },
+    {
+      "verified": false,
+      "verifiableCredential": { /* expired VC */ },
+      "recognizedProfile": "obv3p0.openbadge",
+      "results": [
+        { "id": "cryptographic.core.context-exists",  /* success */ },
+        { "id": "cryptographic.core.vc-context",      /* success */ },
+        { "id": "cryptographic.core.vc-structure",    /* success */ },
+        { "id": "cryptographic.core.credential-id",   /* success */ },
+        { "id": "cryptographic.core.proof-exists",    /* success */ },
+        { "id": "recognition.profile",                /* success */ },
+        { "id": "cryptographic.proof.signature",
+          "suite": "proof", "check": "proof.signature",
+          "outcome": { "status": "failure", "problems": [
+            { "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_EXPIRED",
+              "title": "Credential Expired",
+              "detail": "..." }
+          ]},
+          "fatal": true },
+        { "id": "trust.registry.issuer",
+          "suite": "registry", "check": "registry.issuer",
+          "outcome": { "status": "skipped",
+                       "reason": "Not run: proof.signature failed" },
+          "fatal": false }
+      ],
+      "summary": [
+        { "id": "cryptographic.core",  "phase": "cryptographic",
+          "suite": "core",  "status": "success",
+          "message": "5 of 5 checks passed",
+          "counts": { "passed": 5, "failed": 0, "skipped": 0 } },
+        { "id": "recognition", "phase": "recognition",
+          "suite": "recognition", "status": "success",
+          "message": "1 of 1 check passed",
+          "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
+        // The fatal failure: the one summary with fatalFailureAt.
+        { "id": "cryptographic.proof", "phase": "cryptographic",
+          "suite": "proof", "status": "failure",
+          "message": "1 of 1 check failed",
+          "counts": { "passed": 0, "failed": 1, "skipped": 0 },
+          "fatalFailureAt": "cryptographic.proof.signature" },
+        { "id": "trust.registry", "phase": "trust",
+          "suite": "registry", "status": "skipped",
+          "message": "registry not run: proof.signature failed",
+          "counts": { "passed": 0, "failed": 0, "skipped": 1 } }
       ]
     }
   ]
@@ -606,7 +663,6 @@ interface SuiteSummary {
   phase: SuiteSummaryPhase;
   suite: string;
   status: 'success' | 'failure' | 'skipped' | 'mixed';
-  hasFailures: boolean;
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   fatalFailureAt?: string;

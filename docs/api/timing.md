@@ -310,7 +310,7 @@ function buildBreakdown(result: PresentationVerificationResult) {
       bySuite: cr.summary.map(s => ({
         suite: s.id,
         durationMs: s.timing!.durationMs,
-        hasFailures: s.hasFailures,
+        fatalFailureAt: s.fatalFailureAt,
       })),
     })),
   };

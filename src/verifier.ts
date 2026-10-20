@@ -435,8 +435,8 @@ function parseErrorResult(
 /**
  * Build the one-entry `summary[]` that accompanies every
  * parse-error result. The single check is always a fatal failure,
- * so the summary always has `status: 'failure'`,
- * `hasFailures: true`.
+ * so the summary always has `status: 'failure'` and
+ * `fatalFailureAt: 'cryptographic.parsing.envelope'`.
  *
  * `foldCheckResults` rolls per-check timing into the summary, so
  * the suite-level `timing` propagates here too when the call ran

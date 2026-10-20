@@ -5,7 +5,10 @@ import { VerifiableCredential } from '../schemas/credential.js';
 import { VerifiablePresentation } from '../schemas/presentation.js';
 
 export interface CredentialVerificationResult {
-  /** True if no check returned a failure outcome. */
+  /**
+   * True when no fatal check failed. Non-fatal failures (warnings)
+   * leave this `true`; see {@link SuiteSummary.fatalFailureAt}.
+   */
   verified: boolean;
 
   /**
@@ -82,7 +85,10 @@ export interface CredentialVerificationResult {
 }
 
 export interface PresentationVerificationResult {
-  /** True if no failures in presentation checks or any credential checks. */
+  /**
+   * True when no presentation-level check failed fatally and every
+   * entry in {@link credentialResults} is `verified`.
+   */
   verified: boolean;
 
   /**

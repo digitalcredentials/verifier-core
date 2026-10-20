@@ -113,7 +113,6 @@ function summarizeSuite(
   const fatalFailureAt = fatalCheck?.id;
 
   const status = deriveStatus(counts);
-  const hasFailures = counts.failed > 0;
 
   const message = formatMessage(
     suiteId,
@@ -130,7 +129,6 @@ function summarizeSuite(
     phase: phase ?? 'unknown',
     suite: suiteId,
     status,
-    hasFailures,
     message,
     counts,
     ...(fatalFailureAt !== undefined ? { fatalFailureAt } : {}),

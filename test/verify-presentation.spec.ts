@@ -463,14 +463,14 @@ describe('verifyPresentation', () => {
         true
       );
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
+      expect(result.summary.every(s => s.counts.failed === 0)).toBe(true);
 
       expect(result.credentialResults).toHaveLength(1);
       const cred = result.credentialResults[0];
       expect(cred.results.length).toBeGreaterThan(0);
       expect(cred.results.every(r => r.id !== undefined)).toBe(true);
       expect(cred.summary.length).toBeGreaterThan(0);
-      expect(cred.summary.every(s => !s.hasFailures)).toBe(true);
+      expect(cred.summary.every(s => s.counts.failed === 0)).toBe(true);
     });
   });
 
@@ -502,7 +502,7 @@ describe('verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
       expect(result.summary.length).toBeGreaterThan(0);
-      expect(result.summary.every(s => !s.hasFailures)).toBe(true);
+      expect(result.summary.every(s => s.counts.failed === 0)).toBe(true);
     });
 
     it('passing credential summary is all green; failing credential surfaces a failure entry', async () => {
@@ -514,14 +514,23 @@ describe('verifyPresentation', () => {
       expect(passing).toBeDefined();
       expect(failing).toBeDefined();
 
-      expect(passing!.summary.every(s => !s.hasFailures)).toBe(true);
+      expect(passing!.summary.every(s => s.counts.failed === 0)).toBe(true);
       expect(passing!.results.length).toBeGreaterThan(0);
       expect(
         passing!.results.every(r => r.outcome.status !== 'failure')
       ).toBe(true);
 
-      const failureSummaries = failing!.summary.filter(s => s.hasFailures);
+      const failureSummaries = failing!.summary.filter(
+        s => s.counts.failed > 0
+      );
       expect(failureSummaries.length).toBeGreaterThan(0);
+      // The fatal failure that made it unverified is on exactly one summary.
+      expect(
+        failing!.summary.filter(s => s.fatalFailureAt !== undefined)
+      ).toHaveLength(1);
+      expect(passing!.summary.some(s => s.fatalFailureAt !== undefined)).toBe(
+        false
+      );
       expect(
         failing!.results.filter(r => r.outcome.status === 'failure').length
       ).toBeGreaterThan(0);
@@ -532,7 +541,7 @@ describe('verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, ...cryptoOnly });
 
       const failing = result.credentialResults.find(c => !c.verified)!;
-      const failingSummary = failing.summary.find(s => s.hasFailures)!;
+      const failingSummary = failing.summary.find(s => s.counts.failed > 0)!;
       // `results[]` carries passes and skips too, so a prefix match
       // has to be narrowed by status to reach the failure detail.
       const detail = failing.results.filter(
