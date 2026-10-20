@@ -3,9 +3,9 @@ import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
-import { dispatchProofVerification } from '../../crypto-dispatch.js';
 import { documentHasProof } from '../../util/document-has-proof.js';
 import { isValidityDateOnly } from '../../util/validity-date-problems.js';
+import { verifyProofSet } from './proof-set-verification.js';
 
 const NO_APPLICABLE_SERVICE: ProblemDetail = {
   type: ProblemTypes.PROOF_VERIFICATION_ERROR,
@@ -42,6 +42,12 @@ const UNSIGNED_PRESENTATION_ACCEPTED =
  * A supplied {@link VerificationContext.challenge} (and
  * {@link VerificationContext.domain}) is always enforced on a presentation's
  * proof. A domain without a challenge fails before dispatch.
+ *
+ * A document carrying a proof set passes only when every proof a
+ * registered suite can check verified (VC Data Integrity §4.5); each
+ * proof is verified on its own (see `verifyProofSet`). Proofs no suite
+ * can check, beside one that verified, do not fail this check: they are
+ * reported by `proof.unsupported-proofs`.
  *
  * The credential's validity dates belong to `proof.validity-period`,
  * which runs next. A crypto service may still reject for them:
@@ -97,18 +103,7 @@ export const signatureCheck: VerificationCheck = {
       return { status: 'failure', problems: [CHALLENGE_REQUIRED] };
     }
 
-    const dispatched = await dispatchProofVerification({
-      services: context.cryptoServices,
-      subject,
-      options: {
-        documentLoader: context.documentLoader,
-        challenge: context.challenge,
-        domain: context.domain,
-        // A context built directly in a test may carry no clock; the
-        // production factory always sets one.
-        now: new Date(context.timeService?.dateNowMs() ?? Date.now())
-      }
-    });
+    const dispatched = (await verifyProofSet(subject, context)).combined;
 
     switch (dispatched.kind) {
       case 'verified':

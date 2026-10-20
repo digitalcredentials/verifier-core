@@ -112,8 +112,10 @@ describe('status list cryptosuite parity', () => {
       'https://w3id.org/security/suites/ed25519-2020/v1'
     ];
 
+    // vc's `issue` adds the proof to the object it is given. Sign copies,
+    // so the lists spread from these templates carry only their own proof.
     signedStatusList = (await issue({
-      credential: unsignedList,
+      credential: { ...unsignedList },
       suite: new Ed25519Signature2020({ key }),
       documentLoader: bundledLoader
     })) as Record<string, unknown>;
@@ -144,7 +146,7 @@ describe('status list cryptosuite parity', () => {
       }
     };
     signedForeignStatusList = (await issue({
-      credential: unsignedForeignList,
+      credential: { ...unsignedForeignList },
       suite: new Ed25519Signature2020({ key: foreignKey }),
       documentLoader: bundledLoader
     })) as Record<string, unknown>;

@@ -5,7 +5,7 @@
  */
 
 import {
-  dispatchProofVerification,
+  dispatchProofSetVerification,
   type CryptoDispatchResult
 } from '../../crypto-dispatch.js';
 import type {
@@ -246,7 +246,8 @@ const verifiedLists = new WeakMap<
 
 /**
  * Verify the proof of the status list credential `document`, loaded
- * from `url`, once per `context`.
+ * from `url`, once per `context`. A list's proof set is verified proof
+ * by proof, like a credential's, so one bad proof makes a bad list.
  */
 export function verifyStatusList(
   url: string,
@@ -261,11 +262,11 @@ export function verifyStatusList(
   }
   let pending = byUrl.get(url);
   if (!pending) {
-    pending = dispatchProofVerification({
+    pending = dispatchProofSetVerification({
       services: context.cryptoServices,
       subject: { verifiableCredential: document },
       options: { documentLoader: context.documentLoader, now }
-    });
+    }).then(result => result.combined);
     byUrl.set(url, pending);
   }
   return pending;
