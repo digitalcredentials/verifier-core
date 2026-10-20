@@ -162,6 +162,15 @@ not run after a fatal failure.
   `proof.unsupported-proofs` check; when no proof could be checked,
   `proof.signature` fails with `PROOF_UNSUPPORTED` in place of
   `INVALID_SIGNATURE`.
+- **A did:web issuer whose DID document cannot be fetched is no longer reported
+  as a bad signature**
+  ([#65](https://github.com/digitalcredentials/verifier-core/issues/65)). A DID
+  document answered with a 404 or another non-2xx status, or one whose host
+  could not be reached, made `proof.signature` fail with `INVALID_SIGNATURE`,
+  exactly what a tampered credential reports. It now fails with
+  `DID_WEB_UNRESOLVED`, as the error taxonomy already said, or with
+  `HTTP_ERROR` when the key that could not be fetched is not the issuer's. Still
+  fatal.
 - **A key or controller mismatch is no longer reported as `INVALID_SIGNATURE`
   with the detail "Verification error(s).", exactly what a tampered credential
   reported.** A verification method that is missing, unauthorized by its
