@@ -190,15 +190,27 @@ describe('verifyCredential', () => {
 
   describe('expired credentials', () => {
     // An authentic credential whose validity has ended is not a forgery,
-    // and must not be reported as one: the signature verified, which is
-    // the only reason the date check ran at all.
+    // and must not be reported as one: its signature verifies, and the
+    // expiry is reported by `proof.validity-period`, which does not halt
+    // the checks after it.
     const expiryProblem = (results: CheckResult[]) => {
       const signature = results.find(
         r => r.id === 'cryptographic.proof.signature'
       );
-      expect(signature?.outcome.status).toBe('failure');
-      return signature?.outcome.status === 'failure'
-        ? signature.outcome.problems[0]
+      expect(signature?.outcome.status).toBe('success');
+      const validity = results.find(
+        r => r.id === 'cryptographic.proof.validity-period'
+      );
+      expect(validity?.outcome.status).toBe('failure');
+      expect(
+        results.filter(
+          r =>
+            r.outcome.status === 'skipped' &&
+            r.outcome.reason.startsWith('Not run:')
+        )
+      ).toEqual([]);
+      return validity?.outcome.status === 'failure'
+        ? validity.outcome.problems[0]
         : undefined;
     };
 
@@ -715,9 +727,9 @@ describe('verifyCredential', () => {
       );
       expect(failures.length).toBeGreaterThan(0);
       expect(failures.every(r => r.suite === 'proof')).toBe(true);
-      expect(result.results.some(r => r.outcome.status === 'success')).toBe(
-        true
-      );
+      expect(
+        result.results.some(r => r.outcome.status === 'success')
+      ).toBe(true);
       const proofSummary = result.summary.find(s => s.suite === 'proof');
       expect(['failure', 'mixed']).toContain(proofSummary?.status);
       expect(proofSummary?.fatalFailureAt).toBe(

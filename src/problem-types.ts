@@ -57,9 +57,11 @@ export const ProblemTypes = {
     'https://www.w3.org/TR/vc-data-model#VERIFICATION_METHOD_ERROR',
   /**
    * Synthesized — the credential's validity has ended (`validUntil` /
-   * `expirationDate` is in the past). Reported by the signature check,
-   * which is where validity dates are judged: the signature verified,
-   * so the credential is authentic and merely out of date.
+   * `expirationDate` is in the past). Reported by
+   * `proof.validity-period`, which runs only once the signature
+   * verified, so the credential is authentic and merely out of date.
+   * A crypto service may also report it for a document whose proof
+   * verified; `proof.signature` then reads the signature as verified.
    */
   CREDENTIAL_EXPIRED: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_EXPIRED',
   /**

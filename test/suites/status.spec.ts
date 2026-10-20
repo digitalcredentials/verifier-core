@@ -701,7 +701,7 @@ describe('Status Suite', () => {
   });
 
   describe('status list validity dates', () => {
-    async function runRejected(detail: string) {
+    async function runRejected(problemType: string, detail: string) {
       const listUrl = 'https://factory.test/status/list-dated';
       const list = await StatusListCredentialFactory({ id: listUrl });
       const context = buildTestContext({
@@ -709,13 +709,7 @@ describe('Status Suite', () => {
         cryptoServices: [
           FakeCryptoService({
             verified: false,
-            problems: [
-              {
-                type: ProblemTypes.INVALID_SIGNATURE,
-                title: 'Invalid Signature',
-                detail
-              }
-            ]
+            problems: [{ type: problemType, title: 'Rejected', detail }]
           })
         ]
       });
@@ -737,34 +731,42 @@ describe('Status Suite', () => {
 
     it.each([
       [
+        ProblemTypes.CREDENTIAL_EXPIRED,
         'The current date time (2026-10-01T00:00:00.000Z) is after "validUntil" (2025-01-01T00:00:00Z).',
         ProblemTypes.STATUS_LIST_EXPIRED
       ],
-      ['Credential has expired.', ProblemTypes.STATUS_LIST_EXPIRED],
       [
+        ProblemTypes.CREDENTIAL_NOT_YET_VALID,
         'The current date time (2026-10-01T00:00:00.000Z) is before "validFrom" (2030-01-01T00:00:00Z).',
         ProblemTypes.STATUS_LIST_NOT_YET_VALID
       ],
       [
-        'The current date time (2026-10-01T00:00:00.000Z) is before the "issuanceDate" (2030-01-01T00:00:00Z).',
-        ProblemTypes.STATUS_LIST_NOT_YET_VALID
-      ],
-      [
+        ProblemTypes.INVALID_SIGNATURE,
         'Signature verification failed.',
         ProblemTypes.STATUS_LIST_SIGNATURE_ERROR
+      ],
+      // The type decides, not the text: a signature failure that quotes a
+      // date message is still a signature failure.
+      [
+        ProblemTypes.INVALID_SIGNATURE,
+        'Credential has expired.',
+        ProblemTypes.STATUS_LIST_SIGNATURE_ERROR
       ]
-    ])('classifies a rejected list with "%s"', async (detail, type) => {
-      const outcome = await runRejected(detail);
+    ])(
+      'classifies a list rejected with %s "%s"',
+      async (problemType, detail, type) => {
+        const outcome = await runRejected(problemType, detail);
 
-      expect(outcome.status).toBe('failure');
-      if (outcome.status === 'failure') {
-        expect(outcome.problems).toHaveLength(1);
-        expect(outcome.problems[0].type).toBe(type);
-        if (type !== ProblemTypes.STATUS_LIST_SIGNATURE_ERROR) {
-          expect(outcome.problems[0].detail).toContain(detail);
+        expect(outcome.status).toBe('failure');
+        if (outcome.status === 'failure') {
+          expect(outcome.problems).toHaveLength(1);
+          expect(outcome.problems[0].type).toBe(type);
+          if (type !== ProblemTypes.STATUS_LIST_SIGNATURE_ERROR) {
+            expect(outcome.problems[0].detail).toContain(detail);
+          }
         }
       }
-    });
+    );
   });
 
   describe('status list loading and list errors', () => {

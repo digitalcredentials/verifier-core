@@ -11,7 +11,7 @@ import {
   type DocumentLoader
 } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
-import { findVcDateProblem } from '../../util/vc-date-messages.js';
+import { isValidityDateProblem } from '../../util/validity-date-problems.js';
 import {
   checkedStatusEntries,
   checkedStatusListUrls,
@@ -43,21 +43,18 @@ type CheckStatusResult = {
 /**
  * Classify a crypto service's rejection of a status list credential.
  *
- * `@digitalcredentials/vc` checks a credential's validity dates only
- * after its signature has verified, so a date error in the rejection
- * proves the list is authentic and merely out of date: report it as
- * expired or not yet valid rather than as a bad signature. The match is
- * on vc's message text, carried in the problem's `detail` and shared
- * with the proof suite (see {@link findVcDateProblem}); if the crypto
- * service reports typed expiry problems, those can replace it.
+ * A crypto service reports `CREDENTIAL_EXPIRED` /
+ * `CREDENTIAL_NOT_YET_VALID` only once the list's proof verified, so
+ * such a problem proves the list is authentic and merely out of date:
+ * report it as expired or not yet valid rather than as a bad signature.
  */
 function rejectedListProblems(
   problems: ProblemDetail[],
   url: string
 ): ProblemDetail[] {
-  const dated = findVcDateProblem(problems);
+  const dated = problems.find(isValidityDateProblem);
   if (dated !== undefined) {
-    return dated.fault === 'expired'
+    return dated.type === ProblemTypes.CREDENTIAL_EXPIRED
       ? [
           {
             type: ProblemTypes.STATUS_LIST_EXPIRED,

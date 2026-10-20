@@ -119,14 +119,81 @@ describe('verification method errors (unit)', () => {
     );
   });
 
-  it('takes the detail from an unwrapped error, as vc throws for validity dates', () => {
+  it('takes the detail from an unwrapped error', () => {
     const problems = classifySignatureError(
-      new Error('Credential has expired.'),
+      new Error('Invalid signature.'),
       undefined
     );
 
     expect(problems[0].type).toBe(ProblemTypes.INVALID_SIGNATURE);
-    expect(problems[0].detail).toBe('Credential has expired.');
+    expect(problems[0].detail).toBe('Invalid signature.');
+  });
+});
+
+describe('validity-date faults (unit)', () => {
+  // vc 10.0.2's `_checkCredential` messages, verbatim. vc throws them, as a
+  // plain Error, only after the proof verified.
+  const dateMessages: Array<[string, string]> = [
+    ['Credential has expired.', ProblemTypes.CREDENTIAL_EXPIRED],
+    [
+      'The current date time (2026-10-20T00:00:00.000Z) is after "validUntil" (2011-01-01T00:00:00Z).',
+      ProblemTypes.CREDENTIAL_EXPIRED
+    ],
+    [
+      'The current date time (2026-10-20T00:00:00.000Z) is before the "issuanceDate" (2099-01-01T00:00:00Z).',
+      ProblemTypes.CREDENTIAL_NOT_YET_VALID
+    ],
+    [
+      'The current date time (2026-10-20T00:00:00.000Z) is before "validFrom" (2099-01-01T00:00:00Z).',
+      ProblemTypes.CREDENTIAL_NOT_YET_VALID
+    ]
+  ];
+
+  for (const [message, type] of dateMessages) {
+    it(`types vc's plain "${message}" as a date problem`, () => {
+      const problems = classifySignatureError(new Error(message), undefined);
+
+      expect(problems).toEqual([
+        expect.objectContaining({ type, detail: message })
+      ]);
+    });
+  }
+
+  it('does not type a date message wrapped inside a VerificationError', () => {
+    const problems = classifySignatureError(
+      wrapped(dateMessages[1][0]),
+      undefined
+    );
+
+    expect(problems[0].type).toBe(ProblemTypes.INVALID_SIGNATURE);
+  });
+
+  it('does not type a VerificationError, even one with a date message and no errors array', () => {
+    const error = new Error('Credential has expired.');
+    error.name = 'VerificationError';
+
+    const problems = classifySignatureError(error, undefined);
+
+    expect(problems[0].type).toBe(ProblemTypes.INVALID_SIGNATURE);
+  });
+
+  it('does not type a message that only contains a date phrase', () => {
+    const problems = classifySignatureError(
+      new Error('wrapped: Credential has expired.'),
+      undefined
+    );
+
+    expect(problems[0].type).toBe(ProblemTypes.INVALID_SIGNATURE);
+  });
+
+  it('does not type a plain Error that carries an errors array', () => {
+    const error = Object.assign(new Error('Credential has expired.'), {
+      errors: [new Error('Invalid signature.')]
+    });
+
+    const problems = classifySignatureError(error, undefined);
+
+    expect(problems[0].type).toBe(ProblemTypes.INVALID_SIGNATURE);
   });
 });
 

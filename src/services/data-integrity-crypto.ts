@@ -17,6 +17,7 @@ import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
 import { documentHasProof } from '../util/document-has-proof.js';
 import { isVerificationMethodMessage } from '../util/verification-method-messages.js';
+import { vcDateFault } from '../util/vc-date-messages.js';
 
 /**
  * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
@@ -104,6 +105,27 @@ export function classifySignatureError(
   error: unknown,
   credential: Record<string, unknown> | undefined
 ): ProblemDetail[] {
+  // vc checks validity dates only after the proof verified, and reports a
+  // date failure as a plain Error rather than a VerificationError. Say so
+  // with a typed problem: it is how `proof.signature` knows the proof
+  // verified, and how `status.bitstring` tells an expired list from a bad one.
+  const dateFault = vcDateFault(error);
+  if (dateFault !== undefined) {
+    return [
+      dateFault === 'expired'
+        ? {
+            type: ProblemTypes.CREDENTIAL_EXPIRED,
+            title: 'Credential Expired',
+            detail: (error as Error).message
+          }
+        : {
+            type: ProblemTypes.CREDENTIAL_NOT_YET_VALID,
+            title: 'Credential Not Yet Valid',
+            detail: (error as Error).message
+          }
+    ];
+  }
+
   const errors = extractErrors(error);
 
   if (isJsonLdError(errors)) {

@@ -1,5 +1,6 @@
 import { VerificationSuite } from '../../types/check.js';
 import { signatureCheck } from './signature-check.js';
+import { validityPeriodCheck } from './validity-period-check.js';
 
 /**
  * Proof verification suite.
@@ -12,11 +13,15 @@ import { signatureCheck } from './signature-check.js';
  * `@digitalcredentials/jsonld-signatures`, handles AuthenticationProofPurpose vs
  * AssertionProofPurpose for presentations, and maps library errors to
  * `ProblemDetail` entries.
+ *
+ * `proof.validity-period` follows the signature check, so a failed
+ * signature halts it, and judges the credential's validity dates.
  */
 export const proofSuite: VerificationSuite = {
   id: 'proof',
   name: 'Proof Verification',
-  description: 'Cryptographic signature verification.',
+  description:
+    "Cryptographic signature verification, and the credential's validity period.",
   phase: 'cryptographic',
-  checks: [signatureCheck]
+  checks: [signatureCheck, validityPeriodCheck]
 };

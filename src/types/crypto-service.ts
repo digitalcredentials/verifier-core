@@ -14,6 +14,11 @@ import type { VerificationSubject } from './subject.js';
  * Outcome of a credential or presentation cryptographic verification.
  *
  * Failures carry pre-classified `ProblemDetail` entries (adapter-specific error mapping).
+ *
+ * A crypto service reports `CREDENTIAL_EXPIRED` or
+ * `CREDENTIAL_NOT_YET_VALID` only when the proof itself verified.
+ * `proof.signature` treats a rejection made only of those problems as a
+ * verified signature, and leaves the dates to `proof.validity-period`.
  */
 export type CryptoResult =
   | { verified: true; message?: string }
