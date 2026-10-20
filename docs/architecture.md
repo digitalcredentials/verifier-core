@@ -310,7 +310,7 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { id, suite, outcome, fatal?, timing? }
+CheckResult: { id, suite, outcome, fatal?, halts?, timing? }
 ```
 
 `timing` is opt-in: present on every `CheckResult`,
@@ -323,12 +323,17 @@ break when the flag is left at its default (`false`). See
 
 - **`appliesTo`** limits a check to credential-only or presentation-only subjects. If unset, the
   check runs for both.
-- **`fatal`** on a check means a failure halts every remaining check for the subject, in that
-  suite and in all later suites: once the subject is known to be invalid, later checks would
-  only report misleading follow-on failures or do needless network I/O. Each check that would
-  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`,
-  so the report stays complete. Suites that would not have run anyway (phase filter, `applies`
-  false) stay silent.
+- **`fatal`** on a check means a failure makes the subject's `verified` false.
+- **`halts`** says whether a fatal failure also halts every remaining check for the subject, in
+  that suite and in all later suites, and defaults to `fatal`: once the subject may not be what
+  it claims, later checks would only report misleading follow-on failures or do needless network
+  I/O. Each check that would have run still appears in the report, as `skipped` with reason
+  `Not run: <check-id> failed`, so the report stays complete. Suites that would not have run
+  anyway (phase filter, `applies` false) stay silent. Two built-in fatal checks set
+  `halts: false`, because they run once the credential is known to be authentic and what follows
+  still matters: `proof.validity-period` (an expired credential's status and issuer are still
+  reported) and `status.bitstring` (a revoked credential's list issuer and registry membership
+  are still reported). A throwing `applies` predicate halts regardless.
 - **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
   `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
   yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
@@ -346,8 +351,8 @@ break when the flag is left at its default (`false`). See
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
-| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`, plus the credential's validity dates, which the verifying library reads once the signature holds: an authentic but out-of-date credential fails with `CREDENTIAL_EXPIRED` / `CREDENTIAL_NOT_YET_VALID` rather than `INVALID_SIGNATURE`, judged against `VerificationContext.timeService`. A verification method that is missing, unauthorized by its controller for the proof purpose, or controlled by someone other than the issuer fails with `VERIFICATION_METHOD_ERROR`, also distinct from `INVALID_SIGNATURE`; every signature failure takes its `detail` from the signature library's own message. Does **not** check credential status — see the status suite. |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's; each list is fetched once per verification. |
+| Proof Verification | `proof`       | `cryptographic` | `proof.signature`, `proof.validity-period`                                     | Yes   | Cryptographic signature verification dispatched via `CryptoService`. The verifying library also reads the credential's validity dates once the signature holds, and the crypto service reports a date-only rejection as typed `CREDENTIAL_EXPIRED` / `CREDENTIAL_NOT_YET_VALID` problems, which `proof.signature` reads as a verified signature. `proof.validity-period` (fatal, does not halt) then judges those dates itself against `VerificationContext.timeService`, so an authentic but out-of-date credential fails there rather than as `INVALID_SIGNATURE`. A verification method that is missing, unauthorized by its controller for the proof purpose, or controlled by someone other than the issuer fails with `VERIFICATION_METHOD_ERROR`, also distinct from `INVALID_SIGNATURE`; every signature failure takes its `detail` from the signature library's own message. Does **not** check credential status — see the status suite. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal, does not halt) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's, comparing only lists whose proof verified (or was rejected only for its dates) — including a list that marks the credential revoked; each list is fetched and its proof verified once per verification, shared by both checks. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
@@ -726,7 +731,7 @@ without network dependencies, and composable — consumers wire in exactly the b
   (`default-services.ts`) and are not exported.
 - **`TimeService` is the clock seam.** Wall-clock and monotonic time both flow through
   `VerificationContext.timeService` (default `RealTimeService`). The orchestrator
-  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; `proof.signature` and
+  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; `proof.validity-period` and
   `status.bitstring` read it to judge credential expiry and status-list freshness against the
   same moment, and any other time-sensitive decision (signature clock-skew window,
   key rotation) belongs there too. Tests pass `FakeTimeService` for deterministic

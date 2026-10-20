@@ -18,10 +18,11 @@ not run after a fatal failure.
   summary has no `verified` field: the only verdict is the result-level
   `verified` ("no fatal check failed"). `status` comes from the suite's
   counts, so a non-fatal failure shows as `status: 'failure'` or `'mixed'`
-  inside a result that is still `verified: true`. The one suite whose check
-  failed fatally carries `fatalFailureAt`, and a result is unverified exactly
-  when one of its summaries has it; UIs should colour that suite as an error
-  and other failing suites as warnings.
+  inside a result that is still `verified: true`. Each suite whose check
+  failed fatally carries `fatalFailureAt` — more than one can, since some
+  fatal checks do not halt — and a result is unverified exactly when any of
+  its summaries has it; UIs should colour those suites as errors and other
+  failing suites as warnings.
 - Required `id: string` field on `CheckResult` — dot-separated
   `<phase>.<suite>.<localPart>` namespace, set by the suite runner on every
   row it emits (including not-run rows and synthetic `<suite>.applies`
@@ -46,12 +47,21 @@ not run after a fatal failure.
 - `TimeService` interface plus `RealTimeService` and `FakeTimeService`
   factories. New optional `timeService` on `VerifierConfig` (defaults to
   `RealTimeService()`). Available on `VerificationContext.timeService` to any
-  check that needs to ask "what time is it?": `proof.signature` judges
+  check that needs to ask "what time is it?": `proof.validity-period` judges
   credential validity dates against it and `status.bitstring` judges status-list
   freshness against it, so a verifier built on a `FakeTimeService` decides both
   at the pinned moment. Signature clock-skew and key rotation are still ahead.
 - `CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` on `ProblemTypes`, under
   the same URI namespace as the other synthesized types.
+- `proof.validity-period` check (`cryptographic.proof.validity-period`), run
+  after `proof.signature` for credentials. It judges `validFrom` / `validUntil`
+  (v2) or `issuanceDate` / `expirationDate` (v1) against the verification
+  context's `TimeService`, and reports `CREDENTIAL_EXPIRED` /
+  `CREDENTIAL_NOT_YET_VALID`.
+- Optional `halts?: boolean` on `VerificationCheck` and `CheckResult`. It
+  defaults to `fatal`; a fatal check with `halts: false` still makes `verified`
+  false, but the checks after it still run. `proof.validity-period` and
+  `status.bitstring` set it.
 - `VERIFICATION_METHOD_ERROR` on `ProblemTypes`, under the same URI namespace.
   Reported by `proof.signature` when the proof's verification method cannot be
   found, its controller has not authorized it for the proof purpose, or the
@@ -142,10 +152,24 @@ not run after a fatal failure.
   `INVALID_SIGNATURE` / "Invalid Signature", the same verdict as a forgery.**
   `@digitalcredentials/vc` reads validity dates only after the proof verifies,
   so a date failure is positive evidence the credential is authentic.
-  `proof.signature` now reports `CREDENTIAL_EXPIRED` ("Credential Expired") when
-  `validUntil` / `expirationDate` has passed, and `CREDENTIAL_NOT_YET_VALID`
-  ("Credential Not Yet Valid") when `validFrom` / `issuanceDate` is still in the
-  future. Both remain fatal, and expiry remains part of the proof check.
+  `proof.signature` now reads a date-only rejection as a verified signature, and
+  the new `proof.validity-period` check reports `CREDENTIAL_EXPIRED`
+  ("Credential Expired") when `validUntil` / `expirationDate` has passed, and
+  `CREDENTIAL_NOT_YET_VALID` ("Credential Not Yet Valid") when `validFrom` /
+  `issuanceDate` is still in the future. Both are fatal, so `verified` is
+  `false`, but neither halts: an expired credential still reports whether it
+  was revoked and whether its issuer is registered. The crypto service
+  recognises a date failure only from `@digitalcredentials/vc`'s own
+  unwrapped error and exact wording, so a tampered credential that is also
+  expired is still reported as a bad signature.
+- **A revoked or suspended credential no longer hides its issuer.**
+  `status.bitstring` stays fatal but no longer halts, so `status.list-issuer`,
+  `trust.registry.issuer` and any caller-added suites still run after a
+  revocation, a suspension, or a status list that could not be trusted.
+  `status.list-issuer` compares only lists whose proof verified, and now
+  reports `STATUS_LIST_ISSUER_MISMATCH` for a list that marks the credential
+  revoked, too: previously a revocation read from a list signed by someone
+  else was reported as a plain revocation.
 - **Valid credentials no longer fail as `INVALID_SIGNATURE` because the verifier
   rewrote them.** `verifyCredential` / `verifyPresentation` previously ran the
   suites against the Zod parse output rather than the document the issuer

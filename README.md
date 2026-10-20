@@ -46,7 +46,7 @@ Verification runs an ordered pipeline of **suites**, each containing one or more
 | --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | **Core**        | `cryptographic` | `@context` exists, VC context URI present, VC structure, VP structure, credential ID valid, proof exists                                                                                                                                                                                                                        | Yes                            |
 | **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                             |
-| **Proof**       | `cryptographic` | Cryptographic signature verification                                                                                                                                                                                                                                                                                                   | Yes                            |
+| **Proof**       | `cryptographic` | Cryptographic signature verification (`proof.signature`), then the credential's validity dates against the verifier's clock (`proof.validity-period`)                                                                                                                                                                                  | Yes                            |
 | **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No) |
 | **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                                                                                                                                                                                            | No                             |
 
@@ -226,6 +226,15 @@ check — the ones that passed, the ones that were skipped (with a reason), and
 the ones that were not run after a fatal failure — while `summary` provides the
 per-suite rollup (see [Per-suite summaries](#per-suite-summaries)).
 
+A fatal failure normally halts every later check for the credential. Two fatal
+checks do not halt, because the credential is already known to be authentic when
+they run: `proof.validity-period` (expired or not yet valid) and
+`status.bitstring` (revoked, suspended, or its status list could not be
+trusted). They still make `verified` false, but the checks after them still run,
+so an expired credential still reports whether it was revoked, and a revoked one
+still reports whether its issuer is registered. A check of your own can do the
+same by setting `halts: false` alongside `fatal: true`.
+
 Each `CheckResult` contains a discriminated `CheckOutcome`:
 
 ```typescript
@@ -260,6 +269,7 @@ interface ProblemDetail {
     { "id": "cryptographic.core.proof-exists",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
     { "id": "recognition.profile", "suite": "recognition", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",     "suite": "proof",  "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "id": "cryptographic.proof.validity-period", "suite": "proof", "outcome": { "status": "success", "message": "The credential is within its validity period." } },
     { "id": "cryptographic.status.bitstring",    "suite": "status", "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
     { "id": "cryptographic.status.list-issuer",  "suite": "status", "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
     { "id": "trust.registry.issuer", "suite": "registry",   "outcome": {
@@ -343,6 +353,14 @@ halted. Each check that would have run appears as `skipped` with reason
       }
     },
     {
+      "id": "cryptographic.proof.validity-period",
+      "suite": "proof",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
+      }
+    },
+    {
       "id": "cryptographic.status.bitstring",
       "suite": "status",
       "outcome": {
@@ -370,12 +388,82 @@ halted. Each check that would have run appears as `skipped` with reason
 }
 ```
 
+#### Example: Expired credential (fatal, does not halt)
+
+An expired credential is authentic — its signature verified — but outside its
+validity period. `proof.validity-period` fails it, so `verified` is `false`, but
+does not halt: the status, list-issuer and registry checks still run, and here
+the status list also marks it revoked. Abbreviated to the rows that matter:
+
+```json
+{
+  "verified": false,
+  "results": [
+    {
+      "id": "cryptographic.proof.signature",
+      "suite": "proof",
+      "outcome": {
+        "status": "success",
+        "message": "Signature verified successfully."
+      }
+    },
+    {
+      "id": "cryptographic.proof.validity-period",
+      "suite": "proof",
+      "outcome": {
+        "status": "failure",
+        "problems": [
+          {
+            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_EXPIRED",
+            "title": "Credential Expired",
+            "detail": "The current date time (2026-10-20T12:00:00.000Z) is after \"validUntil\" (2021-01-01T00:00:00Z)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "cryptographic.status.bitstring",
+      "suite": "status",
+      "outcome": {
+        "status": "failure",
+        "problems": [
+          {
+            "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED",
+            "title": "Credential Revoked",
+            "detail": "The status list https://example.edu/status/1 marks the credential revoked (index 42)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "cryptographic.status.list-issuer",
+      "suite": "status",
+      "outcome": {
+        "status": "success",
+        "message": "Every status list is issued by the credential's issuer."
+      }
+    },
+    {
+      "id": "trust.registry.issuer",
+      "suite": "registry",
+      "outcome": {
+        "status": "success",
+        "message": "Issuer found in registry: DCC Sandbox Registry"
+      }
+    }
+  ]
+}
+```
+
+Both the `proof` and the `status` summaries carry `fatalFailureAt`.
+
 #### Example: Revoked credential (fatal, sourced from status)
 
 When a credential's status list marks it revoked or suspended — or the verifier
 can't confidently evaluate the list (missing, expired or not yet valid, wrong
 type, signature invalid) — the status suite fails the credential. The proof
-check still passes on its own merits.
+check still passes on its own merits, and because `status.bitstring` does not
+halt, the list-issuer and registry checks still run.
 
 Every `BitstringStatusListEntry` whose `statusPurpose` is `revocation` or
 `suspension` is checked, and each set bit is its own problem:
@@ -444,16 +532,16 @@ not fetched, and the check's message or skip reason names them.
       "id": "cryptographic.status.list-issuer",
       "suite": "status",
       "outcome": {
-        "status": "skipped",
-        "reason": "Not run: status.bitstring failed"
+        "status": "success",
+        "message": "Every status list is issued by the credential's issuer."
       }
     },
     {
       "id": "trust.registry.issuer",
       "suite": "registry",
       "outcome": {
-        "status": "skipped",
-        "reason": "Not run: status.bitstring failed"
+        "status": "success",
+        "message": "Issuer found in registry: DCC Sandbox Registry"
       }
     }
   ]
@@ -464,9 +552,11 @@ not fetched, and the check's message or skip reason names them.
 
 `status.list-issuer` compares each status list's `issuer` id with the
 credential's (a string issuer, or an issuer object's `id`, compared exactly).
-The list's proof has already been verified by `status.bitstring`, which binds
-the list's signing key to its claimed issuer. When they differ, the check fails
-with `STATUS_LIST_ISSUER_MISMATCH`:
+It compares only lists whose proof verified, which binds the list's signing key
+to its claimed issuer; a list whose proof did not verify is left to
+`status.bitstring`, and this check is skipped. That includes a list that marks
+the credential revoked, so a revocation read from someone else's list says so.
+When they differ, the check fails with `STATUS_LIST_ISSUER_MISMATCH`:
 
 ```json
 {
@@ -531,12 +621,12 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked    |
 | `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
 
-`CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` come from `proof.signature`,
-alongside `INVALID_SIGNATURE`, and are fatal in the same way — but they mean the
-opposite thing about the issuer. Validity dates are read only after the
-signature has verified, so a credential that fails on its dates is authentic and
-merely outside its window; tell your users that, not that the credential may be
-forged. The date is judged against the verifier's `TimeService` (see
+`CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` come from
+`proof.validity-period`, which runs only after `proof.signature` has verified.
+They are fatal, like `INVALID_SIGNATURE`, but they mean the opposite thing about
+the issuer: a credential that fails on its dates is authentic and merely outside
+its window; tell your users that, not that the credential may be forged. They do
+not halt, so the credential's status and issuer are still reported. The date is judged against the verifier's `TimeService` (see
 [Pluggable clock](#pluggable-clock-timeservice)), the same clock the status
 check uses for status-list freshness.
 
@@ -881,7 +971,7 @@ table, and recipes.
 `createVerifier(...)` in tests to make every `TaskTiming` field
 exact-value-assertable. Both factories are exported from the package barrel.
 
-The same clock decides validity dates: `proof.signature` judges a credential's
+The same clock decides validity dates: `proof.validity-period` judges a credential's
 `validUntil` / `expirationDate` and `validFrom` / `issuanceDate` against it, and
 `status.bitstring` judges status-list freshness against it, so the two can never
 disagree within a verification. A verifier built on a `FakeTimeService` pinned

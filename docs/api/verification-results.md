@@ -27,8 +27,10 @@
 
 `results[]` carries **every** check: the ones that passed, the ones that
 were skipped (with the reason), and the ones that were not run because an
-earlier fatal failure halted the pipeline. `summary[]`, new in v2.0.0, is
-the per-suite rollup over those rows.
+earlier fatal failure halted the pipeline (see
+[Fatal failures and `verified`](#fatal-failures-and-verified) for the two
+fatal checks that do not halt). `summary[]`, new in v2.0.0, is the per-suite
+rollup over those rows.
 
 ### The top-level verdict
 
@@ -71,6 +73,7 @@ A successful single-credential verification:
       "outcome": { "status": "skipped",
                    "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",      /* success */ },
+    { "id": "cryptographic.proof.validity-period", /* success */ },
     { "id": "cryptographic.status.bitstring",
       "suite": "status",
       "outcome": { "status": "skipped",
@@ -107,8 +110,8 @@ A successful single-credential verification:
       "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
     { "id": "cryptographic.proof",    "phase": "cryptographic",
       "suite": "proof",   "status": "success",
-      "message": "1 of 1 check passed",
-      "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
+      "message": "2 of 2 checks passed",
+      "counts": { "passed": 2, "failed": 0, "skipped": 0 } },
     { "id": "cryptographic.status",   "phase": "cryptographic",
       "suite": "status",  "status": "skipped",
       "message": "2 of 2 checks skipped",
@@ -268,9 +271,9 @@ interface SuiteSummary {
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   /**
-   * The fully-qualified id of the check in this suite that failed
-   * fatally, if one did. At most one suite per subject carries it,
-   * and that suite is why the subject is not verified.
+   * The fully-qualified id of the first check in this suite that
+   * failed fatally, if one did. Every suite that carries it is a
+   * reason the subject is not verified; more than one can.
    */
   fatalFailureAt?: string;
 }
@@ -284,12 +287,12 @@ interface SuiteSummary {
 | All skipped | `"<n> of <n> checks skipped"` |
 | Failures only | `"<n> of <m> checks failed"` |
 | Mixed | `"<n> of <m> checks failed (<k> passed)"` |
-| Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero) |
+| Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero; a fatal check that does not halt leaves no not-run rows, so it reads like "Failures only" or "Mixed") |
 | Halted by an earlier suite's fatal failure | `"<suite-id> not run: <check-id> failed"` |
 | Explicit `applies` skip | `"<suite-id> not applicable: <reason>"` |
 
 > "Not run" rows are the `skipped` results `runSuites` emits, with reason
-> `"Not run: <check-id> failed"`, for checks halted by a fatal failure. They
+> `"Not run: <check-id> failed"`, for checks halted by a halting fatal failure. They
 > count toward `counts.skipped` but not toward the "skipped" wording: the
 > message reports them as "not run after fatal" instead.
 
@@ -311,11 +314,25 @@ result whose `verified` is still `true`.
 
 ### Fatal failures and `verified`
 
-A fatal failure halts every later check for the subject, so a subject
-has at most one, and at most one of its summaries carries
-`fatalFailureAt`. That gives one invariant to rely on:
+A fatal failure makes `verified` false. Most fatal checks also **halt**:
+every later check for the subject is reported as not run. Two built-in
+fatal checks do not halt, because by the time they run the credential is
+known to be authentic, and what the later checks say still matters:
 
-> A credential's `verified` is `false` exactly when one of its
+- `cryptographic.proof.validity-period` — expired or not yet valid. The
+  credential's status, list issuer and registry membership are still
+  reported.
+- `cryptographic.status.bitstring` — revoked, suspended, or its status
+  list could not be trusted. The list issuer and registry membership are
+  still reported.
+
+A check marks this with `halts: false` alongside `fatal: true`, which a
+caller-supplied check can do too; the row carries `halts: false` as well.
+So a subject can have more than one fatal failure, and more than one of
+its summaries can carry `fatalFailureAt` — an expired, revoked credential
+has both `proof` and `status`. The invariant to rely on:
+
+> A credential's `verified` is `false` exactly when any of its
 > `summary[]` entries has `fatalFailureAt`.
 
 The same holds for a presentation's own checks and its `summary[]`; the
@@ -335,7 +352,7 @@ non-fatal failure never reads as red inside a verified credential:
 | `fatalFailureAt` is set | ✗ | red | This suite's failure is why the subject is not verified |
 | `status` is `failure` or `mixed`, no `fatalFailureAt` | ⚠ | amber | Warning: a non-fatal check failed; `verified` is unaffected |
 | `status === 'success'` | ✓ | green | Every check that ran passed |
-| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier fatal failure) |
+| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier halting fatal failure) |
 
 ## `id` namespace reference
 
@@ -363,6 +380,7 @@ cryptographic.core
   cryptographic.core.proof-exists
 cryptographic.proof
   cryptographic.proof.signature
+  cryptographic.proof.validity-period            (credentials only)
 cryptographic.status
   cryptographic.status.bitstring
   cryptographic.status.list-issuer
@@ -503,7 +521,7 @@ checks, the second failing a fatal one — gets rendered as:
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
 ├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
-│   ├─ cryptographic ✓ (4 + 1 + 1 = 6 checks passed)
+│   ├─ cryptographic ✓ (4 + 2 + 1 = 7 checks passed)
 │   ├─ trust         ⚠ (1 of 1 check failed — advisory)
 │   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓
