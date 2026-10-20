@@ -84,19 +84,20 @@ export interface SuiteSummary {
   counts: { passed: number; failed: number; skipped: number };
 
   /**
-   * The `id` of the check in this suite that failed fatally, if
-   * one did. A fatal failure halts every later check for the
-   * subject, so at most one suite per subject carries this field,
-   * and the subject's `verified` is `false` exactly when one of
-   * its summaries does. `counts.passed` and `counts.failed`
-   * reflect what actually executed before the halt; the halted
-   * checks count as `skipped`.
+   * The `id` of the first check in this suite that failed fatally,
+   * if one did. The subject's `verified` is `false` exactly when any
+   * of its summaries carries this field. A fatal check halts every
+   * later check for the subject unless it sets `halts: false`, so
+   * more than one suite can carry it: one per non-halting fatal
+   * failure, plus the suite of the halting one. `counts.passed` and
+   * `counts.failed` reflect what actually executed; halted checks
+   * count as `skipped`.
    *
    * `status` is computed from counts alone and does not say
    * whether a failure was fatal: a suite whose only failure is
    * non-fatal has `status: 'failure'` or `'mixed'` inside a
    * `verified: true` result. Render such a suite as a warning,
-   * and reserve error styling for the suite with
+   * and reserve error styling for each suite with
    * `fatalFailureAt`.
    *
    * There is deliberately no per-suite `verified`: the only

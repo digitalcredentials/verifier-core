@@ -297,6 +297,51 @@ describe('verifyCredential', () => {
       expect(customSummary?.fatalFailureAt).toBe('unknown.custom.fatal-check');
     });
 
+    it('a custom fatal check with halts: false fails verification without halting later suites', async () => {
+      const datedCheck: VerificationCheck = {
+        id: 'dated.check',
+        name: 'Dated Check',
+        fatal: true,
+        halts: false,
+        appliesTo: ['verifiableCredential'],
+        execute: async (): Promise<CheckOutcome> => ({
+          status: 'failure',
+          problems: [
+            {
+              type: 'https://www.w3.org/TR/vc-data-model#CUSTOM_ERROR',
+              title: 'Custom Fatal Error',
+              detail: 'Fails without halting'
+            }
+          ]
+        })
+      };
+      const laterCheck: VerificationCheck = {
+        id: 'later.check',
+        name: 'Later Check',
+        appliesTo: ['verifiableCredential'],
+        execute: async (): Promise<CheckOutcome> => ({
+          status: 'success',
+          message: 'Ran after the fatal failure'
+        })
+      };
+
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        additionalSuites: [
+          { id: 'dated', name: 'Dated', checks: [datedCheck] },
+          { id: 'later', name: 'Later', checks: [laterCheck] }
+        ],
+        ...fakeVerified
+      });
+
+      expect(result.verified).toBe(false);
+      const later = result.results.find(r => r.suite === 'later');
+      expect(later?.outcome.status).toBe('success');
+      const datedSummary = result.summary.find(s => s.suite === 'dated');
+      expect(datedSummary?.fatalFailureAt).toBe('unknown.dated.check');
+    });
+
     it('a custom non-fatal failure fails its suite but leaves verified true', async () => {
       const warningCheck: VerificationCheck = {
         id: 'custom.warning-check',
@@ -670,9 +715,9 @@ describe('verifyCredential', () => {
       );
       expect(failures.length).toBeGreaterThan(0);
       expect(failures.every(r => r.suite === 'proof')).toBe(true);
-      expect(
-        result.results.some(r => r.outcome.status === 'success')
-      ).toBe(true);
+      expect(result.results.some(r => r.outcome.status === 'success')).toBe(
+        true
+      );
       const proofSummary = result.summary.find(s => s.suite === 'proof');
       expect(['failure', 'mixed']).toContain(proofSummary?.status);
       expect(proofSummary?.fatalFailureAt).toBe(
