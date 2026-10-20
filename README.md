@@ -1302,6 +1302,8 @@ pnpm test            # lint + node tests (vitest)
 pnpm run test:browser # playwright (run `pnpm exec playwright install chromium` first)
 ```
 
+To publish a release, see [RELEASING.md](RELEASING.md).
+
 ## Contribute
 
 PRs accepted.
