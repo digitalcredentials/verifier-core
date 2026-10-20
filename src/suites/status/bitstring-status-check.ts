@@ -1,8 +1,5 @@
 import { checkStatus } from '@digitalcredentials/vc-bitstring-status-list';
-import {
-  dispatchProofVerification,
-  type CryptoDispatchResult
-} from '../../crypto-dispatch.js';
+import type { CryptoDispatchResult } from '../../crypto-dispatch.js';
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
@@ -19,7 +16,8 @@ import {
   credentialStatusEntries,
   describeIgnoredStatusEntry,
   ignoredStatusEntries,
-  loadStatusList
+  loadStatusList,
+  verifyStatusList
 } from './status-lists.js';
 
 // Error strings raised by `@digitalcredentials/vc-bitstring-status-list`,
@@ -237,6 +235,9 @@ function setBitProblem(
  * list is missing, has an invalid signature, is expired or not yet
  * valid, has a wrong type, or actually marks the credential as revoked
  * or suspended), the overall verification result is `verified: false`.
+ * It does not halt (`halts: false`): the credential is authentic by now,
+ * since `proof.signature` passed, so whether its issuer is registered and
+ * who signed its status list still matter to a verifier.
  *
  * Every `BitstringStatusListEntry` with `statusPurpose` `revocation` or
  * `suspension` is checked, wherever it sits in `credentialStatus`. Each
@@ -247,7 +248,8 @@ function setBitProblem(
  * lists are not fetched, and the outcome names them.
  *
  * Proof verification of each named BitstringStatusListCredential goes
- * through {@link dispatchProofVerification} against
+ * through {@link verifyStatusList}, once per list per verification
+ * (shared with `status.list-issuer`), which dispatches against
  * `context.cryptoServices` — the same dispatch presentation and
  * credential proofs use; that is also where the list's validity dates
  * are checked. `@digitalcredentials/vc-bitstring-status-list` keeps
@@ -267,6 +269,7 @@ export const bitstringStatusCheck: VerificationCheck = {
   description:
     'Checks revocation and suspension status via BitstringStatusList.',
   fatal: true,
+  halts: false,
   appliesTo: ['verifiableCredential'],
   execute: async (
     subject: VerificationSubject,
@@ -304,11 +307,7 @@ export const bitstringStatusCheck: VerificationCheck = {
       const loaded = new Map<string, unknown>();
       for (const url of checkedStatusListUrls(credential)) {
         const document = await loadStatusList(url, context);
-        const dispatched = await dispatchProofVerification({
-          services: context.cryptoServices,
-          subject: { verifiableCredential: document },
-          options: { documentLoader: context.documentLoader, now }
-        });
+        const dispatched = await verifyStatusList(url, document, context, now);
         if (dispatched.kind !== 'verified') {
           return {
             status: 'failure',

@@ -56,6 +56,10 @@ describe('bitstringStatusCheck contract', () => {
   it('is fatal — a status failure flips overall verified to false', () => {
     expect(bitstringStatusCheck.fatal).toBe(true);
   });
+
+  it('does not halt — registry and later suites still run after a status failure', () => {
+    expect(bitstringStatusCheck.halts).toBe(false);
+  });
 });
 
 describe('statusListIssuerCheck contract', () => {
@@ -843,12 +847,13 @@ describe('Status Suite', () => {
     async function runWithList(
       list: Record<string, unknown>,
       credentialOverrides: Record<string, unknown> = {},
-      statusListIndex = '0'
+      statusListIndex = '0',
+      cryptoService = FakeCryptoService()
     ) {
       const listUrl = list.id as string;
       const context = buildTestContext({
         documentLoader: FakeDocumentLoader({ [listUrl]: list }),
-        cryptoServices: [FakeCryptoService()]
+        cryptoServices: [cryptoService]
       });
       const cred = CredentialFactory({
         version: 'v2',
@@ -983,7 +988,7 @@ describe('Status Suite', () => {
       }
     });
 
-    it('is not run when the bitstring check fails', async () => {
+    it('reports a list from another DID that marks the credential revoked', async () => {
       const list = await StatusListCredentialFactory({
         id: 'https://factory.test/status/revoked-other-issuer',
         issuer: OTHER_DID,
@@ -993,10 +998,65 @@ describe('Status Suite', () => {
 
       expect(results[0].outcome.status).toBe('failure');
       const result = listIssuerResult(results);
-      expect(result.outcome.status).toBe('skipped');
-      if (result.outcome.status === 'skipped') {
-        expect(result.outcome.reason).toMatch(/^Not run/);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems[0].type).toBe(
+          ProblemTypes.STATUS_LIST_ISSUER_MISMATCH
+        );
       }
+    });
+
+    it('compares a list rejected only for its dates, since its proof verified', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/expired-other-issuer',
+        issuer: OTHER_DID
+      });
+      const results = await runWithList(
+        list,
+        {},
+        '0',
+        FakeCryptoService({
+          verified: false,
+          problems: [
+            {
+              type: ProblemTypes.CREDENTIAL_EXPIRED,
+              title: 'Credential Expired',
+              detail: 'Credential has expired.'
+            }
+          ]
+        })
+      );
+
+      expect(results[0].outcome).toEqual(
+        expect.objectContaining({ status: 'failure' })
+      );
+      const result = listIssuerResult(results);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems[0].type).toBe(
+          ProblemTypes.STATUS_LIST_ISSUER_MISMATCH
+        );
+      }
+    });
+
+    it('takes no issuer claim from a list whose proof did not verify', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/unverified-other-issuer',
+        issuer: OTHER_DID
+      });
+      const results = await runWithList(
+        list,
+        {},
+        '0',
+        FakeCryptoService({ verified: false })
+      );
+
+      expect(results[0].outcome.status).toBe('failure');
+      expect(listIssuerResult(results).outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'A status list could not be loaded or its proof did not verify; status.bitstring reports why.'
+      });
     });
 
     it('skips when the credential has no credentialStatus', async () => {
@@ -1089,7 +1149,8 @@ describe('Status Suite', () => {
       expect(results).toHaveLength(1);
       expect(results[0].outcome).toEqual({
         status: 'skipped',
-        reason: 'Status list could not be loaded; status.bitstring reports why.'
+        reason:
+          'A status list could not be loaded or its proof did not verify; status.bitstring reports why.'
       });
     });
   });
