@@ -42,13 +42,13 @@ cryptosuite.
 Verification runs an ordered pipeline of **suites**, each containing one or more
 **checks**:
 
-| Suite           | Phase           | What it checks                                                                                                                                                                                                                                                                                                                         | Fatal?                         |
-| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| **Core**        | `cryptographic` | `@context` exists, VC context URI present, VC structure, VP structure, credential ID valid, proof exists                                                                                                                                                                                                                        | Yes                            |
-| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                             |
-| **Proof**       | `cryptographic` | Cryptographic signature verification (`proof.signature`), then the credential's validity dates against the verifier's clock (`proof.validity-period`)                                                                                                                                                                                  | Yes                            |
-| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No) |
-| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                                                                                                                                                                                            | No                             |
+| Suite           | Phase           | What it checks                                                                                                                                                                                                                                                                                                                         | Fatal?                               |
+| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **Core**        | `cryptographic` | `@context` exists, VC context URI present, VC structure, VP structure, credential ID valid, proof exists                                                                                                                                                                                                                               | Yes                                  |
+| **Recognition** | `recognition`   | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured)                                                                                                                                                                                                                 | No                                   |
+| **Proof**       | `cryptographic` | Cryptographic signature verification (`proof.signature`; in a proof set, every proof a registered suite can check must verify), a warning for proofs in a set that it cannot check (`proof.unsupported-proofs`), then the credential's validity dates against the verifier's clock (`proof.validity-period`)                           | Yes (`proof.unsupported-proofs`: No) |
+| **Status**      | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification. `status.bitstring` checks every revocation and suspension `BitstringStatusListEntry`, verifying each list credential's proof with the configured `cryptoServices`. `status.list-issuer` warns when a list is not issued by the credential's issuer. | Yes (`status.list-issuer`: No)       |
+| **Registry**    | `trust`         | Issuer DID lookup in known trust registries                                                                                                                                                                                                                                                                                            | No                                   |
 
 The **Phase** column drives the optional `phases:` filter on `VerifierConfig`
 and per-call args, used for
@@ -269,6 +269,7 @@ interface ProblemDetail {
     { "id": "cryptographic.core.proof-exists",   "suite": "core",   "outcome": { "status": "success", "message": "..." } },
     { "id": "recognition.profile", "suite": "recognition", "outcome": { "status": "skipped", "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",     "suite": "proof",  "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "id": "cryptographic.proof.unsupported-proofs", "suite": "proof", "outcome": { "status": "success", "message": "Every proof was checked." } },
     { "id": "cryptographic.proof.validity-period", "suite": "proof", "outcome": { "status": "success", "message": "The credential is within its validity period." } },
     { "id": "cryptographic.status.bitstring",    "suite": "status", "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
     { "id": "cryptographic.status.list-issuer",  "suite": "status", "outcome": { "status": "success", "message": "Every status list is issued by the credential's issuer." } },
@@ -350,6 +351,14 @@ halted. Each check that would have run appears as `skipped` with reason
             "detail": "Invalid signature."
           }
         ]
+      }
+    },
+    {
+      "id": "cryptographic.proof.unsupported-proofs",
+      "suite": "proof",
+      "outcome": {
+        "status": "skipped",
+        "reason": "Not run: proof.signature failed"
       }
     },
     {
@@ -602,24 +611,25 @@ with no `credentialStatus` skips the status check:
 
 All failures use `ProblemDetail` with a `type` URI. Common error types:
 
-| Type URI                          | Title                                                                                                                                                          | When                                                          |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                   |
-| `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                               |
-| `...#VERIFICATION_METHOD_ERROR`   | Verification Method Error                                                                                                                                      | The proof's verification method is missing or not the issuer's |
-| `...#CREDENTIAL_EXPIRED`          | Credential Expired                                                                                                                                             | `validUntil` / `expirationDate` has passed; authentic         |
-| `...#CREDENTIAL_NOT_YET_VALID`    | Credential Not Yet Valid                                                                                                                                       | `validFrom` / `issuanceDate` in the future; authentic         |
-| `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                        |
-| `...#HTTP_ERROR`                  | HTTP Error                                                                                                                                                     | Network error during signature check                          |
-| `...#CREDENTIAL_REVOKED`          | Credential Revoked                                                                                                                                             | A revocation status list marks the credential revoked         |
-| `...#CREDENTIAL_SUSPENDED`        | Credential Suspended                                                                                                                                           | A suspension status list marks the credential suspended       |
-| `...#STATUS_LIST_NOT_FOUND`       | Status List Not Found                                                                                                                                          | Status list URL unreachable                                   |
-| `...#STATUS_LIST_EXPIRED`         | Status List Expired                                                                                                                                            | Status list VC has expired                                    |
-| `...#STATUS_LIST_NOT_YET_VALID`   | Status List Not Yet Valid                                                                                                                                      | Status list VC is not valid yet                               |
-| `...#STATUS_LIST_SIGNATURE_ERROR` | Status List Signature Error                                                                                                                                    | Status list VC signature invalid                              |
-| `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal) |
-| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked    |
-| `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                           |
+| Type URI                          | Title                                                                                                                                                          | When                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `...#PARSING_ERROR`               | Credential Parsing Failed / Invalid Credential Structure / Invalid Presentation Structure / Invalid JSON-LD / No VC Context / Invalid Credential ID / No Proof | Envelope gate or `core` structural problems                                                                        |
+| `...#INVALID_SIGNATURE`           | Invalid Signature                                                                                                                                              | Signature doesn't match content                                                                                    |
+| `...#VERIFICATION_METHOD_ERROR`   | Verification Method Error                                                                                                                                      | The proof's verification method is missing or not the issuer's                                                     |
+| `...#PROOF_UNSUPPORTED`           | Unsupported Proof                                                                                                                                              | No registered suite supports the proof, or it was made for another purpose; a warning beside a proof that verified |
+| `...#CREDENTIAL_EXPIRED`          | Credential Expired                                                                                                                                             | `validUntil` / `expirationDate` has passed; authentic                                                              |
+| `...#CREDENTIAL_NOT_YET_VALID`    | Credential Not Yet Valid                                                                                                                                       | `validFrom` / `issuanceDate` in the future; authentic                                                              |
+| `...#DID_WEB_UNRESOLVED`          | DID Web Unresolved                                                                                                                                             | `did:web` document couldn't be fetched                                                                             |
+| `...#HTTP_ERROR`                  | HTTP Error                                                                                                                                                     | Network error during signature check                                                                               |
+| `...#CREDENTIAL_REVOKED`          | Credential Revoked                                                                                                                                             | A revocation status list marks the credential revoked                                                              |
+| `...#CREDENTIAL_SUSPENDED`        | Credential Suspended                                                                                                                                           | A suspension status list marks the credential suspended                                                            |
+| `...#STATUS_LIST_NOT_FOUND`       | Status List Not Found                                                                                                                                          | Status list URL unreachable                                                                                        |
+| `...#STATUS_LIST_EXPIRED`         | Status List Expired                                                                                                                                            | Status list VC has expired                                                                                         |
+| `...#STATUS_LIST_NOT_YET_VALID`   | Status List Not Yet Valid                                                                                                                                      | Status list VC is not valid yet                                                                                    |
+| `...#STATUS_LIST_SIGNATURE_ERROR` | Status List Signature Error                                                                                                                                    | Status list VC signature invalid                                                                                   |
+| `...#STATUS_LIST_ISSUER_MISMATCH` | Status List Issuer Mismatch                                                                                                                                    | Status list not issued by the credential's issuer (non-fatal)                                                      |
+| `...#ISSUER_NOT_REGISTERED`       | Issuer Not Registered                                                                                                                                          | Issuer DID not found in any registry that could be checked                                                         |
+| `...#REGISTRY_UNCHECKED`          | Registry Unchecked                                                                                                                                             | Some registries couldn't be reached                                                                                |
 
 `CREDENTIAL_EXPIRED` and `CREDENTIAL_NOT_YET_VALID` come from
 `proof.validity-period`, which runs only after `proof.signature` has verified.
@@ -637,6 +647,13 @@ its controller has not authorized for the proof purpose, or that belongs to
 someone other than the credential's issuer. Nothing was necessarily altered —
 the issuer's key setup does not back the proof it published. The `detail` is
 the signature library's own message, so it names the method and the fault.
+
+`PROOF_UNSUPPORTED` marks a proof this verifier did not check: its cryptosuite
+is not one a registered suite supports, or it was made for a different proof
+purpose. A credential may carry a proof set so that different verifiers can
+each check the proof they support, so beside a proof that verified it is only a
+warning, on the non-fatal `proof.unsupported-proofs` check. When no proof could
+be checked at all, `proof.signature` fails with it instead.
 
 #### Problem types
 

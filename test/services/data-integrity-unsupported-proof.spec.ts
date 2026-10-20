@@ -86,8 +86,7 @@ describe('DataIntegrityCryptoService: proofs it cannot check', () => {
     expect(problem).toEqual({
       type: ProblemTypes.PROOF_UNSUPPORTED,
       title: 'Unsupported Proof',
-      detail:
-        "This verifier does not support this proof's cryptosuite (DataIntegrityProof, bbs-2023)."
+      detail: "This verifier does not support this proof's cryptosuite."
     });
   });
 
@@ -145,7 +144,7 @@ describe('DataIntegrityCryptoService: proofs it cannot check', () => {
       )
     );
     expect(problem?.detail).toBe(
-      "This verifier does not support this proof's cryptosuite (DataIntegrityProof, bbs-2023)."
+      "This verifier does not support this proof's cryptosuite."
     );
   });
 

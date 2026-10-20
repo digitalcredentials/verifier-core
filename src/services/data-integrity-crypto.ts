@@ -17,7 +17,6 @@ import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
 import { documentHasProof } from '../util/document-has-proof.js';
 import { isJsigsNoMatch } from '../util/jsigs-no-match.js';
-import { proofLabel } from '../util/proof-label.js';
 import { isVerificationMethodMessage } from '../util/verification-method-messages.js';
 import { vcDateFault } from '../util/vc-date-messages.js';
 
@@ -272,7 +271,7 @@ async function unsupportedProofProblem(
   const proof = singleProof(document);
   if (document && proof) {
     if (!(await anySuiteMatches(proof, document, suites, documentLoader))) {
-      detail = `This verifier does not support this proof's cryptosuite (${proofLabel(proof)}).`;
+      detail = "This verifier does not support this proof's cryptosuite.";
     } else if (proof.proofPurpose !== expectedPurpose) {
       detail = `This proof's purpose (${String(proof.proofPurpose ?? 'none')}) is not the one being checked (${expectedPurpose}).`;
     }

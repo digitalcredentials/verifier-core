@@ -19,6 +19,14 @@ import type { VerificationSubject } from './subject.js';
  * `CREDENTIAL_NOT_YET_VALID` only when the proof itself verified.
  * `proof.signature` treats a rejection made only of those problems as a
  * verified signature, and leaves the dates to `proof.validity-period`.
+ *
+ * A document carrying a proof set is handed to the service one proof at
+ * a time (`dispatchProofSetVerification`), so "the proof itself" is that
+ * one proof. A service that cannot check the proof it was handed — no
+ * suite supports it, or it was made for another purpose — should reject
+ * with only `PROOF_UNSUPPORTED` problems: beside a proof that verified,
+ * `proof.unsupported-proofs` then reports it as a warning rather than a
+ * failure.
  */
 export type CryptoResult =
   | { verified: true; message?: string }

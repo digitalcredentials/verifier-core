@@ -73,6 +73,7 @@ A successful single-credential verification:
       "outcome": { "status": "skipped",
                    "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",      /* success */ },
+    { "id": "cryptographic.proof.unsupported-proofs", /* success */ },
     { "id": "cryptographic.proof.validity-period", /* success */ },
     { "id": "cryptographic.status.bitstring",
       "suite": "status",
@@ -110,8 +111,8 @@ A successful single-credential verification:
       "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
     { "id": "cryptographic.proof",    "phase": "cryptographic",
       "suite": "proof",   "status": "success",
-      "message": "2 of 2 checks passed",
-      "counts": { "passed": 2, "failed": 0, "skipped": 0 } },
+      "message": "3 of 3 checks passed",
+      "counts": { "passed": 3, "failed": 0, "skipped": 0 } },
     { "id": "cryptographic.status",   "phase": "cryptographic",
       "suite": "status",  "status": "skipped",
       "message": "2 of 2 checks skipped",
@@ -342,6 +343,34 @@ presentation's `verified` additionally requires every
 There is deliberately no per-suite `verified`: the only verdicts are
 the result-level `verified` fields.
 
+### Proof sets and `cryptographic.proof.unsupported-proofs`
+
+A credential, presentation or status list credential may carry a
+**proof set**: several proofs in its `proof` array, often in different
+cryptosuites so that different verifiers can each check one they
+support. Each proof is verified on its own, and
+`cryptographic.proof.signature` succeeds only when **every proof a
+registered suite can check** verified (VC Data Integrity §4.5). One
+broken proof fails the check, and halts, even when the others verified;
+its problem's `detail` names the proof, e.g.
+`Proof 2 of 2 (DataIntegrityProof, eddsa-rdfc-2022): …`. The prefix
+appears only when the document carries two or more proofs.
+
+A proof this verifier cannot check — no registered suite supports its
+cryptosuite, or it was made for a different proof purpose — does not
+fail the signature when another proof verified. The non-fatal
+`cryptographic.proof.unsupported-proofs` check, which runs right after
+the signature check, reports it instead: a failure with one
+`PROOF_UNSUPPORTED` problem per such proof, so the credential stays
+`verified: true` and the proof suite shows a warning. The check
+succeeds ("Every proof was checked.") when there is nothing to report,
+including for a single-proof document; is skipped for an unsigned
+presentation accepted through `unsignedPresentation`; and is not run
+when the signature check failed. A document whose **only** proofs are
+unsupported has nothing verified to warn beside, so it fails
+`cryptographic.proof.signature` with `PROOF_UNSUPPORTED`. Unsupported
+proofs on a status list credential are not reported.
+
 ### Per-suite badge recommendations
 
 Colour a suite by `fatalFailureAt` first and `status` second, so a
@@ -380,6 +409,7 @@ cryptographic.core
   cryptographic.core.proof-exists
 cryptographic.proof
   cryptographic.proof.signature
+  cryptographic.proof.unsupported-proofs
   cryptographic.proof.validity-period            (credentials only)
 cryptographic.status
   cryptographic.status.bitstring
@@ -521,7 +551,7 @@ checks, the second failing a fatal one — gets rendered as:
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
 ├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
-│   ├─ cryptographic ✓ (4 + 2 + 1 = 7 checks passed)
+│   ├─ cryptographic ✓ (4 + 3 + 1 = 8 checks passed)
 │   ├─ trust         ⚠ (1 of 1 check failed — advisory)
 │   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓

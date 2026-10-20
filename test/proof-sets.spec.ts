@@ -3,7 +3,8 @@
  * Data Integrity §4.5): a credential, presentation or status list
  * credential signed with both `Ed25519Signature2020` and
  * `DataIntegrityProof` + `eddsa-rdfc-2022` fails when either proof is
- * broken, not only when both are.
+ * broken, not only when both are. A proof this verifier cannot check
+ * beside one that verified is a warning on `proof.unsupported-proofs`.
  *
  * Runs offline with real signatures, the way
  * `status-list-cryptosuite-parity.spec.ts` does: `did:key` resolves from
@@ -470,7 +471,88 @@ describe('proof sets: every proof must verify', () => {
     });
   });
 
-  it('asks the crypto service once per proof', async () => {
+  describe('proofs this verifier cannot check', () => {
+    const eddsaProof = () => (v2.proof as Doc[])[1];
+    const ed25519Proof = () => (v2.proof as Doc[])[0];
+    const UNSUPPORTED_ROW = 'cryptographic.proof.unsupported-proofs';
+
+    it('warns about an unsupported cryptosuite beside a verified proof', async () => {
+      const result = await verifyCredential({
+        ...v2,
+        proof: [eddsaProof(), { ...eddsaProof(), cryptosuite: 'bbs-2023' }]
+      });
+
+      expect(result.verified).toBe(true);
+      expect(
+        row(result.results, 'cryptographic.proof.signature')?.outcome.status
+      ).toBe('success');
+      expect(row(result.results, UNSUPPORTED_ROW)?.fatal).toBe(false);
+      expect(failureProblems(result.results, UNSUPPORTED_ROW)).toEqual([
+        [
+          ProblemTypes.PROOF_UNSUPPORTED,
+          "Proof 2 of 2 (DataIntegrityProof, bbs-2023): This verifier does not support this proof's cryptosuite."
+        ]
+      ]);
+      expect(
+        result.summary.find(s => s.suite === 'proof')?.fatalFailureAt
+      ).toBeUndefined();
+    });
+
+    it('warns about a proof made for another purpose beside a verified proof', async () => {
+      const result = await verifyCredential({
+        ...v2,
+        proof: [
+          eddsaProof(),
+          { ...ed25519Proof(), proofPurpose: 'authentication' }
+        ]
+      });
+
+      expect(result.verified).toBe(true);
+      expect(failureProblems(result.results, UNSUPPORTED_ROW)).toEqual([
+        [
+          ProblemTypes.PROOF_UNSUPPORTED,
+          "Proof 2 of 2 (Ed25519Signature2020): This proof's purpose (authentication) is not the one being checked (assertionMethod)."
+        ]
+      ]);
+    });
+
+    it('fails the signature when the only proof is unsupported', async () => {
+      const result = await verifyCredential({
+        ...v2,
+        proof: { ...eddsaProof(), cryptosuite: 'bbs-2023' }
+      });
+
+      expect(result.verified).toBe(false);
+      expect(
+        failureProblems(result.results, 'cryptographic.proof.signature').map(
+          ([type]) => type
+        )
+      ).toEqual([ProblemTypes.PROOF_UNSUPPORTED]);
+      expect(row(result.results, UNSUPPORTED_ROW)?.outcome).toEqual(
+        NOT_RUN_AFTER_SIGNATURE
+      );
+    });
+
+    it('reports every proof checked for a set of two supported proofs', async () => {
+      const result = await verifyCredential(v2);
+
+      expect(row(result.results, UNSUPPORTED_ROW)?.outcome).toEqual({
+        status: 'success',
+        message: 'Every proof was checked.'
+      });
+    });
+
+    it('reports every proof checked for a single proof', async () => {
+      const result = await verifyCredential(singleProof);
+
+      expect(row(result.results, UNSUPPORTED_ROW)?.outcome).toEqual({
+        status: 'success',
+        message: 'Every proof was checked.'
+      });
+    });
+  });
+
+  it('asks the crypto service once per proof, for both proof checks together', async () => {
     const [service] = defaultCryptoServices();
     const seen: unknown[] = [];
     const counting: CryptoService = {

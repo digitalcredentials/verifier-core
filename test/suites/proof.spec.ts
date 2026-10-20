@@ -3,9 +3,11 @@ import { runSuites } from '../../src/run-suites.js';
 import { defaultCryptoServices } from '../../src/default-services.js';
 import { proofSuite } from '../../src/suites/proof/index.js';
 import { signatureCheck } from '../../src/suites/proof/signature-check.js';
+import { unsupportedProofsCheck } from '../../src/suites/proof/unsupported-proofs-check.js';
 import { validityPeriodCheck } from '../../src/suites/proof/validity-period-check.js';
 import { ProblemTypes } from '../../src/problem-types.js';
 import type { ProblemDetail } from '../../src/types/problem-detail.js';
+import type { CryptoService } from '../../src/types/crypto-service.js';
 import { FakeTimeService } from '../../src/services/time-service/fake-time-service.js';
 import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
@@ -56,6 +58,7 @@ describe('Proof Verification Suite', () => {
 
       expect(results.map(r => r.id)).toEqual([
         'cryptographic.proof.signature',
+        'cryptographic.proof.unsupported-proofs',
         'cryptographic.proof.validity-period'
       ]);
       expect(results[0].outcome.status).toBe('success');
@@ -139,9 +142,10 @@ describe('Proof Verification Suite', () => {
       const subject = createPresentationSubject(presentation);
       const results = await runSuites([proofSuite], subject, context);
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(2);
       expect(results[0].id).toBe('cryptographic.proof.signature');
       expect(results[0].outcome.status).toBe('success');
+      expect(results[1].id).toBe('cryptographic.proof.unsupported-proofs');
     });
 
     it('skips an unsigned presentation when context allows it', async () => {
@@ -312,11 +316,13 @@ describe('Proof Verification Suite', () => {
       const subject = createCredentialSubject(cred);
       const results = await runSuites([proofSuite], subject, context);
 
-      expect(results).toHaveLength(2);
-      expect(results[1].outcome).toEqual({
-        status: 'skipped',
-        reason: 'Not run: proof.signature failed'
-      });
+      expect(results).toHaveLength(3);
+      for (const notRun of results.slice(1)) {
+        expect(notRun.outcome).toEqual({
+          status: 'skipped',
+          reason: 'Not run: proof.signature failed'
+        });
+      }
       expect(results[0].outcome.status).toBe('failure');
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].title).toBe(
@@ -365,6 +371,7 @@ describe('Proof Verification Suite', () => {
       expect(validityPeriodCheck.halts).toBe(false);
       expect(proofSuite.checks.map(c => c.id)).toEqual([
         'proof.signature',
+        'proof.unsupported-proofs',
         'proof.validity-period'
       ]);
     });
@@ -492,6 +499,140 @@ describe('Proof Verification Suite', () => {
         status: 'failure',
         problems: [expired, invalid]
       });
+    });
+  });
+
+  describe('unsupportedProofsCheck', () => {
+    const supported = { type: 'Ed25519Signature2020' };
+    const alsoSupported = {
+      type: 'DataIntegrityProof',
+      cryptosuite: 'eddsa-rdfc-2022'
+    };
+    const unsupported = { type: 'DataIntegrityProof', cryptosuite: 'bbs-2023' };
+
+    /**
+     * Rejects a lone bbs-2023 proof as unsupported and verifies any other,
+     * recording every proof it is handed.
+     */
+    function bbsUnsupported(seen: unknown[]): CryptoService {
+      const answer = async (document: unknown) => {
+        const { proof } = document as { proof?: { cryptosuite?: string } };
+        seen.push(proof);
+        return proof?.cryptosuite === 'bbs-2023'
+          ? {
+              verified: false as const,
+              problems: [
+                {
+                  type: ProblemTypes.PROOF_UNSUPPORTED,
+                  title: 'Unsupported Proof',
+                  detail: 'Not supported here.'
+                }
+              ]
+            }
+          : { verified: true as const };
+      };
+      return {
+        canVerify: () => true,
+        verifyCredential: answer,
+        verifyPresentation: answer
+      };
+    }
+
+    const withProof = (proof: unknown) =>
+      createCredentialSubject(
+        CredentialFactory({ version: 'v2', credential: { proof } })
+      );
+
+    it('is a non-fatal check between proof.signature and proof.validity-period', () => {
+      expect(unsupportedProofsCheck.fatal).toBe(false);
+      expect(proofSuite.checks.indexOf(unsupportedProofsCheck)).toBe(1);
+    });
+
+    it('warns about an unsupported proof beside a verified one, reusing the verification', async () => {
+      const seen: unknown[] = [];
+      const results = await runSuites(
+        [proofSuite],
+        withProof([supported, unsupported]),
+        buildTestContext({ cryptoServices: [bbsUnsupported(seen)] })
+      );
+
+      expect(results[0].outcome.status).toBe('success');
+      expect(results[1]).toMatchObject({
+        id: 'cryptographic.proof.unsupported-proofs',
+        fatal: false,
+        outcome: {
+          status: 'failure',
+          problems: [
+            {
+              type: ProblemTypes.PROOF_UNSUPPORTED,
+              title: 'Unsupported Proof',
+              detail:
+                'Proof 2 of 2 (DataIntegrityProof, bbs-2023): Not supported here.'
+            }
+          ]
+        }
+      });
+      // One call per proof, shared by both checks.
+      expect(seen).toEqual([supported, unsupported]);
+    });
+
+    it('succeeds when every proof of a set was checked', async () => {
+      const outcome = await unsupportedProofsCheck.execute(
+        withProof([supported, alsoSupported]),
+        buildTestContext({ cryptoServices: [bbsUnsupported([])] })
+      );
+
+      expect(outcome).toEqual({
+        status: 'success',
+        message: 'Every proof was checked.'
+      });
+    });
+
+    it('succeeds for a single proof', async () => {
+      const outcome = await unsupportedProofsCheck.execute(
+        withProof(supported),
+        buildTestContext({ cryptoServices: [bbsUnsupported([])] })
+      );
+
+      expect(outcome).toEqual({
+        status: 'success',
+        message: 'Every proof was checked.'
+      });
+    });
+
+    it('is not run when the only proofs are unsupported, since proof.signature fails', async () => {
+      const results = await runSuites(
+        [proofSuite],
+        withProof([unsupported, { ...unsupported, id: 'urn:proof:2' }]),
+        buildTestContext({ cryptoServices: [bbsUnsupported([])] })
+      );
+
+      expect(results[0].outcome.status).toBe('failure');
+      expect(results[1].outcome).toEqual({
+        status: 'skipped',
+        reason: 'Not run: proof.signature failed'
+      });
+    });
+
+    it('skips an unsigned presentation without asking the crypto service', async () => {
+      const service = FakeCryptoService({ verified: true });
+      const verifySpy = vi.spyOn(service, 'verifyPresentation');
+      const presentation = PresentationFactory();
+      delete (presentation as { proof?: unknown }).proof;
+
+      const outcome = await unsupportedProofsCheck.execute(
+        createPresentationSubject(presentation),
+        buildTestContext({
+          cryptoServices: [service],
+          unsignedPresentation: true
+        })
+      );
+
+      expect(outcome).toEqual({
+        status: 'skipped',
+        reason: 'The document has no proof.'
+      });
+      expect(verifySpy).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { VerificationSuite } from '../../types/check.js';
 import { signatureCheck } from './signature-check.js';
+import { unsupportedProofsCheck } from './unsupported-proofs-check.js';
 import { validityPeriodCheck } from './validity-period-check.js';
 
 /**
@@ -14,8 +15,11 @@ import { validityPeriodCheck } from './validity-period-check.js';
  * AssertionProofPurpose for presentations, and maps library errors to
  * `ProblemDetail` entries.
  *
- * `proof.validity-period` follows the signature check, so a failed
- * signature halts it, and judges the credential's validity dates.
+ * `proof.unsupported-proofs` follows the signature check and warns about
+ * proofs in a proof set that no registered suite could check.
+ *
+ * `proof.validity-period` follows them, so a failed signature halts it,
+ * and judges the credential's validity dates.
  */
 export const proofSuite: VerificationSuite = {
   id: 'proof',
@@ -23,5 +27,5 @@ export const proofSuite: VerificationSuite = {
   description:
     "Cryptographic signature verification, and the credential's validity period.",
   phase: 'cryptographic',
-  checks: [signatureCheck, validityPeriodCheck]
+  checks: [signatureCheck, unsupportedProofsCheck, validityPeriodCheck]
 };

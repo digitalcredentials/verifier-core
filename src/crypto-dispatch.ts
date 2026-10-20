@@ -20,7 +20,6 @@ import type {
 import type { ProblemDetail } from './types/problem-detail.js';
 import type { VerificationSubject } from './types/subject.js';
 import { ProblemTypes } from './problem-types.js';
-import { proofLabel } from './util/proof-label.js';
 import { isValidityDateOnly } from './util/validity-date-problems.js';
 
 /**
@@ -156,8 +155,8 @@ export function problemsOfProof(outcome: ProofOutcome): ProblemDetail[] {
  * proof's position and label; the first date-only rejection, unprefixed
  * because the dates belong to the document; the first verified proof;
  * otherwise, when no proof was checked at all, the unsupported proofs'
- * problems, prefixed. Unsupported proofs beside checked ones do not change `combined`;
- * they are left in `proofs` for the caller to report.
+ * problems, prefixed. Unsupported proofs beside checked ones do not
+ * change `combined`; they are left in `proofs` for the caller to report.
  */
 export async function dispatchProofSetVerification(
   input: CryptoDispatchInput
@@ -192,6 +191,23 @@ export async function dispatchProofSetVerification(
   );
 
   return { combined: combineProofOutcomes(proofs), proofs };
+}
+
+/**
+ * How a proof is named in a problem's `detail`: its `type`, plus its
+ * `cryptosuite` when it has one, e.g. "DataIntegrityProof, eddsa-rdfc-2022".
+ * Data Integrity proofs all share one `type`, so the cryptosuite is what
+ * tells two of them apart.
+ */
+function proofLabel(proof: unknown): string {
+  const { type, cryptosuite } = (proof ?? {}) as {
+    type?: unknown;
+    cryptosuite?: unknown;
+  };
+  const typeName = typeof type === 'string' ? type : 'unknown proof type';
+  return typeof cryptosuite === 'string'
+    ? `${typeName}, ${cryptosuite}`
+    : typeName;
 }
 
 function combineProofOutcomes(proofs: ProofOutcome[]): CryptoDispatchResult {

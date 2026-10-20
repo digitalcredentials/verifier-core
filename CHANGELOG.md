@@ -66,6 +66,15 @@ not run after a fatal failure.
   Reported by `proof.signature` when the proof's verification method cannot be
   found, its controller has not authorized it for the proof purpose, or the
   credential's issuer is not that controller.
+- `PROOF_UNSUPPORTED` on `ProblemTypes`, under the same URI namespace: a proof
+  this verifier did not check, because no registered suite supports its
+  cryptosuite or it was made for a different proof purpose.
+- `proof.unsupported-proofs` check (`cryptographic.proof.unsupported-proofs`),
+  non-fatal, run after `proof.signature` for credentials and presentations. It
+  fails with one `PROOF_UNSUPPORTED` problem per proof in a proof set that could
+  not be checked, as a warning beside the proofs that verified; otherwise it
+  succeeds ("Every proof was checked."). Every credential and presentation
+  result now has this one more row.
 - Optional `now?: Date` on `CryptoVerifyOptions`, filled by the calling check
   from the verification context's `TimeService` and passed through to
   `@digitalcredentials/vc` by `DataIntegrityCryptoService`. Custom
@@ -137,6 +146,22 @@ not run after a fatal failure.
 
 ### Fixed
 
+- **A proof set no longer passes when only one of its proofs verifies**
+  ([#67](https://github.com/digitalcredentials/verifier-core/issues/67)). A
+  credential, presentation or status list credential carrying several proofs
+  reported `proof.signature` success, and `verified: true`, when any one proof
+  verified, because the signature libraries accept a set on its first good
+  proof. Each proof is now verified on its own, and `proof.signature` fails when
+  any proof a registered suite can check fails, naming it: "Proof 2 of 2
+  (DataIntegrityProof, eddsa-rdfc-2022): …". A status list with one broken proof
+  is a bad list signature (`STATUS_LIST_SIGNATURE_ERROR`), and an expired
+  credential with one broken proof reports the broken proof rather than reading
+  as authentic and merely expired. A proof in a cryptosuite this verifier does
+  not support, or made for another proof purpose, is no longer silently ignored:
+  beside a proof that verified it is a warning on the new
+  `proof.unsupported-proofs` check; when no proof could be checked,
+  `proof.signature` fails with `PROOF_UNSUPPORTED` in place of
+  `INVALID_SIGNATURE`.
 - **A key or controller mismatch is no longer reported as `INVALID_SIGNATURE`
   with the detail "Verification error(s).", exactly what a tampered credential
   reported.** A verification method that is missing, unauthorized by its
