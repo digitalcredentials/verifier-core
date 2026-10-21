@@ -1,9 +1,13 @@
 /**
  * Status-list helpers shared by the status suite's checks: reading a
- * credential's `credentialStatus` entries, and loading the status list
- * credentials they name.
+ * credential's `credentialStatus` entries, and loading and verifying the
+ * status list credentials they name.
  */
 
+import {
+  dispatchProofSetVerification,
+  type CryptoDispatchResult
+} from '../../crypto-dispatch.js';
 import type {
   DocumentLoader,
   VerificationContext
@@ -226,4 +230,44 @@ export function issuerId(issuer: unknown): string | undefined {
     return typeof id === 'string' && id.length > 0 ? id : undefined;
   }
   return undefined;
+}
+
+/**
+ * Proof verifications of status lists during one verification, keyed
+ * like {@link loadStatusList}'s memo. `status.bitstring` and
+ * `status.list-issuer` both need to know whether a list's proof
+ * verified, and the memo makes it one verification per URL, judged at
+ * the first caller's `now`.
+ */
+const verifiedLists = new WeakMap<
+  VerificationContext,
+  Map<string, Promise<CryptoDispatchResult>>
+>();
+
+/**
+ * Verify the proof of the status list credential `document`, loaded
+ * from `url`, once per `context`. A list's proof set is verified proof
+ * by proof, like a credential's, so one bad proof makes a bad list.
+ */
+export function verifyStatusList(
+  url: string,
+  document: unknown,
+  context: VerificationContext,
+  now: Date
+): Promise<CryptoDispatchResult> {
+  let byUrl = verifiedLists.get(context);
+  if (!byUrl) {
+    byUrl = new Map();
+    verifiedLists.set(context, byUrl);
+  }
+  let pending = byUrl.get(url);
+  if (!pending) {
+    pending = dispatchProofSetVerification({
+      services: context.cryptoServices,
+      subject: { verifiableCredential: document },
+      options: { documentLoader: context.documentLoader, now }
+    }).then(result => result.combined);
+    byUrl.set(url, pending);
+  }
+  return pending;
 }

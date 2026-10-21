@@ -9,9 +9,28 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # required for npm trusted publishing and provenance
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check release against package version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "::error::Release tag $TAG does not match package.json version $VERSION"
+            exit 1
+          fi
+          case "$VERSION" in
+            *-*) IS_PRE=true ;;
+            *) IS_PRE=false ;;
+          esac
+          if [ "$PRERELEASE" != "$IS_PRE" ]; then
+            echo "::error::Version $VERSION needs the release's pre-release setting to be $IS_PRE"
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v6
 
@@ -20,14 +39,26 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Update npm for trusted publishing
-        run: npm install -g npm@latest # trusted publishing needs npm >= 11.5.1
+      - name: Install pinned npm
+        run: npm install -g npm@11.21.1 # trusted publishing needs npm >= 11.5.1
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm run lint
+
       - name: Build
         run: pnpm run build
 
+      - name: Test (Node)
+        run: pnpm run test:node
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test (Browser)
+        run: pnpm run test:browser
+
       - name: Publish to npm
-        run: npm publish
+        run: npm publish --tag ${{ github.event.release.prerelease && 'beta' || 'latest' }}

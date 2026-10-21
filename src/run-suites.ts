@@ -7,10 +7,12 @@
  * and returns a flat `CheckResult[]` report.
  *
  * Invariants:
- * - The first fatal failure halts the subject: no later check executes,
- *   in the same suite or any later one. Each check that would have run is
- *   reported as a `'skipped'` row with reason
- *   `Not run: <check-id> failed`, so the report still lists it.
+ * - The first failure of a halting check — fatal, and `halts` not
+ *   `false` — halts the subject: no later check executes, in the same
+ *   suite or any later one. Each check that would have run is reported
+ *   as a `'skipped'` row with reason `Not run: <check-id> failed`, so the
+ *   report still lists it. A fatal check with `halts: false` still counts
+ *   against `verified`, but later checks run.
  * - A throw never escapes. A throwing `execute` or `applies` becomes a
  *   `failure` result carrying {@link ProblemTypes.CHECK_ERROR}, so
  *   `runSuites` always resolves.
@@ -123,9 +125,10 @@ function appliesToSubject(
  * - Checks with `appliesTo` restrictions are skipped if they don't match the subject.
  * - A throwing check becomes a `failure` carrying `CHECK_ERROR`, and
  *   keeps the check's own `fatal` flag.
- * - A fatal failure halts every remaining check for the subject, in
- *   this suite and all later suites. Each check that would have run is
- *   reported as `'skipped'` with reason `Not run: <check-id> failed`.
+ * - A failure of a halting check (see {@link haltsOnFailure}) halts
+ *   every remaining check for the subject, in this suite and all later
+ *   suites. Each check that would have run is reported as `'skipped'`
+ *   with reason `Not run: <check-id> failed`.
  *   Phase filtering and `applies` are still evaluated after a halt, so
  *   suites that would not have run stay silent.
  * - Returns a flat array of all check results.
@@ -139,7 +142,7 @@ export async function runSuites(
   const results: CheckResult[] = [];
   const timing = context.timing === true;
   const timeService = context.timeService;
-  /** Local id of the first fatal failure; once set, no check executes. */
+  /** Local id of the first halting failure; once set, no check executes. */
   let haltedBy: string | undefined;
 
   for (const suite of suites) {
@@ -152,6 +155,8 @@ export async function runSuites(
       try {
         applies = suite.applies(subject, context);
       } catch (error) {
+        // A throwing predicate leaves every check in the suite unknown, so
+        // any fatal check halts here, whatever its `halts` says.
         const fatal = suite.checks.some(c => c.fatal === true);
         results.push(
           buildAppliesErrorResult(suite, error, fatal, timing, timeService)
@@ -199,20 +204,34 @@ export async function runSuites(
         id: computeId(suite.phase, suite.id, check.id),
         suite: suite.id,
         outcome,
-        fatal: check.fatal
+        fatal: check.fatal,
+        ...haltsField(check)
       };
       if (finishedTiming !== undefined) {
         result.timing = finishedTiming;
       }
       results.push(result);
 
-      if (check.fatal && outcome.status === 'failure') {
+      if (haltsOnFailure(check) && outcome.status === 'failure') {
         haltedBy = check.id;
       }
     }
   }
 
   return results;
+}
+
+/** Whether a failure of `check` halts the subject: fatal, and not opted out. */
+function haltsOnFailure(check: VerificationCheck): boolean {
+  return check.fatal === true && check.halts !== false;
+}
+
+/**
+ * Internal: `{ halts }` when the check sets it, so rows of checks that
+ * leave it unset keep their existing shape.
+ */
+function haltsField(check: VerificationCheck): { halts?: boolean } {
+  return check.halts !== undefined ? { halts: check.halts } : {};
 }
 
 /**
@@ -276,7 +295,8 @@ function buildNotRunResult(
       status: 'skipped',
       reason: `${NOT_RUN_REASON_PREFIX}${haltedBy} failed`
     },
-    fatal: check.fatal
+    fatal: check.fatal,
+    ...haltsField(check)
   };
   return withInstantTiming(result, timing, timeService);
 }

@@ -13,6 +13,7 @@ import {
 } from '@digitalcredentials/did-method-web';
 import { klona } from 'klona';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
+import type { HttpGetResult } from '../types/http.js';
 
 const contextsBySuite = new Map<string, string>([
   [
@@ -33,6 +34,26 @@ const contextsBySuite = new Map<string, string>([
     'https://w3id.org/security/suites/x25519-2019/v1'
   ]
 ]);
+
+/**
+ * A DID document that could not be fetched. Named `HTTPError`, as
+ * `@digitalcredentials/http-client` names its errors, because that name is
+ * what `classifySignatureError` reads to report `DID_WEB_UNRESOLVED` (the
+ * issuer's own DID) or `HTTP_ERROR` (any other) instead of
+ * `INVALID_SIGNATURE`. `requestUrl` is how it tells the two apart.
+ */
+export class DidDocumentFetchError extends Error {
+  override name = 'HTTPError';
+
+  constructor(
+    message: string,
+    readonly requestUrl: string,
+    readonly status?: number,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+  }
+}
 
 function assertDomainAllowList(
   allowList: string[] | undefined,
@@ -111,7 +132,9 @@ export interface DidWebDriverLike {
 
 /**
  * did-io driver: same surface as {@link DidWebDriver} for `get` / `use`, but
- * `get` loads documents via `httpGetService`.
+ * `get` loads documents via `httpGetService`. A document that cannot be
+ * fetched — a non-2xx status, or anything `httpGetService.get` throws —
+ * rejects with a {@link DidDocumentFetchError} carrying `requestUrl`.
  */
 export function didWebDriverWithHttpGet(
   httpGetService: HttpGetService,
@@ -136,9 +159,24 @@ export function didWebDriverWithHttpGet(
       }
       const { baseUrl, fragment } = didUrlToHttpsUrl(didOrUrl);
       assertDomainAllowList(inner.allowList, baseUrl);
-      const { body, status } = await httpGetService.get(baseUrl);
+      let result: HttpGetResult;
+      try {
+        result = await httpGetService.get(baseUrl);
+      } catch (cause) {
+        // The service's own message: BuiltinHttpGetService writes fixed text
+        // naming the URL and the reason, never the network error's.
+        const message = cause instanceof Error ? cause.message : String(cause);
+        throw new DidDocumentFetchError(message, baseUrl, undefined, {
+          cause
+        });
+      }
+      const { body, status } = result;
       if (status < 200 || status >= 300) {
-        throw new Error(`Failed to fetch DID document: HTTP ${status}`);
+        throw new DidDocumentFetchError(
+          `Failed to fetch DID document: HTTP ${status}`,
+          baseUrl,
+          status
+        );
       }
       const data = body as Record<string, unknown> | null;
       const [didAuth] = didOrUrl.split(/(?=[?#])/);

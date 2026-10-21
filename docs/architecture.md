@@ -26,10 +26,10 @@ src/
 ├── index.ts                         Public API barrel (all exports)
 ├── verifier.ts                      createVerifier(config) factory + internal context builder (composition root)
 ├── verify-suite.ts                  Standalone verifyCredential / verifyPresentation wrappers over createVerifier
-├── default-suites.ts                Internal: defaultSuites array (core → recognition → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` submodule
+├── default-suites.ts                Internal: defaultSuites array (core → recognition → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` and `/openbadges/schema` submodules
 ├── default-services.ts              Internal: lazy factories for default httpGetService, cryptoServices, documentLoader (memoized) + per-call createDefaultCacheService
 ├── run-suites.ts                    Suite orchestration engine
-├── crypto-dispatch.ts               Shared CryptoService selection + invocation (proof suite and status suite)
+├── crypto-dispatch.ts               Shared CryptoService selection + invocation, one proof at a time for proof sets (proof suite and status suite)
 ├── extract-credentials-from.ts      Normalize VP's embedded credentials to array
 ├── flatten-presentation-results.ts  flattenPresentationResults helper + FlattenedCheckResult provenance-tagged union
 ├── problem-types.ts                 ProblemTypes const map + ProblemType union (catalog of built-in ProblemDetail.type URIs)
@@ -59,15 +59,12 @@ src/
 │   ├── recognition/                 Pluggable recognizer dispatch; produces normalized credential form
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
-│   ├── registry/                    Issuer DID lookup via context.lookupIssuers
-│   └── schema/
-│       ├── schema-loader.ts         Cached AJV loadSchema: schema JSON in cacheService under schema:<url>, for allow-listed URLs only
-│       └── obv3/                    AJV-backed OBv3 JSON Schema check (validators compiled once per verifier); consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
-├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`)
-│   ├── index.ts                     Curated barrel — suites, individual checks, factory, recognition helpers, problem-type catalog, vocabulary
-│   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite (all phase: 'semantic')
+│   └── registry/                    Issuer DID lookup via context.lookupIssuers
+├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`); loads no AJV
+│   ├── index.ts                     Curated barrel — semantic suite, semantic checks, factory, recognition helpers, problem-type catalog, vocabulary
+│   ├── openbadges-suite.ts          openBadgesSemanticSuite (phase: 'semantic'; OpenBadgeCredential only)
 │   ├── openbadges-zod.ts            Internal tolerant Zod shapes (CredentialSubject / Achievement / Result / ResultDescription)
-│   ├── recognize.ts                 isOpenBadgeCredential / isEndorsementCredential predicates (also consumed by suites/schema/obv3/)
+│   ├── recognize.ts                 isOpenBadgeCredential / isEndorsementCredential predicates (also consumed by schema/)
 │   ├── recognizers.ts               obv3p0Recognizer + obv3p0EndorsementRecognizer (RecognizerSpec implementations)
 │   ├── problem-types.ts             Obv3ProblemTypes catalog (also exported as OpenBadgesProblemTypes)
 │   ├── known-achievement-types.ts   OB_3_0_ACHIEVEMENT_TYPES set + KNOWN_ACHIEVEMENT_TYPES default alias + ACHIEVEMENT_TYPE_EXT_PREFIX
@@ -75,6 +72,14 @@ src/
 │   ├── achieved-level-check.ts      Result.achievedLevel → RubricCriterionLevel.id reference check
 │   ├── missing-result-status-check.ts  Result.status presence check when ResultDescription.resultType is 'Status'
 │   ├── unknown-achievement-type-check.ts  AchievementType vocabulary check (+ createObv3UnknownAchievementTypeCheck factory)
+│   ├── schema/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges/schema`): JSON Schema validation, loads AJV
+│   │   ├── index.ts                 Barrel — openBadgesSuite, openBadgesSchemaSuite, obv3SchemaCheck, obv3DeclaredSchemaCheck
+│   │   ├── schema-suites.ts         openBadgesSchemaSuite + openBadgesSuite (semantic + schema), phase: 'semantic', OpenBadgeCredential or EndorsementCredential
+│   │   ├── obv3-schema-check.ts     schema.obv3.json: validates against the bundled schema for the credential's OB type + VC version; one Ajv2020, validators compiled once per process
+│   │   ├── obv3-declared-schema-check.ts  schema.obv3.declared: reports a declared credentialSchema that does not fit (never fetched)
+│   │   ├── select-schema.ts         OB type / VC version detection and the vendored schema for them
+│   │   ├── known-schema-urls.ts     The 12 known OB 3.0 schema URLs (purl + spec $ids), with OB type and accepted VC versions
+│   │   └── json-schema/             The four OB 3.0 JSON Schemas vendored from the spec (generated by scripts/refresh-ob-schemas.mjs; internal)
 │   └── schemas/                     Strict OB 3.0 envelope Zod schemas (recognition pipeline)
 │       ├── fields-v3p0.ts           Shared field builders (IriString, JsonLdTypeField, Obv3p0ContextArray, zodErrorToProblems)
 │       ├── classes-v3p0.ts          Inner class schemas (Image, Profile, Achievement, AchievementSubject, Result, ResultDescription, RubricCriterionLevel) + ProfileRefField + ImageField
@@ -126,9 +131,17 @@ test/
 │   ├── achieved-level-check.spec.ts
 │   ├── missing-result-status-check.spec.ts
 │   ├── unknown-achievement-type-check.spec.ts
-│   ├── openbadges-submodule.spec.ts     Integration spec: package.json#exports resolution, default-path invariant, opt-in path, factory composition
+│   ├── openbadges-submodule.spec.ts     Integration spec: package.json#exports resolution (both subpaths), default-path invariant, opt-in path, factory composition
+│   ├── openbadges-no-ajv.spec.ts        Pins that /openbadges loads no AJV
+│   ├── schema/                          Zod envelope specs, plus the JSON Schema check, declared-schema check and schema-suite specs
+│   ├── schema-files/                    Vendored-schema integrity and drift specs; purl/ holds the published twins
 │   └── fixtures/                        TS-module fixtures for the OB integration spec
 └── util/                                Util unit tests
+```
+
+```
+scripts/
+└── refresh-ob-schemas.mjs               Hand-run only: regenerate src/openbadges/schema/json-schema/ from the OB 3.0 spec HTML (--fixtures: also the purl twins)
 ```
 
 ## Verification pipeline
@@ -292,7 +305,7 @@ The fix: `createVerifier` forward-declares the verifier reference, then passes
 object is built, the slot is filled. Handlers receive the verifier through
 `RegistryHandlerContext`, and `vc-recognition` passes `registries: []` to its recursive
 `verifier.verifyCredential(...)` as a recursion guard. Status-list credential proofs do **not**
-take this path: they go through `dispatchProofVerification` against `cryptoServices` (see the
+take this path: they go through `dispatchProofSetVerification` against `cryptoServices` (see the
 status suite) rather than a recursive `Verifier.verifyCredential` call.
 
 ## Suites and checks
@@ -310,7 +323,7 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { id, suite, outcome, fatal?, timing? }
+CheckResult: { id, suite, outcome, fatal?, halts?, timing? }
 ```
 
 `timing` is opt-in: present on every `CheckResult`,
@@ -323,12 +336,17 @@ break when the flag is left at its default (`false`). See
 
 - **`appliesTo`** limits a check to credential-only or presentation-only subjects. If unset, the
   check runs for both.
-- **`fatal`** on a check means a failure halts every remaining check for the subject, in that
-  suite and in all later suites: once the subject is known to be invalid, later checks would
-  only report misleading follow-on failures or do needless network I/O. Each check that would
-  have run still appears in the report, as `skipped` with reason `Not run: <check-id> failed`,
-  so the report stays complete. Suites that would not have run anyway (phase filter, `applies`
-  false) stay silent.
+- **`fatal`** on a check means a failure makes the subject's `verified` false.
+- **`halts`** says whether a fatal failure also halts every remaining check for the subject, in
+  that suite and in all later suites, and defaults to `fatal`: once the subject may not be what
+  it claims, later checks would only report misleading follow-on failures or do needless network
+  I/O. Each check that would have run still appears in the report, as `skipped` with reason
+  `Not run: <check-id> failed`, so the report stays complete. Suites that would not have run
+  anyway (phase filter, `applies` false) stay silent. Two built-in fatal checks set
+  `halts: false`, because they run once the credential is known to be authentic and what follows
+  still matters: `proof.validity-period` (an expired credential's status and issuer are still
+  reported) and `status.bitstring` (a revoked credential's list issuer and registry membership
+  are still reported). A throwing `applies` predicate halts regardless.
 - **Throws are contained.** A check whose `execute` throws yields a `failure` carrying
   `CHECK_ERROR`, keeping the check's own `fatal` flag. A suite whose `applies` predicate throws
   yields a `<suite-id>.applies` `CHECK_ERROR` failure, fatal when the suite has any fatal check.
@@ -346,12 +364,12 @@ break when the flag is left at its default (`false`). See
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.vc-structure`, `core.credential-id`, `core.proof-exists` (credentials); `core.vp-structure` (presentations) | Yes  | Validates basic VC / VP structure before crypto. Runs for presentations too, ahead of `proof`. `core.vc-structure` and `core.vp-structure` check the VC Data Model's structural requirements and report every violation, each with a JSON Pointer `instance`. |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
-| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`, plus the credential's validity dates, which the verifying library reads once the signature holds: an authentic but out-of-date credential fails with `CREDENTIAL_EXPIRED` / `CREDENTIAL_NOT_YET_VALID` rather than `INVALID_SIGNATURE`, judged against `VerificationContext.timeService`. A verification method that is missing, unauthorized by its controller for the proof purpose, or controlled by someone other than the issuer fails with `VERIFICATION_METHOD_ERROR`, also distinct from `INVALID_SIGNATURE`; every signature failure takes its `detail` from the signature library's own message. Does **not** check credential status — see the status suite. |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's; each list is fetched once per verification. |
+| Proof Verification | `proof`       | `cryptographic` | `proof.signature`, `proof.unsupported-proofs`, `proof.validity-period`         | Yes / No | Cryptographic signature verification dispatched via `CryptoService`. A proof set is verified one proof at a time (`dispatchProofSetVerification` hands each `CryptoService` call a shallow copy carrying a single proof), and `proof.signature` passes only when every proof a registered suite can check verified (VC Data Integrity §4.5): the signature libraries alone accept a set when any one proof verifies. A proof no registered suite supports, or made for another proof purpose, is `PROOF_UNSUPPORTED`; beside a verified proof it is a warning on the non-fatal `proof.unsupported-proofs`, which reads the same memoised verification, and when no proof could be checked it fails `proof.signature`. The verifying library also reads the credential's validity dates once the signature holds, and the crypto service reports a date-only rejection as typed `CREDENTIAL_EXPIRED` / `CREDENTIAL_NOT_YET_VALID` problems, which `proof.signature` reads as a verified signature. `proof.validity-period` (fatal, does not halt) then judges those dates itself against `VerificationContext.timeService`, so an authentic but out-of-date credential fails there rather than as `INVALID_SIGNATURE`. A verification method that is missing, unauthorized by its controller for the proof purpose, or controlled by someone other than the issuer fails with `VERIFICATION_METHOD_ERROR`, also distinct from `INVALID_SIGNATURE`; every signature failure takes its `detail` from the signature library's own message. Does **not** check credential status — see the status suite. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`, `status.list-issuer`                                       | Yes / No | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification. `status.bitstring` (fatal, does not halt) checks every `BitstringStatusListEntry` for `revocation` or `suspension`, ignoring other entries without fetching their lists: a missing, invalid, expired or not-yet-valid status list, a wrong-typed list, or a set bit (`CREDENTIAL_REVOKED` / `CREDENTIAL_SUSPENDED`, one per entry) fails the credential. The status list credential's own proof is verified through the injected `CryptoService`s, same dispatch as any other credential. `status.list-issuer` (non-fatal) reports `STATUS_LIST_ISSUER_MISMATCH` when a list's `issuer` is not the credential's, comparing only lists whose proof verified (or was rejected only for its dates) — including a list that marks the credential revoked; each list is fetched and its proof verified once per verification, shared by both checks. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
-longer in the default list; it ships as an opt-in submodule
+longer in the default list; it ships as opt-in submodules
 (see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)). The OB
 suite bundles are tagged `phase: 'semantic'`.
 
@@ -491,7 +509,9 @@ Some verification logic only matters to a subset of credential consumers. Rather
 than ship that logic in the default suite list — and pay its cost on every
 verification — the library exposes it as an **opt-in submodule** under a
 dedicated `package.json#exports` subpath. The first such submodule is
-`@digitalcredentials/verifier-core/openbadges`.
+`@digitalcredentials/verifier-core/openbadges`, with
+`@digitalcredentials/verifier-core/openbadges/schema` beside it for the part
+that loads AJV.
 
 A vertical submodule has three properties:
 
@@ -503,18 +523,19 @@ A vertical submodule has three properties:
    both `OpenBadgesProblemTypes` and `Obv3ProblemTypes`). The core
    `src/problem-types.ts` no longer mirrors these entries; consumers branching
    on OB problems import the submodule's catalog directly.
-3. **It may share recognition helpers with the core suites.** The AJV-backed
-   `obv3SchemaCheck` in `src/suites/schema/obv3/` consumes
-   `isOpenBadgeCredential` / `isEndorsementCredential` from
-   `src/openbadges/recognize.ts`. The directional dependency is
-   `suites/schema/obv3/` → `openbadges/`, never the reverse — the submodule
-   stays free to depend on whatever it needs from the rest of `src/` without
-   creating a cycle.
+3. **Heavy dependencies sit behind their own subpath.** The AJV-backed
+   `obv3SchemaCheck` and `obv3DeclaredSchemaCheck`, the bundled schemas and
+   the suites that carry them live in `src/openbadges/schema/`, published as
+   `/openbadges/schema`. That directory consumes `isOpenBadgeCredential` /
+   `isEndorsementCredential` and `openBadgesSemanticSuite` from
+   `src/openbadges/`. The directional dependency is `openbadges/schema/` →
+   `openbadges/`, never the reverse, so importing `/openbadges` never loads
+   AJV or ~270 KB of schema JSON. That matters to bundlers that do not
+   tree-shake (Metro) and to pages whose CSP forbids `unsafe-eval`.
 
-The `/openbadges` submodule exports three suite bundles
-(`openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite` — all
-tagged `phase: 'semantic'` and gated by an `applies` predicate that returns
-true only for OB credentials), individual checks, a factory for
+The `/openbadges` submodule exports `openBadgesSemanticSuite` (tagged
+`phase: 'semantic'` and gated by an `applies` predicate that returns true
+only for `OpenBadgeCredential`), the semantic checks, a factory for
 caller-augmented vocabulary (`createObv3UnknownAchievementTypeCheck`),
 recognition helpers, two `RecognizerSpec`s (`obv3p0Recognizer`,
 `obv3p0EndorsementRecognizer`) plus their strict envelope Zod schemas
@@ -524,7 +545,20 @@ catalog, and version-scoped `AchievementType` vocabulary
 (`OB_3_0_ACHIEVEMENT_TYPES`, the moving `KNOWN_ACHIEVEMENT_TYPES` alias, and the
 spec-sanctioned `ACHIEVEMENT_TYPE_EXT_PREFIX = 'ext:'`). The schemas are
 version-pinned to OB 3.0 so a future OB 3.1 schema can be introduced
-side-by-side with its own recognizer rather than mutating the 3.0 shape. See
+side-by-side with its own recognizer rather than mutating the 3.0 shape.
+
+The `/openbadges/schema` submodule exports `openBadgesSchemaSuite` and
+`openBadgesSuite` (the semantic checks plus the schema checks), both
+`phase: 'semantic'` and gated on `OpenBadgeCredential` or
+`EndorsementCredential`, and the two checks. `schema.obv3.json` validates
+against one of four OB 3.0 JSON Schemas vendored from the spec, chosen by OB
+type and VC version only, so a credential's `credentialSchema` cannot swap in
+another. Nothing is fetched: the schemas are TypeScript modules, compiled once
+per process by a module-level `Ajv2020`, which is safe because no loader binds
+a verifier's HTTP service. `schema.obv3.declared` reports a declared
+`credentialSchema` that does not fit. A hand-run script refreshes the vendored
+schemas; tests pin their SHA-256 and compare them with the purl-published
+schemas. See
 the README's
 [Open Badges 3.0 verification](../README.md#open-badges-30-verification-opt-in-submodule)
 and
@@ -658,7 +692,8 @@ into the core `ProblemTypes` map. The first such catalog is
 `src/openbadges/problem-types.ts`, surfaced via
 `@digitalcredentials/verifier-core/openbadges`. Current OB entries:
 `OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
-`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`. The wire URIs use the
+`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`,
+`OB_DECLARED_SCHEMA_MISMATCH`, `OB_DECLARED_SCHEMA_NOT_CHECKED`. The wire URIs use the
 `…#OB_*` shape so they remain stable across OB version updates. Failure-outcome
 problems from these checks (and from the strict OB envelope schemas) populate
 `ProblemDetail.instance` with an RFC 6901 JSON Pointer locating the offending
@@ -684,7 +719,7 @@ their own URIs without requiring an entry in any catalog.
 | `@digitalcredentials/did-method-key`, `did-method-web` | DID resolution drivers used by the document loader                  |
 | `@digitalcredentials/vc-bitstring-status-list`       | BitstringStatusList status checking                                   |
 | `zod`                                                | Minimal input envelope gate; strict OB 3.0 envelopes (recognition)   |
-| `ajv` / `ajv-formats`                                | JSON Schema validation for OBv3 schema checks                        |
+| `ajv` / `ajv-formats`                                | JSON Schema validation for OBv3 schema checks; loaded only by `/openbadges/schema` |
 
 ### Test
 
@@ -726,7 +761,7 @@ without network dependencies, and composable — consumers wire in exactly the b
   (`default-services.ts`) and are not exported.
 - **`TimeService` is the clock seam.** Wall-clock and monotonic time both flow through
   `VerificationContext.timeService` (default `RealTimeService`). The orchestrator
-  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; `proof.signature` and
+  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; `proof.validity-period` and
   `status.bitstring` read it to judge credential expiry and status-list freshness against the
   same moment, and any other time-sensitive decision (signature clock-skew window,
   key rotation) belongs there too. Tests pass `FakeTimeService` for deterministic
@@ -765,10 +800,13 @@ without network dependencies, and composable — consumers wire in exactly the b
 - **Registry handlers** (`dcc-legacy`, `oidf`, `vc-recognition`) consume third-party clients and
   parsing libraries inline rather than through narrower ports — though they do share the verifier's
   `httpGetService` and `cacheService`, so caching and HTTP behavior are uniform.
-- **OBv3 schema check** uses AJV directly. A `JsonSchemaValidator` port would let consumers swap
-  in a different validator or share a single validator across calls. (The check itself was
-  already lifted into the opt-in `/openbadges` submodule's `openBadgesSchemaSuite` bundle, so
-  consumers who don't care about Open Badges already pay zero cost for it.)
+- **OBv3 schema check** uses AJV directly. It never touches the network (the schemas are
+  bundled), but AJV compiles with `new Function`, so the check cannot run under a CSP without
+  `unsafe-eval` or where code generation is unavailable. A `JsonSchemaValidator` port would let
+  consumers swap in a different validator, and precompiled (AJV standalone) validators are an
+  option if such a consumer needs the check — at roughly ten times the size of the schema JSON.
+  (The check already lives in the opt-in `/openbadges/schema` subpath, so consumers who don't
+  import it pay nothing for it.)
 - **Cache TTL math bypasses the clock seam.** `TimeService` is the clock seam for verification
   decisions (see above), but the caching layer does not route through it: the registry handlers'
   TTL math (`services/registry-handlers/cache-ttl.ts`, `oidf-handler.ts`) and the in-memory cache's

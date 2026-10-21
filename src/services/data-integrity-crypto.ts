@@ -16,7 +16,9 @@ import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
 import { documentHasProof } from '../util/document-has-proof.js';
+import { isJsigsNoMatch } from '../util/jsigs-no-match.js';
 import { isVerificationMethodMessage } from '../util/verification-method-messages.js';
+import { vcDateFault } from '../util/vc-date-messages.js';
 
 /**
  * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
@@ -104,6 +106,27 @@ export function classifySignatureError(
   error: unknown,
   credential: Record<string, unknown> | undefined
 ): ProblemDetail[] {
+  // vc checks validity dates only after the proof verified, and reports a
+  // date failure as a plain Error rather than a VerificationError. Say so
+  // with a typed problem: it is how `proof.signature` knows the proof
+  // verified, and how `status.bitstring` tells an expired list from a bad one.
+  const dateFault = vcDateFault(error);
+  if (dateFault !== undefined) {
+    return [
+      dateFault === 'expired'
+        ? {
+            type: ProblemTypes.CREDENTIAL_EXPIRED,
+            title: 'Credential Expired',
+            detail: (error as Error).message
+          }
+        : {
+            type: ProblemTypes.CREDENTIAL_NOT_YET_VALID,
+            title: 'Credential Not Yet Valid',
+            detail: (error as Error).message
+          }
+    ];
+  }
+
   const errors = extractErrors(error);
 
   if (isJsonLdError(errors)) {
@@ -177,6 +200,87 @@ export function classifySignatureError(
       detail: messages.join(' ') || 'The signature is not valid.'
     }
   ];
+}
+
+/**
+ * The proof purpose vc checks a credential's proof against: its default
+ * `CredentialIssuancePurpose` is an assertion purpose.
+ */
+const CREDENTIAL_PROOF_PURPOSE = 'assertionMethod';
+
+/** The document's proof when it carries exactly one, otherwise `undefined`. */
+function singleProof(
+  document: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  const proof = document?.proof;
+  if (Array.isArray(proof)) {
+    return proof.length === 1
+      ? (proof[0] as Record<string, unknown>)
+      : undefined;
+  }
+  return proof !== null && typeof proof === 'object'
+    ? (proof as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * Whether any configured suite would check `proof`, asked the way
+ * jsonld-signatures asks: with the document's `@context` on the proof.
+ */
+async function anySuiteMatches(
+  proof: Record<string, unknown>,
+  document: Record<string, unknown>,
+  suites: CryptoSuite[],
+  documentLoader: unknown
+): Promise<boolean> {
+  const proofWithContext = { '@context': document['@context'], ...proof };
+  for (const suite of suites) {
+    try {
+      if (
+        await suite.matchProof({
+          proof: proofWithContext,
+          document,
+          documentLoader
+        })
+      ) {
+        return true;
+      }
+    } catch {
+      // A suite that cannot even look at the proof does not support it.
+    }
+  }
+  return false;
+}
+
+/**
+ * Say why jsonld-signatures checked no proof, so that a warning about an
+ * extra proof in a proof set names the real reason. jsonld-signatures
+ * skips a proof for a purpose mismatch or for having no matching suite,
+ * and reports both the same way; asking the suites tells them apart.
+ * A document with several proofs gets a general wording, since each
+ * proof may have been skipped for a different reason.
+ */
+async function unsupportedProofProblem(
+  document: Record<string, unknown> | undefined,
+  suites: CryptoSuite[],
+  expectedPurpose: string,
+  documentLoader: unknown
+): Promise<ProblemDetail> {
+  let detail =
+    'No proof in this document could be checked: none uses a cryptosuite this verifier supports with the expected proof purpose.';
+  const proof = singleProof(document);
+  if (document && proof) {
+    if (!(await anySuiteMatches(proof, document, suites, documentLoader))) {
+      detail = "This verifier does not support this proof's cryptosuite.";
+    } else if (proof.proofPurpose !== expectedPurpose) {
+      detail = `This proof's purpose (${String(proof.proofPurpose ?? 'none')}) is not the one being checked (${expectedPurpose}).`;
+    }
+  }
+  return {
+    type: ProblemTypes.PROOF_UNSUPPORTED,
+    title: 'Unsupported Proof',
+    detail
+  };
 }
 
 function getPresentationPurpose(
@@ -259,6 +363,20 @@ export function DataIntegrityCryptoService(
           };
         }
 
+        if (isJsigsNoMatch(result.error)) {
+          return {
+            verified: false,
+            problems: [
+              await unsupportedProofProblem(
+                credential as Record<string, unknown> | undefined,
+                suites,
+                CREDENTIAL_PROOF_PURPOSE,
+                options.documentLoader
+              )
+            ]
+          };
+        }
+
         return {
           verified: false,
           problems: classifySignatureError(
@@ -306,6 +424,20 @@ export function DataIntegrityCryptoService(
           return {
             verified: true,
             message: 'Signature verified successfully.'
+          };
+        }
+
+        if (isJsigsNoMatch(result.error)) {
+          return {
+            verified: false,
+            problems: [
+              await unsupportedProofProblem(
+                presentation as Record<string, unknown> | undefined,
+                suites,
+                purpose.term,
+                options.documentLoader
+              )
+            ]
           };
         }
 

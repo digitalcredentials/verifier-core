@@ -72,12 +72,18 @@ export interface CheckResult {
   outcome: CheckOutcome;
   /**
    * Whether this check was marked fatal in its suite definition.
-   * Fatal failures affect the overall `verified` status and halt every
-   * later check for the subject; non-fatal ones are
-   * informational/warnings only. A `'skipped'` "Not run" row carries
-   * its check's flag too, but only a `'failure'` counts as fatal.
+   * Fatal failures make the overall `verified` status `false`;
+   * non-fatal ones are informational/warnings only. Whether a fatal
+   * failure also halted later checks is {@link CheckResult.halts}. A
+   * `'skipped'` "Not run" row carries its check's flag too, but only a
+   * `'failure'` counts as fatal.
    */
   fatal?: boolean;
+  /**
+   * Copied from {@link VerificationCheck.halts} when the check sets it.
+   * Absent, a fatal check halts.
+   */
+  halts?: boolean;
   /**
    * Per-check timing data. Only populated when the producing
    * call ran with `timing: true` on `VerifierConfig` or
@@ -144,11 +150,20 @@ export interface VerificationCheck {
   /** Restricts this check to specific subject types. Unset = runs for all. */
   appliesTo?: readonly VerificationSubjectType[];
   /**
-   * If true, a failure halts every remaining check for the subject, in
-   * this suite and all later suites. Checks that would have run are
-   * reported as `'skipped'` with reason `Not run: <check-id> failed`.
+   * If true, a failure makes the subject's `verified` false and, unless
+   * {@link VerificationCheck.halts} is `false`, halts every remaining
+   * check for the subject, in this suite and all later suites. Checks
+   * that would have run are reported as `'skipped'` with reason
+   * `Not run: <check-id> failed`.
    */
   fatal?: boolean;
+  /**
+   * Whether a fatal failure halts every later check for the subject.
+   * Defaults to `fatal`. Set `halts: false` on a fatal check whose
+   * failure leaves later checks still meaningful: the failure still
+   * makes `verified` false, but later checks run.
+   */
+  halts?: boolean;
   execute: (
     subject: VerificationSubject,
     context: VerificationContext

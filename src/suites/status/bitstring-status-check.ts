@@ -1,8 +1,5 @@
 import { checkStatus } from '@digitalcredentials/vc-bitstring-status-list';
-import {
-  dispatchProofVerification,
-  type CryptoDispatchResult
-} from '../../crypto-dispatch.js';
+import type { CryptoDispatchResult } from '../../crypto-dispatch.js';
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
@@ -11,7 +8,7 @@ import {
   type DocumentLoader
 } from '../../types/context.js';
 import { ProblemTypes } from '../../problem-types.js';
-import { findVcDateProblem } from '../../util/vc-date-messages.js';
+import { isValidityDateProblem } from '../../util/validity-date-problems.js';
 import {
   checkedStatusEntries,
   checkedStatusListUrls,
@@ -19,7 +16,8 @@ import {
   credentialStatusEntries,
   describeIgnoredStatusEntry,
   ignoredStatusEntries,
-  loadStatusList
+  loadStatusList,
+  verifyStatusList
 } from './status-lists.js';
 
 // Error strings raised by `@digitalcredentials/vc-bitstring-status-list`,
@@ -43,21 +41,18 @@ type CheckStatusResult = {
 /**
  * Classify a crypto service's rejection of a status list credential.
  *
- * `@digitalcredentials/vc` checks a credential's validity dates only
- * after its signature has verified, so a date error in the rejection
- * proves the list is authentic and merely out of date: report it as
- * expired or not yet valid rather than as a bad signature. The match is
- * on vc's message text, carried in the problem's `detail` and shared
- * with the proof suite (see {@link findVcDateProblem}); if the crypto
- * service reports typed expiry problems, those can replace it.
+ * A crypto service reports `CREDENTIAL_EXPIRED` /
+ * `CREDENTIAL_NOT_YET_VALID` only once the list's proof verified, so
+ * such a problem proves the list is authentic and merely out of date:
+ * report it as expired or not yet valid rather than as a bad signature.
  */
 function rejectedListProblems(
   problems: ProblemDetail[],
   url: string
 ): ProblemDetail[] {
-  const dated = findVcDateProblem(problems);
+  const dated = problems.find(isValidityDateProblem);
   if (dated !== undefined) {
-    return dated.fault === 'expired'
+    return dated.type === ProblemTypes.CREDENTIAL_EXPIRED
       ? [
           {
             type: ProblemTypes.STATUS_LIST_EXPIRED,
@@ -240,6 +235,9 @@ function setBitProblem(
  * list is missing, has an invalid signature, is expired or not yet
  * valid, has a wrong type, or actually marks the credential as revoked
  * or suspended), the overall verification result is `verified: false`.
+ * It does not halt (`halts: false`): the credential is authentic by now,
+ * since `proof.signature` passed, so whether its issuer is registered and
+ * who signed its status list still matter to a verifier.
  *
  * Every `BitstringStatusListEntry` with `statusPurpose` `revocation` or
  * `suspension` is checked, wherever it sits in `credentialStatus`. Each
@@ -250,7 +248,8 @@ function setBitProblem(
  * lists are not fetched, and the outcome names them.
  *
  * Proof verification of each named BitstringStatusListCredential goes
- * through {@link dispatchProofVerification} against
+ * through {@link verifyStatusList}, once per list per verification
+ * (shared with `status.list-issuer`), which dispatches against
  * `context.cryptoServices` — the same dispatch presentation and
  * credential proofs use; that is also where the list's validity dates
  * are checked. `@digitalcredentials/vc-bitstring-status-list` keeps
@@ -270,6 +269,7 @@ export const bitstringStatusCheck: VerificationCheck = {
   description:
     'Checks revocation and suspension status via BitstringStatusList.',
   fatal: true,
+  halts: false,
   appliesTo: ['verifiableCredential'],
   execute: async (
     subject: VerificationSubject,
@@ -307,11 +307,7 @@ export const bitstringStatusCheck: VerificationCheck = {
       const loaded = new Map<string, unknown>();
       for (const url of checkedStatusListUrls(credential)) {
         const document = await loadStatusList(url, context);
-        const dispatched = await dispatchProofVerification({
-          services: context.cryptoServices,
-          subject: { verifiableCredential: document },
-          options: { documentLoader: context.documentLoader, now }
-        });
+        const dispatched = await verifyStatusList(url, document, context, now);
         if (dispatched.kind !== 'verified') {
           return {
             status: 'failure',

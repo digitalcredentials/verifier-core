@@ -23,6 +23,7 @@ import { Ed25519VerificationKey2020 } from '@digitalcredentials/ed25519-verifica
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
 import { createVerifier } from '../src/verifier.js';
 import { defaultDocumentLoaderFor } from '../src/default-services.js';
+import { ProblemTypes } from '../src/problem-types.js';
 import type { CheckResult } from '../src/types/check.js';
 
 const { purposes } = jsonLdSignatures;
@@ -59,6 +60,23 @@ function expectInvalidSignature(results: CheckResult[]): void {
   expect(outcome?.status).toBe('failure');
   if (outcome?.status === 'failure') {
     expect(outcome.problems[0].title).toBe('Invalid Signature');
+  }
+}
+
+/**
+ * The presentation's own proof was not checked, because it was made for
+ * a purpose other than the authentication a challenge requires.
+ */
+function expectWrongPurpose(results: CheckResult[]): void {
+  const outcome = signatureResult(results)?.outcome;
+  expect(outcome?.status).toBe('failure');
+  if (outcome?.status === 'failure') {
+    expect(outcome.problems[0]).toEqual({
+      type: ProblemTypes.PROOF_UNSUPPORTED,
+      title: 'Unsupported Proof',
+      detail:
+        "This proof's purpose (assertionMethod) is not the one being checked (authentication)."
+    });
   }
 }
 
@@ -129,7 +147,7 @@ describe('challenge enforcement with the default crypto service', () => {
     const result = await verify(presentation, { challenge: 'x' });
 
     expect(result.verified).toBe(false);
-    expectInvalidSignature(result.presentationResults);
+    expectWrongPurpose(result.presentationResults);
   });
 
   it('fails an authentication presentation signed for a different challenge', async () => {

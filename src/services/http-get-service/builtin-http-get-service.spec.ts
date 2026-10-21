@@ -13,7 +13,10 @@ import {
   BuiltinHttpGetService,
   MAX_REDIRECTS
 } from './builtin-http-get-service.js';
-import { didWebDriverWithHttpGet } from '../../util/did-web-driver-with-http-get.js';
+import {
+  DidDocumentFetchError,
+  didWebDriverWithHttpGet
+} from '../../util/did-web-driver-with-http-get.js';
 
 const SECRET_BODY = 'SECRET-TOK-1234 not json';
 
@@ -339,5 +342,35 @@ describe('BuiltinHttpGetService — consumers agree', () => {
       id: string;
     };
     expect(doc.id).toBe('did:web:example.com');
+  });
+
+  it('rejects a DID document answered with a 404 as an HTTPError naming the URL', async () => {
+    stubFetch(async () => new Response('Not Found', { status: 404 }));
+    const driver = didWebDriverWithHttpGet(BuiltinHttpGetService());
+    const error = await rejectionOf(driver.get({ did: 'did:web:example.com' }));
+    expect(error).toBeInstanceOf(DidDocumentFetchError);
+    expect(error).toMatchObject({
+      name: 'HTTPError',
+      requestUrl: 'https://example.com/.well-known/did.json',
+      status: 404,
+      message: 'Failed to fetch DID document: HTTP 404'
+    });
+  });
+
+  it('rejects a DID document fetch that fails as an HTTPError, keeping the fixed text and the cause', async () => {
+    const networkError = new TypeError('fetch failed: getaddrinfo ENOTFOUND');
+    stubFetch(async () => {
+      throw networkError;
+    });
+    const driver = didWebDriverWithHttpGet(BuiltinHttpGetService());
+    const error = await rejectionOf(driver.get({ did: 'did:web:example.com' }));
+    expect(error).toMatchObject({
+      name: 'HTTPError',
+      requestUrl: 'https://example.com/.well-known/did.json',
+      status: undefined,
+      message: 'Request to https://example.com/.well-known/did.json failed'
+    });
+    expect(error.message).not.toContain('ENOTFOUND');
+    expect((error.cause as Error).cause).toBe(networkError);
   });
 });

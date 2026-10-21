@@ -37,6 +37,11 @@ import { BitstringStatusEntry } from './factories/data/index.js';
 const STATUS_LIST_URL = 'https://factory.test/status/parity-list';
 const FOREIGN_STATUS_LIST_URL = 'https://factory.test/status/foreign-list';
 const EXPIRED_STATUS_LIST_URL = 'https://factory.test/status/expired-list';
+const REVOKED_STATUS_LIST_URL = 'https://factory.test/status/revoked-list';
+const FOREIGN_REVOKED_STATUS_LIST_URL =
+  'https://factory.test/status/foreign-revoked-list';
+const FOREIGN_EXPIRED_STATUS_LIST_URL =
+  'https://factory.test/status/foreign-expired-list';
 
 const offlineHttpGetService: HttpGetService = {
   async get(url: string): Promise<HttpGetResult> {
@@ -75,6 +80,9 @@ describe('status list cryptosuite parity', () => {
   let signedSubjectWithForeignList: Record<string, unknown>;
   let foreignDid: string;
   let signedSubjectWithExpiredList: Record<string, unknown>;
+  let signedExpiredSubjectWithRevokedList: Record<string, unknown>;
+  let signedSubjectWithForeignRevokedList: Record<string, unknown>;
+  let signedSubjectWithForeignExpiredList: Record<string, unknown>;
   let documentLoader: DocumentLoader;
 
   beforeAll(async () => {
@@ -104,8 +112,10 @@ describe('status list cryptosuite parity', () => {
       'https://w3id.org/security/suites/ed25519-2020/v1'
     ];
 
+    // vc's `issue` adds the proof to the object it is given. Sign copies,
+    // so the lists spread from these templates carry only their own proof.
     signedStatusList = (await issue({
-      credential: unsignedList,
+      credential: { ...unsignedList },
       suite: new Ed25519Signature2020({ key }),
       documentLoader: bundledLoader
     })) as Record<string, unknown>;
@@ -136,7 +146,7 @@ describe('status list cryptosuite parity', () => {
       }
     };
     signedForeignStatusList = (await issue({
-      credential: unsignedForeignList,
+      credential: { ...unsignedForeignList },
       suite: new Ed25519Signature2020({ key: foreignKey }),
       documentLoader: bundledLoader
     })) as Record<string, unknown>;
@@ -175,10 +185,90 @@ describe('status list cryptosuite parity', () => {
       documentLoader: bundledLoader
     })) as Record<string, unknown>;
 
+    const signSubject = async (
+      statusListUrl: string,
+      overrides: Record<string, unknown> = {}
+    ) =>
+      (await issue({
+        credential: {
+          ...subjectTemplate(issuerDid, statusListUrl),
+          ...overrides
+        },
+        suite: new DataIntegrityProof({
+          signer: multiKey.signer(),
+          cryptosuite: eddsaRdfc2022CryptoSuite
+        }),
+        documentLoader: bundledLoader
+      })) as Record<string, unknown>;
+
+    // A list with the subject's index (0) set, signed by `signingKey` as
+    // `signerDid`, optionally already expired.
+    const signRevokedList = async (
+      url: string,
+      signerDid: string,
+      signingKey: typeof key,
+      overrides: Record<string, unknown> = {}
+    ) => {
+      const revokedList = await createList({ length: 32 });
+      revokedList.setStatus(0, true);
+      const unsigned = (await createCredential({
+        id: url,
+        list: revokedList,
+        statusPurpose: 'revocation'
+      })) as Record<string, unknown>;
+      unsigned.issuer = signerDid;
+      unsigned.validFrom = '2020-01-01T00:00:00Z';
+      unsigned['@context'] = unsignedList['@context'];
+      return (await issue({
+        credential: { ...unsigned, ...overrides },
+        suite: new Ed25519Signature2020({ key: signingKey }),
+        documentLoader: bundledLoader
+      })) as Record<string, unknown>;
+    };
+
+    const signedRevokedStatusList = await signRevokedList(
+      REVOKED_STATUS_LIST_URL,
+      issuerDid,
+      key
+    );
+    const signedForeignRevokedStatusList = await signRevokedList(
+      FOREIGN_REVOKED_STATUS_LIST_URL,
+      foreignDid,
+      foreignKey
+    );
+    const signedForeignExpiredStatusList = (await issue({
+      credential: {
+        ...unsignedForeignList,
+        id: FOREIGN_EXPIRED_STATUS_LIST_URL,
+        validUntil: '2021-01-01T00:00:00Z',
+        credentialSubject: {
+          ...(unsignedList.credentialSubject as Record<string, unknown>),
+          id: `${FOREIGN_EXPIRED_STATUS_LIST_URL}#list`
+        }
+      },
+      suite: new Ed25519Signature2020({ key: foreignKey }),
+      documentLoader: bundledLoader
+    })) as Record<string, unknown>;
+
+    // Revoked on its issuer's own list, and past its validUntil.
+    signedExpiredSubjectWithRevokedList = await signSubject(
+      REVOKED_STATUS_LIST_URL,
+      { validUntil: '2021-01-01T00:00:00Z' }
+    );
+    signedSubjectWithForeignRevokedList = await signSubject(
+      FOREIGN_REVOKED_STATUS_LIST_URL
+    );
+    signedSubjectWithForeignExpiredList = await signSubject(
+      FOREIGN_EXPIRED_STATUS_LIST_URL
+    );
+
     const lists: Record<string, Record<string, unknown>> = {
       [STATUS_LIST_URL]: signedStatusList,
       [FOREIGN_STATUS_LIST_URL]: signedForeignStatusList,
-      [EXPIRED_STATUS_LIST_URL]: signedExpiredStatusList
+      [EXPIRED_STATUS_LIST_URL]: signedExpiredStatusList,
+      [REVOKED_STATUS_LIST_URL]: signedRevokedStatusList,
+      [FOREIGN_REVOKED_STATUS_LIST_URL]: signedForeignRevokedStatusList,
+      [FOREIGN_EXPIRED_STATUS_LIST_URL]: signedForeignExpiredStatusList
     };
     documentLoader = async (url: string) => {
       if (url in lists) {
@@ -236,6 +326,12 @@ describe('status list cryptosuite parity', () => {
       r => r.id === 'cryptographic.proof.signature'
     );
     expect(proofResult?.outcome.status).toBe('success');
+
+    // The list's proof never verified, so its issuer claim is not compared.
+    const issuerResult = result.results.find(
+      r => r.id === 'cryptographic.status.list-issuer'
+    );
+    expect(issuerResult?.outcome.status).toBe('skipped');
   });
 
   it('(b) succeeds status.bitstring when the injected set includes the list credential suite', async () => {
@@ -300,5 +396,82 @@ describe('status list cryptosuite parity', () => {
         EXPIRED_STATUS_LIST_URL
       );
     }
+  });
+
+  const rowOf = (
+    results: Awaited<
+      ReturnType<ReturnType<typeof verifierWith>['verifyCredential']>
+    >['results'],
+    id: string
+  ) => {
+    const row = results.find(r => r.id === id);
+    expect(row, `${id} result present`).toBeDefined();
+    return row!;
+  };
+  const problemTypes = (row: ReturnType<typeof rowOf>) =>
+    row.outcome.status === 'failure'
+      ? row.outcome.problems.map(p => p.type)
+      : [];
+
+  it('(e) reports a revoked credential that has also expired as both, and still checks the list issuer and registry', async () => {
+    const result = await verifierWith([eddsaAndEd25519()]).verifyCredential({
+      credential: signedExpiredSubjectWithRevokedList
+    });
+
+    expect(result.verified).toBe(false);
+    expect(
+      rowOf(result.results, 'cryptographic.proof.signature').outcome.status
+    ).toBe('success');
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.proof.validity-period'))
+    ).toEqual([ProblemTypes.CREDENTIAL_EXPIRED]);
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.status.bitstring'))
+    ).toEqual([ProblemTypes.CREDENTIAL_REVOKED]);
+    expect(
+      rowOf(result.results, 'cryptographic.status.list-issuer').outcome.status
+    ).toBe('success');
+    const notRun = result.results.filter(
+      r =>
+        r.outcome.status === 'skipped' &&
+        r.outcome.reason.startsWith('Not run:')
+    );
+    expect(notRun).toEqual([]);
+    expect(result.results.some(r => r.suite === 'registry')).toBe(true);
+    expect(
+      result.summary
+        .filter(s => s.fatalFailureAt !== undefined)
+        .map(s => s.suite)
+    ).toEqual(['proof', 'status']);
+  });
+
+  it('(f) reports a revocation on a list from a different DID as both a revocation and an issuer mismatch', async () => {
+    const result = await verifierWith([eddsaAndEd25519()]).verifyCredential({
+      credential: signedSubjectWithForeignRevokedList,
+      phases: ['cryptographic']
+    });
+
+    expect(result.verified).toBe(false);
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.status.bitstring'))
+    ).toEqual([ProblemTypes.CREDENTIAL_REVOKED]);
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.status.list-issuer'))
+    ).toEqual([ProblemTypes.STATUS_LIST_ISSUER_MISMATCH]);
+  });
+
+  it('(h) still compares the issuer of an authentic but expired list from a different DID', async () => {
+    const result = await verifierWith([eddsaAndEd25519()]).verifyCredential({
+      credential: signedSubjectWithForeignExpiredList,
+      phases: ['cryptographic']
+    });
+
+    expect(result.verified).toBe(false);
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.status.bitstring'))
+    ).toEqual([ProblemTypes.STATUS_LIST_EXPIRED]);
+    expect(
+      problemTypes(rowOf(result.results, 'cryptographic.status.list-issuer'))
+    ).toEqual([ProblemTypes.STATUS_LIST_ISSUER_MISMATCH]);
   });
 });

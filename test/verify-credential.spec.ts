@@ -5,7 +5,7 @@ import {
   defaultHttpGetService
 } from '../src/default-services.js';
 import { createVerifier } from '../src/verifier.js';
-import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
+import { openBadgesSchemaSuite } from '../src/openbadges/schema/index.js';
 import { runSuites } from '../src/run-suites.js';
 import { defaultSuites } from '../src/default-suites.js';
 import {
@@ -190,15 +190,27 @@ describe('verifyCredential', () => {
 
   describe('expired credentials', () => {
     // An authentic credential whose validity has ended is not a forgery,
-    // and must not be reported as one: the signature verified, which is
-    // the only reason the date check ran at all.
+    // and must not be reported as one: its signature verifies, and the
+    // expiry is reported by `proof.validity-period`, which does not halt
+    // the checks after it.
     const expiryProblem = (results: CheckResult[]) => {
       const signature = results.find(
         r => r.id === 'cryptographic.proof.signature'
       );
-      expect(signature?.outcome.status).toBe('failure');
-      return signature?.outcome.status === 'failure'
-        ? signature.outcome.problems[0]
+      expect(signature?.outcome.status).toBe('success');
+      const validity = results.find(
+        r => r.id === 'cryptographic.proof.validity-period'
+      );
+      expect(validity?.outcome.status).toBe('failure');
+      expect(
+        results.filter(
+          r =>
+            r.outcome.status === 'skipped' &&
+            r.outcome.reason.startsWith('Not run:')
+        )
+      ).toEqual([]);
+      return validity?.outcome.status === 'failure'
+        ? validity.outcome.problems[0]
         : undefined;
     };
 
@@ -295,6 +307,51 @@ describe('verifyCredential', () => {
       expect(customResult?.outcome.status).toBe('failure');
       const customSummary = result.summary.find(s => s.suite === 'custom');
       expect(customSummary?.fatalFailureAt).toBe('unknown.custom.fatal-check');
+    });
+
+    it('a custom fatal check with halts: false fails verification without halting later suites', async () => {
+      const datedCheck: VerificationCheck = {
+        id: 'dated.check',
+        name: 'Dated Check',
+        fatal: true,
+        halts: false,
+        appliesTo: ['verifiableCredential'],
+        execute: async (): Promise<CheckOutcome> => ({
+          status: 'failure',
+          problems: [
+            {
+              type: 'https://www.w3.org/TR/vc-data-model#CUSTOM_ERROR',
+              title: 'Custom Fatal Error',
+              detail: 'Fails without halting'
+            }
+          ]
+        })
+      };
+      const laterCheck: VerificationCheck = {
+        id: 'later.check',
+        name: 'Later Check',
+        appliesTo: ['verifiableCredential'],
+        execute: async (): Promise<CheckOutcome> => ({
+          status: 'success',
+          message: 'Ran after the fatal failure'
+        })
+      };
+
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        additionalSuites: [
+          { id: 'dated', name: 'Dated', checks: [datedCheck] },
+          { id: 'later', name: 'Later', checks: [laterCheck] }
+        ],
+        ...fakeVerified
+      });
+
+      expect(result.verified).toBe(false);
+      const later = result.results.find(r => r.suite === 'later');
+      expect(later?.outcome.status).toBe('success');
+      const datedSummary = result.summary.find(s => s.suite === 'dated');
+      expect(datedSummary?.fatalFailureAt).toBe('unknown.dated.check');
     });
 
     it('a custom non-fatal failure fails its suite but leaves verified true', async () => {

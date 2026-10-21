@@ -56,6 +56,10 @@ describe('bitstringStatusCheck contract', () => {
   it('is fatal — a status failure flips overall verified to false', () => {
     expect(bitstringStatusCheck.fatal).toBe(true);
   });
+
+  it('does not halt — registry and later suites still run after a status failure', () => {
+    expect(bitstringStatusCheck.halts).toBe(false);
+  });
 });
 
 describe('statusListIssuerCheck contract', () => {
@@ -701,7 +705,7 @@ describe('Status Suite', () => {
   });
 
   describe('status list validity dates', () => {
-    async function runRejected(detail: string) {
+    async function runRejected(problemType: string, detail: string) {
       const listUrl = 'https://factory.test/status/list-dated';
       const list = await StatusListCredentialFactory({ id: listUrl });
       const context = buildTestContext({
@@ -709,13 +713,7 @@ describe('Status Suite', () => {
         cryptoServices: [
           FakeCryptoService({
             verified: false,
-            problems: [
-              {
-                type: ProblemTypes.INVALID_SIGNATURE,
-                title: 'Invalid Signature',
-                detail
-              }
-            ]
+            problems: [{ type: problemType, title: 'Rejected', detail }]
           })
         ]
       });
@@ -737,34 +735,42 @@ describe('Status Suite', () => {
 
     it.each([
       [
+        ProblemTypes.CREDENTIAL_EXPIRED,
         'The current date time (2026-10-01T00:00:00.000Z) is after "validUntil" (2025-01-01T00:00:00Z).',
         ProblemTypes.STATUS_LIST_EXPIRED
       ],
-      ['Credential has expired.', ProblemTypes.STATUS_LIST_EXPIRED],
       [
+        ProblemTypes.CREDENTIAL_NOT_YET_VALID,
         'The current date time (2026-10-01T00:00:00.000Z) is before "validFrom" (2030-01-01T00:00:00Z).',
         ProblemTypes.STATUS_LIST_NOT_YET_VALID
       ],
       [
-        'The current date time (2026-10-01T00:00:00.000Z) is before the "issuanceDate" (2030-01-01T00:00:00Z).',
-        ProblemTypes.STATUS_LIST_NOT_YET_VALID
-      ],
-      [
+        ProblemTypes.INVALID_SIGNATURE,
         'Signature verification failed.',
         ProblemTypes.STATUS_LIST_SIGNATURE_ERROR
+      ],
+      // The type decides, not the text: a signature failure that quotes a
+      // date message is still a signature failure.
+      [
+        ProblemTypes.INVALID_SIGNATURE,
+        'Credential has expired.',
+        ProblemTypes.STATUS_LIST_SIGNATURE_ERROR
       ]
-    ])('classifies a rejected list with "%s"', async (detail, type) => {
-      const outcome = await runRejected(detail);
+    ])(
+      'classifies a list rejected with %s "%s"',
+      async (problemType, detail, type) => {
+        const outcome = await runRejected(problemType, detail);
 
-      expect(outcome.status).toBe('failure');
-      if (outcome.status === 'failure') {
-        expect(outcome.problems).toHaveLength(1);
-        expect(outcome.problems[0].type).toBe(type);
-        if (type !== ProblemTypes.STATUS_LIST_SIGNATURE_ERROR) {
-          expect(outcome.problems[0].detail).toContain(detail);
+        expect(outcome.status).toBe('failure');
+        if (outcome.status === 'failure') {
+          expect(outcome.problems).toHaveLength(1);
+          expect(outcome.problems[0].type).toBe(type);
+          if (type !== ProblemTypes.STATUS_LIST_SIGNATURE_ERROR) {
+            expect(outcome.problems[0].detail).toContain(detail);
+          }
         }
       }
-    });
+    );
   });
 
   describe('status list loading and list errors', () => {
@@ -841,12 +847,13 @@ describe('Status Suite', () => {
     async function runWithList(
       list: Record<string, unknown>,
       credentialOverrides: Record<string, unknown> = {},
-      statusListIndex = '0'
+      statusListIndex = '0',
+      cryptoService = FakeCryptoService()
     ) {
       const listUrl = list.id as string;
       const context = buildTestContext({
         documentLoader: FakeDocumentLoader({ [listUrl]: list }),
-        cryptoServices: [FakeCryptoService()]
+        cryptoServices: [cryptoService]
       });
       const cred = CredentialFactory({
         version: 'v2',
@@ -981,7 +988,7 @@ describe('Status Suite', () => {
       }
     });
 
-    it('is not run when the bitstring check fails', async () => {
+    it('reports a list from another DID that marks the credential revoked', async () => {
       const list = await StatusListCredentialFactory({
         id: 'https://factory.test/status/revoked-other-issuer',
         issuer: OTHER_DID,
@@ -991,10 +998,65 @@ describe('Status Suite', () => {
 
       expect(results[0].outcome.status).toBe('failure');
       const result = listIssuerResult(results);
-      expect(result.outcome.status).toBe('skipped');
-      if (result.outcome.status === 'skipped') {
-        expect(result.outcome.reason).toMatch(/^Not run/);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems[0].type).toBe(
+          ProblemTypes.STATUS_LIST_ISSUER_MISMATCH
+        );
       }
+    });
+
+    it('compares a list rejected only for its dates, since its proof verified', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/expired-other-issuer',
+        issuer: OTHER_DID
+      });
+      const results = await runWithList(
+        list,
+        {},
+        '0',
+        FakeCryptoService({
+          verified: false,
+          problems: [
+            {
+              type: ProblemTypes.CREDENTIAL_EXPIRED,
+              title: 'Credential Expired',
+              detail: 'Credential has expired.'
+            }
+          ]
+        })
+      );
+
+      expect(results[0].outcome).toEqual(
+        expect.objectContaining({ status: 'failure' })
+      );
+      const result = listIssuerResult(results);
+      expect(result.outcome.status).toBe('failure');
+      if (result.outcome.status === 'failure') {
+        expect(result.outcome.problems[0].type).toBe(
+          ProblemTypes.STATUS_LIST_ISSUER_MISMATCH
+        );
+      }
+    });
+
+    it('takes no issuer claim from a list whose proof did not verify', async () => {
+      const list = await StatusListCredentialFactory({
+        id: 'https://factory.test/status/unverified-other-issuer',
+        issuer: OTHER_DID
+      });
+      const results = await runWithList(
+        list,
+        {},
+        '0',
+        FakeCryptoService({ verified: false })
+      );
+
+      expect(results[0].outcome.status).toBe('failure');
+      expect(listIssuerResult(results).outcome).toEqual({
+        status: 'skipped',
+        reason:
+          'A status list could not be loaded or its proof did not verify; status.bitstring reports why.'
+      });
     });
 
     it('skips when the credential has no credentialStatus', async () => {
@@ -1087,7 +1149,8 @@ describe('Status Suite', () => {
       expect(results).toHaveLength(1);
       expect(results[0].outcome).toEqual({
         status: 'skipped',
-        reason: 'Status list could not be loaded; status.bitstring reports why.'
+        reason:
+          'A status list could not be loaded or its proof did not verify; status.bitstring reports why.'
       });
     });
   });

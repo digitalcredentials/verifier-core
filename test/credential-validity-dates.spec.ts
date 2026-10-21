@@ -63,19 +63,43 @@ function v1Template(issuerDid: string): Record<string, unknown> {
   };
 }
 
+function row(results: CheckResult[], id: string): CheckResult | undefined {
+  const found = results.find(r => r.id === id);
+  expect(found, `${id} result present`).toBeDefined();
+  return found;
+}
+
 function signatureProblem(results: CheckResult[]): ProblemDetail | undefined {
-  const signature = results.find(r => r.id === 'cryptographic.proof.signature');
-  expect(signature, 'proof.signature result present').toBeDefined();
+  const signature = row(results, 'cryptographic.proof.signature');
   expect(signature?.outcome.status).toBe('failure');
   return signature?.outcome.status === 'failure'
     ? signature.outcome.problems[0]
     : undefined;
 }
 
+/** The validity-period problem, once the signature itself verified. */
+function validityProblem(results: CheckResult[]): ProblemDetail | undefined {
+  expect(row(results, 'cryptographic.proof.signature')?.outcome.status).toBe(
+    'success'
+  );
+  const validity = row(results, 'cryptographic.proof.validity-period');
+  expect(validity?.outcome.status).toBe('failure');
+  return validity?.outcome.status === 'failure'
+    ? validity.outcome.problems[0]
+    : undefined;
+}
+
+const NOT_RUN_AFTER_SIGNATURE = {
+  status: 'skipped',
+  reason: 'Not run: proof.signature failed'
+};
+
 describe('credential validity dates', () => {
   let futureV2: Record<string, unknown>;
   let futureV1: Record<string, unknown>;
   let tampered: Record<string, unknown>;
+  let tamperedExpiredV2: Record<string, unknown>;
+  let tamperedExpiredV1: Record<string, unknown>;
 
   beforeAll(async () => {
     const key = await Ed25519VerificationKey2020.generate({
@@ -115,6 +139,38 @@ describe('credential validity dates', () => {
       ...valid,
       credentialSubject: { id: 'did:example:someone-else' }
     };
+
+    // Expired and edited: the proof is bad and the dates are past. vc
+    // must report the proof, which it checks first.
+    const expiredV2 = (await issue({
+      credential: {
+        ...v2Template(issuerDid),
+        id: 'urn:uuid:credential-validity-dates-tampered-expired-v2',
+        validFrom: '2010-01-01T00:00:00Z',
+        validUntil: '2011-01-01T00:00:00Z'
+      },
+      suite,
+      documentLoader: bundledLoader
+    })) as Record<string, unknown>;
+    tamperedExpiredV2 = {
+      ...expiredV2,
+      credentialSubject: { id: 'did:example:someone-else' }
+    };
+
+    const expiredV1 = (await issue({
+      credential: {
+        ...v1Template(issuerDid),
+        id: 'urn:uuid:credential-validity-dates-tampered-expired-v1',
+        issuanceDate: '2010-01-01T00:00:00Z',
+        expirationDate: '2011-01-01T00:00:00Z'
+      },
+      suite,
+      documentLoader: bundledLoader
+    })) as Record<string, unknown>;
+    tamperedExpiredV1 = {
+      ...expiredV1,
+      credentialSubject: { id: 'did:example:someone-else' }
+    };
   });
 
   const verifier = () =>
@@ -130,7 +186,7 @@ describe('credential validity dates', () => {
     });
 
     expect(result.verified).toBe(false);
-    const problem = signatureProblem(result.results);
+    const problem = validityProblem(result.results);
     expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_NOT_YET_VALID);
     expect(problem?.title).toBe('Credential Not Yet Valid');
     expect(problem?.detail).toContain('validFrom');
@@ -143,9 +199,39 @@ describe('credential validity dates', () => {
     });
 
     expect(result.verified).toBe(false);
-    const problem = signatureProblem(result.results);
+    const problem = validityProblem(result.results);
     expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_NOT_YET_VALID);
     expect(problem?.detail).toContain('issuanceDate');
+  });
+
+  it('reports an expired v2 credential on proof.validity-period, and still runs the checks after it', async () => {
+    const result = await verifier().verifyCredential({ credential: v2Expired });
+
+    expect(result.verified).toBe(false);
+    const problem = validityProblem(result.results);
+    expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_EXPIRED);
+    expect(problem?.detail).toContain('validUntil');
+    const notRun = result.results.filter(
+      r =>
+        r.outcome.status === 'skipped' &&
+        r.outcome.reason.startsWith('Not run:')
+    );
+    expect(notRun).toEqual([]);
+    expect(result.summary.find(s => s.suite === 'proof')?.fatalFailureAt).toBe(
+      'cryptographic.proof.validity-period'
+    );
+  });
+
+  it('reports an expired v1 credential on proof.validity-period', async () => {
+    const result = await verifier().verifyCredential({
+      credential: v1Expired,
+      phases: ['cryptographic']
+    });
+
+    expect(result.verified).toBe(false);
+    const problem = validityProblem(result.results);
+    expect(problem?.type).toBe(ProblemTypes.CREDENTIAL_EXPIRED);
+    expect(problem?.detail).toContain('expirationDate');
   });
 
   it('still reports a tampered credential as INVALID_SIGNATURE', async () => {
@@ -158,7 +244,35 @@ describe('credential validity dates', () => {
     expect(signatureProblem(result.results)?.type).toBe(
       ProblemTypes.INVALID_SIGNATURE
     );
+    expect(
+      row(result.results, 'cryptographic.proof.validity-period')?.outcome
+    ).toEqual(NOT_RUN_AFTER_SIGNATURE);
   });
+
+  // The ordering guard. `proof.signature` reads a date-only rejection as a
+  // verified signature because vc checks dates only after the proof. If an
+  // upgrade of `@digitalcredentials/vc` ever checked dates first, a
+  // tampered, expired credential would read as merely expired; these fail
+  // instead.
+  for (const [version, credential] of [
+    ['v2', () => tamperedExpiredV2],
+    ['v1', () => tamperedExpiredV1]
+  ] as const) {
+    it(`reports a tampered, expired ${version} credential as a bad signature, not as expired`, async () => {
+      const result = await verifier().verifyCredential({
+        credential: credential(),
+        phases: ['cryptographic']
+      });
+
+      expect(result.verified).toBe(false);
+      expect(signatureProblem(result.results)?.type).toBe(
+        ProblemTypes.INVALID_SIGNATURE
+      );
+      expect(
+        row(result.results, 'cryptographic.proof.validity-period')?.outcome
+      ).toEqual(NOT_RUN_AFTER_SIGNATURE);
+    });
+  }
 
   it('honours the verifier clock: an expired fixture verifies when the clock is set inside its validity window', async () => {
     const withinV2Validity = createVerifier({

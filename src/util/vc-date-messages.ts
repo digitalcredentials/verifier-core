@@ -1,68 +1,57 @@
 /**
  * `@digitalcredentials/vc`'s validity-date error messages.
  *
- * vc checks a credential's validity dates only after its proof has
- * verified, and reports a date failure as a plain `Error` whose message
- * is the only machine-readable signal: the crypto service can do no
- * better than hand it back as an invalid-signature `detail`. Two checks
- * need to recognise it — `proof.signature` for the credential itself,
- * and `status.bitstring` for a BitstringStatusListCredential — so the
- * patterns live here rather than in two copies that could drift apart.
- * If a crypto service starts reporting typed date problems, this module
- * is what it retires.
+ * vc's `verifyCredential` verifies the proof first and checks the
+ * credential's validity dates only once it has verified. A date failure
+ * comes back as a plain `Error` whose message is the only
+ * machine-readable signal; a proof failure comes back as a
+ * `VerificationError` carrying the reasons in `errors[]`. The crypto
+ * service uses {@link vcDateFault} to tell the two apart and report a
+ * typed date problem, which is how the rest of the verifier learns that
+ * the proof itself verified.
  *
  * Both document versions are covered: v2 (`validUntil` / `validFrom`)
- * and v1 (`expirationDate` / `issuanceDate`).
+ * and v1 (`expirationDate` / `issuanceDate`). The messages are vc
+ * 10.0.2's, matched in full.
  */
 
-import type { ProblemDetail } from '../types/problem-detail.js';
-
 /** vc's messages for a credential whose validity has ended. */
-export const VC_EXPIRED_PATTERNS = [
-  'is after "validUntil"',
-  'Credential has expired.'
+const VC_EXPIRED_MESSAGES = [
+  /^Credential has expired\.$/,
+  /^The current date time \(.+\) is after "validUntil" \(.+\)\.$/
 ];
 
 /** vc's messages for a credential whose validity has not begun. */
-export const VC_NOT_YET_VALID_PATTERNS = [
-  'is before "validFrom"',
-  'is before the "issuanceDate"'
+const VC_NOT_YET_VALID_MESSAGES = [
+  /^The current date time \(.+\) is before the "issuanceDate" \(.+\)\.$/,
+  /^The current date time \(.+\) is before "validFrom" \(.+\)\.$/
 ];
 
 /** Which way round a credential is out of date. */
 export type VcDateFault = 'expired' | 'not-yet-valid';
 
-/** A recognized validity-date fault and the vc message that reported it. */
-export interface VcDateProblem {
-  fault: VcDateFault;
-  detail: string;
-}
-
-/** The validity-date fault `detail` reports, if it reports one. */
-export function vcDateFault(detail: string): VcDateFault | undefined {
-  if (VC_EXPIRED_PATTERNS.some(p => detail.includes(p))) {
+/**
+ * The validity-date fault vc's `verifyCredential` rejected with, if that
+ * is all it rejected for.
+ *
+ * vc throws these from `_checkCredential` only after the proof verified,
+ * as a plain `Error`; a proof failure is a `VerificationError` carrying
+ * `errors[]`. Both conditions are required, and the message must match
+ * vc's wording in full, so a date phrase quoted inside a wrapped proof
+ * error never counts.
+ */
+export function vcDateFault(error: unknown): VcDateFault | undefined {
+  if (!(error instanceof Error) || error.name === 'VerificationError') {
+    return undefined;
+  }
+  if (Array.isArray((error as { errors?: unknown }).errors)) {
+    return undefined;
+  }
+  if (VC_EXPIRED_MESSAGES.some(m => m.test(error.message))) {
     return 'expired';
   }
-  if (VC_NOT_YET_VALID_PATTERNS.some(p => detail.includes(p))) {
+  if (VC_NOT_YET_VALID_MESSAGES.some(m => m.test(error.message))) {
     return 'not-yet-valid';
-  }
-  return undefined;
-}
-
-/**
- * The first validity-date fault named among `problems`, if any. A
- * rejection that names one is proof the document's signature verified:
- * vc never reaches the date checks otherwise.
- */
-export function findVcDateProblem(
-  problems: ProblemDetail[]
-): VcDateProblem | undefined {
-  for (const problem of problems) {
-    const detail = problem.detail ?? '';
-    const fault = vcDateFault(detail);
-    if (fault !== undefined) {
-      return { fault, detail };
-    }
   }
   return undefined;
 }

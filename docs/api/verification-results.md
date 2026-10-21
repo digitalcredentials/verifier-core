@@ -27,8 +27,10 @@
 
 `results[]` carries **every** check: the ones that passed, the ones that
 were skipped (with the reason), and the ones that were not run because an
-earlier fatal failure halted the pipeline. `summary[]`, new in v2.0.0, is
-the per-suite rollup over those rows.
+earlier fatal failure halted the pipeline (see
+[Fatal failures and `verified`](#fatal-failures-and-verified) for the two
+fatal checks that do not halt). `summary[]`, new in v2.0.0, is the per-suite
+rollup over those rows.
 
 ### The top-level verdict
 
@@ -42,7 +44,7 @@ flips `verified`:
 - `recognition.profile`
 - `cryptographic.status.list-issuer`
 - the Open Badges checks — the semantic `schema.obv3.*` checks and the
-  Open Badges JSON-schema check
+  JSON Schema checks `schema.obv3.json` and `schema.obv3.declared`
 - any caller-supplied check that leaves `fatal` unset
 
 So a credential whose only failing check is the registry lookup is
@@ -71,6 +73,8 @@ A successful single-credential verification:
       "outcome": { "status": "skipped",
                    "reason": "no recognizer matched" } },
     { "id": "cryptographic.proof.signature",      /* success */ },
+    { "id": "cryptographic.proof.unsupported-proofs", /* success */ },
+    { "id": "cryptographic.proof.validity-period", /* success */ },
     { "id": "cryptographic.status.bitstring",
       "suite": "status",
       "outcome": { "status": "skipped",
@@ -107,8 +111,8 @@ A successful single-credential verification:
       "counts": { "passed": 0, "failed": 0, "skipped": 1 } },
     { "id": "cryptographic.proof",    "phase": "cryptographic",
       "suite": "proof",   "status": "success",
-      "message": "1 of 1 check passed",
-      "counts": { "passed": 1, "failed": 0, "skipped": 0 } },
+      "message": "3 of 3 checks passed",
+      "counts": { "passed": 3, "failed": 0, "skipped": 0 } },
     { "id": "cryptographic.status",   "phase": "cryptographic",
       "suite": "status",  "status": "skipped",
       "message": "2 of 2 checks skipped",
@@ -240,7 +244,7 @@ Suites without a `phase` tag are reported as `'unknown'` on
 | `cryptographic` | `core`, `proof`, `status` | — |
 | `trust` | `registry` | — |
 | `recognition` | `recognition` | — |
-| `semantic` | — | `openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite` (via `/openbadges` submodule) |
+| `semantic` | — | `openBadgesSemanticSuite` (via `/openbadges` submodule); `openBadgesSuite`, `openBadgesSchemaSuite` (via `/openbadges/schema` submodule) |
 | `unknown` | — | any caller-supplied suite without a `phase` tag |
 
 The phase is the natural top-level grouping for a UI. See
@@ -268,9 +272,9 @@ interface SuiteSummary {
   message: string;
   counts: { passed: number; failed: number; skipped: number };
   /**
-   * The fully-qualified id of the check in this suite that failed
-   * fatally, if one did. At most one suite per subject carries it,
-   * and that suite is why the subject is not verified.
+   * The fully-qualified id of the first check in this suite that
+   * failed fatally, if one did. Every suite that carries it is a
+   * reason the subject is not verified; more than one can.
    */
   fatalFailureAt?: string;
 }
@@ -284,12 +288,12 @@ interface SuiteSummary {
 | All skipped | `"<n> of <n> checks skipped"` |
 | Failures only | `"<n> of <m> checks failed"` |
 | Mixed | `"<n> of <m> checks failed (<k> passed)"` |
-| Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero) |
+| Fatal short-circuit | `"<n> of <m> checks failed (<k> passed, <r> not run after fatal)"` (either tail clause may be omitted when zero; a fatal check that does not halt leaves no not-run rows, so it reads like "Failures only" or "Mixed") |
 | Halted by an earlier suite's fatal failure | `"<suite-id> not run: <check-id> failed"` |
 | Explicit `applies` skip | `"<suite-id> not applicable: <reason>"` |
 
 > "Not run" rows are the `skipped` results `runSuites` emits, with reason
-> `"Not run: <check-id> failed"`, for checks halted by a fatal failure. They
+> `"Not run: <check-id> failed"`, for checks halted by a halting fatal failure. They
 > count toward `counts.skipped` but not toward the "skipped" wording: the
 > message reports them as "not run after fatal" instead.
 
@@ -311,11 +315,25 @@ result whose `verified` is still `true`.
 
 ### Fatal failures and `verified`
 
-A fatal failure halts every later check for the subject, so a subject
-has at most one, and at most one of its summaries carries
-`fatalFailureAt`. That gives one invariant to rely on:
+A fatal failure makes `verified` false. Most fatal checks also **halt**:
+every later check for the subject is reported as not run. Two built-in
+fatal checks do not halt, because by the time they run the credential is
+known to be authentic, and what the later checks say still matters:
 
-> A credential's `verified` is `false` exactly when one of its
+- `cryptographic.proof.validity-period` — expired or not yet valid. The
+  credential's status, list issuer and registry membership are still
+  reported.
+- `cryptographic.status.bitstring` — revoked, suspended, or its status
+  list could not be trusted. The list issuer and registry membership are
+  still reported.
+
+A check marks this with `halts: false` alongside `fatal: true`, which a
+caller-supplied check can do too; the row carries `halts: false` as well.
+So a subject can have more than one fatal failure, and more than one of
+its summaries can carry `fatalFailureAt` — an expired, revoked credential
+has both `proof` and `status`. The invariant to rely on:
+
+> A credential's `verified` is `false` exactly when any of its
 > `summary[]` entries has `fatalFailureAt`.
 
 The same holds for a presentation's own checks and its `summary[]`; the
@@ -324,6 +342,34 @@ presentation's `verified` additionally requires every
 
 There is deliberately no per-suite `verified`: the only verdicts are
 the result-level `verified` fields.
+
+### Proof sets and `cryptographic.proof.unsupported-proofs`
+
+A credential, presentation or status list credential may carry a
+**proof set**: several proofs in its `proof` array, often in different
+cryptosuites so that different verifiers can each check one they
+support. Each proof is verified on its own, and
+`cryptographic.proof.signature` succeeds only when **every proof a
+registered suite can check** verified (VC Data Integrity §4.5). One
+broken proof fails the check, and halts, even when the others verified;
+its problem's `detail` names the proof, e.g.
+`Proof 2 of 2 (DataIntegrityProof, eddsa-rdfc-2022): …`. The prefix
+appears only when the document carries two or more proofs.
+
+A proof this verifier cannot check — no registered suite supports its
+cryptosuite, or it was made for a different proof purpose — does not
+fail the signature when another proof verified. The non-fatal
+`cryptographic.proof.unsupported-proofs` check, which runs right after
+the signature check, reports it instead: a failure with one
+`PROOF_UNSUPPORTED` problem per such proof, so the credential stays
+`verified: true` and the proof suite shows a warning. The check
+succeeds ("Every proof was checked.") when there is nothing to report,
+including for a single-proof document; is skipped for an unsigned
+presentation accepted through `unsignedPresentation`; and is not run
+when the signature check failed. A document whose **only** proofs are
+unsupported has nothing verified to warn beside, so it fails
+`cryptographic.proof.signature` with `PROOF_UNSUPPORTED`. Unsupported
+proofs on a status list credential are not reported.
 
 ### Per-suite badge recommendations
 
@@ -335,7 +381,7 @@ non-fatal failure never reads as red inside a verified credential:
 | `fatalFailureAt` is set | ✗ | red | This suite's failure is why the subject is not verified |
 | `status` is `failure` or `mixed`, no `fatalFailureAt` | ⚠ | amber | Warning: a non-fatal check failed; `verified` is unaffected |
 | `status === 'success'` | ✓ | green | Every check that ran passed |
-| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier fatal failure) |
+| `status === 'skipped'` | — | gray | Nothing ran (not applicable, or halted by an earlier halting fatal failure) |
 
 ## `id` namespace reference
 
@@ -351,7 +397,7 @@ it emits, so it is always there. Every `SuiteSummary` has the matching
 > refactor.
 
 Every id the default suites, the parse-failure path and the
-`/openbadges` suites can produce:
+`/openbadges` and `/openbadges/schema` suites can produce:
 
 ```
 cryptographic.core
@@ -363,6 +409,8 @@ cryptographic.core
   cryptographic.core.proof-exists
 cryptographic.proof
   cryptographic.proof.signature
+  cryptographic.proof.unsupported-proofs
+  cryptographic.proof.validity-period            (credentials only)
 cryptographic.status
   cryptographic.status.bitstring
   cryptographic.status.list-issuer
@@ -379,6 +427,7 @@ semantic.openbadges                             (openBadgesSuite)
   semantic.openbadges.schema.obv3.missing-result-status
   semantic.openbadges.schema.obv3.unknown-achievement-type
   semantic.openbadges.schema.obv3.json
+  semantic.openbadges.schema.obv3.declared
 semantic.openbadges.semantic                    (openBadgesSemanticSuite)
   semantic.openbadges.semantic.applies
   semantic.openbadges.semantic.schema.obv3.result-ref
@@ -388,6 +437,7 @@ semantic.openbadges.semantic                    (openBadgesSemanticSuite)
 semantic.openbadges.schema                      (openBadgesSchemaSuite)
   semantic.openbadges.schema.applies
   semantic.openbadges.schema.schema.obv3.json
+  semantic.openbadges.schema.schema.obv3.declared
 ```
 
 The three `*.applies` rows appear only when the suite was queued
@@ -503,7 +553,7 @@ checks, the second failing a fatal one — gets rendered as:
 Presentation: ✗ (1 of 2 credentials verified)
 ├─ VP signature: ✓
 ├─ Credential 1 (obv3p0.openbadge): ✓   — verified, with advisory failures
-│   ├─ cryptographic ✓ (4 + 1 + 1 = 6 checks passed)
+│   ├─ cryptographic ✓ (4 + 3 + 1 = 8 checks passed)
 │   ├─ trust         ⚠ (1 of 1 check failed — advisory)
 │   │   └─ trust.registry.issuer — Issuer Not Registered
 │   ├─ recognition   ✓

@@ -264,6 +264,39 @@ describe('foldCheckResults', () => {
     );
   });
 
+  it('marks every suite with a non-halting fatal failure, without a "not run" clause', () => {
+    const suites = [
+      mkSuite('proof', [
+        mkCheck('proof.a', 'success'),
+        mkCheck('proof.b', 'failure', { fatal: true })
+      ]),
+      mkSuite('status', [mkCheck('status.a', 'failure', { fatal: true })]),
+      mkSuite('registry', [mkCheck('registry.a', 'success')])
+    ];
+    const checks: CheckResult[] = [
+      mkResult('proof', 'proof.a', 'success'),
+      {
+        ...mkResult('proof', 'proof.b', 'failure', { fatal: true }),
+        halts: false
+      },
+      {
+        ...mkResult('status', 'status.a', 'failure', { fatal: true }),
+        halts: false
+      },
+      mkResult('registry', 'registry.a', 'success')
+    ];
+
+    const { summaries } = foldCheckResults(checks, suites);
+
+    expect(summaries.map(s => s.fatalFailureAt)).toEqual([
+      'cryptographic.proof.b',
+      'cryptographic.status.a',
+      undefined
+    ]);
+    expect(summaries[0].message).toBe('1 of 2 checks failed (1 passed)');
+    expect(summaries[1].message).toBe('1 of 1 check failed');
+  });
+
   describe('not-run rows after a fatal failure', () => {
     const core = mkSuite(
       'core',

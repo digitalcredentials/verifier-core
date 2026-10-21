@@ -3,7 +3,7 @@
  * `applies` / `parse` surface, the strict envelope schema's
  * happy path and refinements, and end-to-end wiring through
  * `createVerifier` (recognizer + recognition suite + the
- * `applies` predicate on `openBadgesSuite`).
+ * `applies` predicate on `openBadgesSemanticSuite`).
  *
  * Out of scope for now: endorsement semantic checks,
  * recursive verification of embedded endorsements.
@@ -14,7 +14,7 @@ import { createVerifier } from '../../src/verifier.js';
 import {
   obv3p0EndorsementRecognizer,
   obv3p0Recognizer,
-  openBadgesSuite,
+  openBadgesSemanticSuite,
   parseObv3p0EndorsementCredential
 } from '../../src/openbadges/index.js';
 import type { VerificationContext } from '../../src/types/context.js';
@@ -195,21 +195,21 @@ describe('obv3p0EndorsementRecognizer', () => {
       expect(result.recognizedProfile).toBe('obv3p0.endorsement');
     });
 
-    it('emits openbadges.applies skip when openBadgesSuite is queued against an endorsement', async () => {
+    it('emits openbadges.semantic.applies skip when openBadgesSemanticSuite is queued against an endorsement', async () => {
       const verifier = createVerifier({
         ...fakeVerified,
         recognizers: [obv3p0EndorsementRecognizer]
       });
       const result = await verifier.verifyCredential({
         credential: signedEndorsement(),
-        additionalSuites: [openBadgesSuite]
+        additionalSuites: [openBadgesSemanticSuite]
       });
 
       const obSuiteResults = result.results.filter(
-        r => r.suite === 'openbadges'
+        r => r.suite === 'openbadges.semantic'
       );
       expect(obSuiteResults).toHaveLength(1);
-      expect(obSuiteResults[0].id).toBe('semantic.openbadges.applies');
+      expect(obSuiteResults[0].id).toBe('semantic.openbadges.semantic.applies');
       expect(obSuiteResults[0].outcome.status).toBe('skipped');
     });
   });

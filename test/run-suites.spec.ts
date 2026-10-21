@@ -22,6 +22,7 @@ describe('runSuites', () => {
     outcome: 'success' | 'failure' | 'skipped',
     options: {
       fatal?: boolean;
+      halts?: boolean;
       appliesTo?: Array<'verifiableCredential' | 'verifiablePresentation'>;
     } = {}
   ): VerificationCheck => ({
@@ -29,6 +30,7 @@ describe('runSuites', () => {
     name: `Mock check ${id}`,
     description: `Test check that returns ${outcome}`,
     fatal: options.fatal ?? false,
+    ...(options.halts !== undefined ? { halts: options.halts } : {}),
     appliesTo: options.appliesTo,
     execute: async () => {
       if (outcome === 'success') {
@@ -623,6 +625,91 @@ describe('runSuites', () => {
       expect(results[0].outcome.status).toBe('failure');
       expect(results[1].id).toBe('unknown.suite1.check2');
       expect(results[1].outcome.status).toBe('success');
+    });
+  });
+
+  describe('fatal without halting', () => {
+    it('runs later checks, in this suite and later ones, after a fatal failure with halts: false', async () => {
+      const a2 = spyCheck('a.two');
+      const b1 = spyCheck('b.one', { fatal: true });
+      const suiteA: VerificationSuite = {
+        id: 'a',
+        name: 'A',
+        checks: [
+          createMockCheck('a.dated', 'failure', { fatal: true, halts: false }),
+          a2
+        ]
+      };
+      const suiteB: VerificationSuite = { id: 'b', name: 'B', checks: [b1] };
+
+      const results = await runSuites([suiteA, suiteB], subject, mockContext);
+
+      expect(results.map(r => [r.id, r.outcome.status])).toEqual([
+        ['unknown.a.dated', 'failure'],
+        ['unknown.a.two', 'success'],
+        ['unknown.b.one', 'success']
+      ]);
+      expect(results[0].fatal).toBe(true);
+      expect(results[0].halts).toBe(false);
+      expect(a2.execute).toHaveBeenCalledOnce();
+      expect(b1.execute).toHaveBeenCalledOnce();
+    });
+
+    it('names the first halting failure, not an earlier non-halting one, on not-run rows', async () => {
+      const c1 = spyCheck('c.one');
+      const suites: VerificationSuite[] = [
+        {
+          id: 'a',
+          name: 'A',
+          checks: [
+            createMockCheck('a.dated', 'failure', { fatal: true, halts: false })
+          ]
+        },
+        {
+          id: 'b',
+          name: 'B',
+          checks: [createMockCheck('b.forged', 'failure', { fatal: true })]
+        },
+        { id: 'c', name: 'C', checks: [c1] }
+      ];
+
+      const results = await runSuites(suites, subject, mockContext);
+
+      expect(results[2].id).toBe('unknown.c.one');
+      expect(results[2].outcome).toEqual(notRun('b.forged'));
+      expect(c1.execute).not.toHaveBeenCalled();
+    });
+
+    it('ignores halts: true on a non-fatal check', async () => {
+      const a2 = spyCheck('a.two');
+      const suite: VerificationSuite = {
+        id: 'a',
+        name: 'A',
+        checks: [
+          createMockCheck('a.warn', 'failure', { fatal: false, halts: true }),
+          a2
+        ]
+      };
+
+      const results = await runSuites([suite], subject, mockContext);
+
+      expect(results[1].outcome.status).toBe('success');
+      expect(a2.execute).toHaveBeenCalledOnce();
+    });
+
+    it('leaves halts off the rows of checks that do not set it', async () => {
+      const suite: VerificationSuite = {
+        id: 'a',
+        name: 'A',
+        checks: [
+          createMockCheck('a.fatal', 'failure', { fatal: true }),
+          spyCheck('a.two')
+        ]
+      };
+
+      const results = await runSuites([suite], subject, mockContext);
+
+      expect(results.every(r => !('halts' in r))).toBe(true);
     });
   });
 
