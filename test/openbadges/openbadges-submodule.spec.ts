@@ -3,10 +3,12 @@
  *
  * Pins three contracts that no per-check unit spec covers:
  *
- * 1. **The `package.json#exports` entry resolves at runtime.** A
- *    dynamic `import('@digitalcredentials/verifier-core/openbadges')`
- *    catches typos in `exports` and missing re-exports in
- *    `src/openbadges/index.ts`.
+ * 1. **The `package.json#exports` entries resolve at runtime.**
+ *    Dynamic imports of `@digitalcredentials/verifier-core/openbadges`
+ *    and `…/openbadges/schema` catch typos in `exports`, missing
+ *    re-exports in `src/openbadges/index.ts` and
+ *    `src/openbadges/schema/index.ts`, and an AJV-carrying export
+ *    leaking back into `/openbadges`.
  * 2. **Default-path invariant.** A vanilla
  *    `createVerifier()` against a real OB credential emits zero
  *    OB-related `CheckResult` entries.
@@ -15,8 +17,7 @@
  *    results, and a mutated fixture surfaces
  *    `OB_INVALID_ACHIEVED_LEVEL`.
  *
- * The static imports use the relative `../../src/openbadges/index.js`
- * path so this spec compiles under the repo's `moduleResolution:
+ * The static imports use relative `../../src/openbadges/…` paths so this spec compiles under the repo's `moduleResolution:
  * node` setting (which predates `package.json#exports` support in
  * the TS resolver). The runtime `exports` contract is exercised by
  * the dynamic-import test below.
@@ -25,16 +26,12 @@
 import { describe, it, expect } from 'vitest';
 import { createVerifier } from '../../src/verifier.js';
 import {
-  openBadgesSuite,
   openBadgesSemanticSuite,
-  openBadgesSchemaSuite,
   obv3ResultRefCheck,
   obv3AchievedLevelCheck,
   obv3MissingResultStatusCheck,
   obv3UnknownAchievementTypeCheck,
   createObv3UnknownAchievementTypeCheck,
-  obv3SchemaCheck,
-  obv3DeclaredSchemaCheck,
   isOpenBadgeCredential,
   isEndorsementCredential,
   OpenBadgesProblemTypes,
@@ -43,6 +40,12 @@ import {
   OB_3_0_ACHIEVEMENT_TYPES,
   ACHIEVEMENT_TYPE_EXT_PREFIX
 } from '../../src/openbadges/index.js';
+import {
+  openBadgesSuite,
+  openBadgesSchemaSuite,
+  obv3SchemaCheck,
+  obv3DeclaredSchemaCheck
+} from '../../src/openbadges/schema/index.js';
 import { FakeCryptoService } from '../factories/services/fake-crypto-service.js';
 import { FakeHttpGetService } from '../factories/services/fake-http-get-service.js';
 import { sampleAchievementCredential } from './fixtures/sample-achievement-credential.js';
@@ -63,16 +66,33 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     // ESM resolver handles it at runtime via package self-reference.
     const submodulePath = '@digitalcredentials/verifier-core/openbadges';
     const mod = (await import(submodulePath)) as Record<string, unknown>;
-    expect(mod.openBadgesSuite, 'openBadgesSuite').toBeDefined();
     expect(
       mod.openBadgesSemanticSuite,
       'openBadgesSemanticSuite'
     ).toBeDefined();
-    expect(mod.openBadgesSchemaSuite, 'openBadgesSchemaSuite').toBeDefined();
-    expect(mod.obv3SchemaCheck, 'obv3SchemaCheck').toBeDefined();
+    // The AJV-carrying exports live in ./openbadges/schema only.
+    expect(mod.openBadgesSuite, 'openBadgesSuite').toBeUndefined();
+    expect(mod.openBadgesSchemaSuite, 'openBadgesSchemaSuite').toBeUndefined();
+    expect(mod.obv3SchemaCheck, 'obv3SchemaCheck').toBeUndefined();
+    expect(
+      mod.obv3DeclaredSchemaCheck,
+      'obv3DeclaredSchemaCheck'
+    ).toBeUndefined();
     expect(mod.createObv3UnknownAchievementTypeCheck).toBeTypeOf('function');
     expect(mod.isOpenBadgeCredential).toBeTypeOf('function');
     expect(mod.OpenBadgesProblemTypes).toBe(mod.Obv3ProblemTypes);
+  });
+
+  it('resolves the ./openbadges/schema entry via package.json#exports', async () => {
+    const submodulePath = '@digitalcredentials/verifier-core/openbadges/schema';
+    const mod = (await import(submodulePath)) as Record<string, unknown>;
+    expect(mod.openBadgesSuite, 'openBadgesSuite').toBeDefined();
+    expect(mod.openBadgesSchemaSuite, 'openBadgesSchemaSuite').toBeDefined();
+    expect(mod.obv3SchemaCheck, 'obv3SchemaCheck').toBeDefined();
+    expect(
+      mod.obv3DeclaredSchemaCheck,
+      'obv3DeclaredSchemaCheck'
+    ).toBeDefined();
   });
 
   it('exposes the documented surface from the static import', () => {

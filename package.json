@@ -34,6 +34,12 @@
       "react-native": "./dist/openbadges/index.js",
       "import": "./dist/openbadges/index.js",
       "default": "./dist/openbadges/index.js"
+    },
+    "./openbadges/schema": {
+      "types": "./dist/openbadges/schema/index.d.ts",
+      "react-native": "./dist/openbadges/schema/index.js",
+      "import": "./dist/openbadges/schema/index.js",
+      "default": "./dist/openbadges/schema/index.js"
     }
   },
   "files": [

@@ -7,17 +7,19 @@
  * passed explicitly via a verify call's `additionalSuites` (or
  * composed into a custom suite).
  *
+ * Nothing here loads AJV or the bundled Open Badges JSON Schemas.
+ * JSON Schema validation — `openBadgesSuite`, `openBadgesSchemaSuite`,
+ * `obv3SchemaCheck` and `obv3DeclaredSchemaCheck` — lives in the
+ * `@digitalcredentials/verifier-core/openbadges/schema` submodule.
+ *
  * The surface is:
  *
- * - **Suites** (most common entry point):
- *   {@link openBadgesSuite}, {@link openBadgesSemanticSuite},
- *   {@link openBadgesSchemaSuite}.
+ * - **Suite**: {@link openBadgesSemanticSuite}.
  * - **Individual checks** for callers who want to compose their own
  *   suites a la carte: {@link obv3ResultRefCheck},
  *   {@link obv3AchievedLevelCheck},
  *   {@link obv3MissingResultStatusCheck},
- *   {@link obv3UnknownAchievementTypeCheck},
- *   {@link obv3SchemaCheck}, {@link obv3DeclaredSchemaCheck}.
+ *   {@link obv3UnknownAchievementTypeCheck}.
  * - **Factory** for the achievement-type check with a caller-supplied
  *   vocab augment: {@link createObv3UnknownAchievementTypeCheck}.
  * - **Recognition helpers** for branching on credential shape:
@@ -32,11 +34,7 @@
  *   prefix in their own logic or UI.
  */
 
-export {
-  openBadgesSuite,
-  openBadgesSemanticSuite,
-  openBadgesSchemaSuite
-} from './openbadges-suite.js';
+export { openBadgesSemanticSuite } from './openbadges-suite.js';
 
 export { obv3ResultRefCheck } from './result-ref-check.js';
 export { obv3AchievedLevelCheck } from './achieved-level-check.js';
@@ -46,9 +44,6 @@ export {
   createObv3UnknownAchievementTypeCheck
 } from './unknown-achievement-type-check.js';
 export type { CreateObv3UnknownAchievementTypeCheckOptions } from './unknown-achievement-type-check.js';
-
-export { obv3SchemaCheck } from './schema/obv3-schema-check.js';
-export { obv3DeclaredSchemaCheck } from './schema/obv3-declared-schema-check.js';
 
 export { isOpenBadgeCredential, isEndorsementCredential } from './recognize.js';
 

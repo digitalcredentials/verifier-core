@@ -36,7 +36,7 @@ import type {
 import type { VerificationContext } from '../src/types/context.js';
 import type { VerificationSubject } from '../src/types/subject.js';
 import { obv3p0Recognizer } from '../src/openbadges/recognizers.js';
-import { openBadgesSuite } from '../src/openbadges/openbadges-suite.js';
+import { openBadgesSuite } from '../src/openbadges/schema/index.js';
 import { sampleAchievementCredential } from './openbadges/fixtures/sample-achievement-credential.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 

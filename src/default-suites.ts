@@ -18,17 +18,16 @@
  * {@link VerifierConfig.recognizers} configured it emits `'skipped'`
  * — zero behavior change for consumers who don't opt in.
  *
- * OpenBadges 3.0 verification (semantic checks and JSON Schema
- * validation) is opt-in and lives in the
- * `@digitalcredentials/verifier-core/openbadges` submodule. Add it
- * via `additionalSuites`:
+ * OpenBadges 3.0 verification is opt-in: semantic checks live in the
+ * `@digitalcredentials/verifier-core/openbadges` submodule, and JSON
+ * Schema validation (which loads AJV) in
+ * `@digitalcredentials/verifier-core/openbadges/schema`. Add it via
+ * `additionalSuites`:
  *
  * ```ts
  * import { createVerifier } from '@digitalcredentials/verifier-core';
- * import {
- *   obv3p0Recognizer,
- *   openBadgesSuite,
- * } from '@digitalcredentials/verifier-core/openbadges';
+ * import { obv3p0Recognizer } from '@digitalcredentials/verifier-core/openbadges';
+ * import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges/schema';
  *
  * const verifier = createVerifier({ recognizers: [obv3p0Recognizer] });
  * await verifier.verifyCredential({

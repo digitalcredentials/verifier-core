@@ -4,7 +4,7 @@ import { createVerifier } from '../../../src/verifier.js';
 import { obv3DeclaredSchemaCheck } from '../../../src/openbadges/schema/obv3-declared-schema-check.js';
 import { KNOWN_OB_SCHEMA_URLS } from '../../../src/openbadges/schema/known-schema-urls.js';
 import { VENDORED_OB_SCHEMAS } from '../../../src/openbadges/schema/json-schema/index.js';
-import { openBadgesSuite } from '../../../src/openbadges/openbadges-suite.js';
+import { openBadgesSuite } from '../../../src/openbadges/schema/index.js';
 import { OpenBadgesProblemTypes } from '../../../src/openbadges/index.js';
 import type {
   CheckOutcome,

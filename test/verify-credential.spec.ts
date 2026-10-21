@@ -5,7 +5,7 @@ import {
   defaultHttpGetService
 } from '../src/default-services.js';
 import { createVerifier } from '../src/verifier.js';
-import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
+import { openBadgesSchemaSuite } from '../src/openbadges/schema/index.js';
 import { runSuites } from '../src/run-suites.js';
 import { defaultSuites } from '../src/default-suites.js';
 import {
