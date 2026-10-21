@@ -220,7 +220,8 @@ interface CredentialVerificationResult {
 `verified` is `true` when no **fatal** check returned a failure. Some checks are
 advisory: `trust.registry.issuer`, `recognition.profile`,
 `cryptographic.status.list-issuer`, the Open Badges checks (the semantic
-`schema.obv3.*` checks and the Open Badges JSON-schema check), and any check of
+`schema.obv3.*` checks and the JSON Schema checks `schema.obv3.json` and
+`schema.obv3.declared`), and any check of
 your own that leaves `fatal` unset. An advisory failure never flips `verified`,
 so a credential whose only failing check is the registry lookup is still
 `verified: true` — its `trust.registry` summary carries `status: 'failure'` and
@@ -853,8 +854,8 @@ const result = await verifier.verifyPresentation({ presentation });
 ### Network policy of the built-in HTTP service
 
 Verification fetches URLs the credential chooses: JSON-LD contexts, `did:web`
-documents, status lists, schemas and registries. The built-in
-`BuiltinHttpGetService` is safe to point at them, including on a server:
+documents, status lists and registries. The built-in `BuiltinHttpGetService` is
+safe to point at them, including on a server:
 
 - **https only, and no local addresses.** It refuses `http:` and other schemes,
   `localhost` and `*.localhost`, and loopback, private (including carrier-grade
@@ -1001,21 +1002,27 @@ clock-skew windows and key rotation are still ahead — see
 
 ## Open Badges 3.0 verification (opt-in submodule)
 
-Open Badges 3.0 verification ships in
-`@digitalcredentials/verifier-core/openbadges` as an opt-in submodule. It is not
-part of the default suite list; consumers that want OB checks pass
+Open Badges 3.0 verification ships as two opt-in submodules:
+
+- `@digitalcredentials/verifier-core/openbadges` — the semantic checks,
+  recognizers, Zod schemas, problem types and vocabulary. It loads no JSON
+  Schema validator.
+- `@digitalcredentials/verifier-core/openbadges/schema` — JSON Schema
+  validation, which loads AJV and the bundled Open Badges schemas.
+
+Neither is part of the default suite list; consumers that want OB checks pass
 `openBadgesSuite` (or one of the bundled variants) via `additionalSuites` on a
 verify call.
 
 > [!IMPORTANT] If you were on `1.0.0-beta.x` and relied on its schema check
 > running by default, you now need to opt in explicitly. The simplest migration
-> is to add `openBadgesSuite` to your verify call.
+> is to add `openBadgesSuite` from `/openbadges/schema` to your verify call.
 
 ### Enabling OB verification
 
 ```ts
 import { createVerifier } from '@digitalcredentials/verifier-core';
-import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
+import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges/schema';
 
 const verifier = createVerifier();
 const result = await verifier.verifyCredential({
@@ -1026,22 +1033,62 @@ const result = await verifier.verifyCredential({
 
 ### Bundle variants
 
-| Bundle                    | Contents                                                           | Network?                      |
-| ------------------------- | ------------------------------------------------------------------ | ----------------------------- |
-| `openBadgesSuite`         | Semantic checks **and** AJV JSON Schema check (the default bundle) | Yes (schema fetch; see below) |
-| `openBadgesSemanticSuite` | Cross-field semantic checks only                                   | No                            |
-| `openBadgesSchemaSuite`   | AJV JSON Schema check only                                         | Yes (schema fetch; see below) |
+| Bundle                    | Contents                                                            | Import from          | Applies to                                     |
+| ------------------------- | ------------------------------------------------------------------- | -------------------- | ---------------------------------------------- |
+| `openBadgesSuite`         | Semantic checks **and** the JSON Schema checks (the default bundle) | `/openbadges/schema` | `OpenBadgeCredential`, `EndorsementCredential` |
+| `openBadgesSemanticSuite` | Cross-field semantic checks only                                    | `/openbadges`        | `OpenBadgeCredential`                          |
+| `openBadgesSchemaSuite`   | The JSON Schema checks only                                         | `/openbadges/schema` | `OpenBadgeCredential`, `EndorsementCredential` |
 
-The schema check fetches the four published OB 3.0 schemas once per
-`cacheService`, and compiles them once per verifier, so reuse a verifier for
-repeated work. Verifiers that share a `cacheService` share the fetched schemas.
-A `credentialSchema` URL outside the published four is fetched and compiled on
-every verification and never cached.
+In `openBadgesSuite`, the semantic checks report `skipped` for an
+`EndorsementCredential`.
 
-Pick `openBadgesSemanticSuite` when you want the OB-specific semantic checks
-(`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
-`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`) but cannot afford a
-network fetch on the first OB credential of a process.
+### JSON Schema validation
+
+`schema.obv3.json` validates a credential against the JSON Schema the Open
+Badges 3.0 specification gives for its type and VC version. The four schemas are
+bundled with the package, copied from the specification's appendix:
+
+| Credential                      | Schema                             |
+| ------------------------------- | ---------------------------------- |
+| `OpenBadgeCredential`, VC 2.0   | E.2.1.2 AchievementCredential      |
+| `OpenBadgeCredential`, VC 1.1   | E.2.1.34 AchievementCredentialv1p1 |
+| `EndorsementCredential`, VC 2.0 | E.2.1.7 EndorsementCredential      |
+| `EndorsementCredential`, VC 1.1 | E.2.1.36 EndorsementCredentialv1p1 |
+
+Nothing is fetched. A VC 1.1 credential is validated only against the VC 1.1
+schema, never one that also accepts VC 2.0. The credential's own
+`credentialSchema` does not choose the schema: an issuer cannot swap in a schema
+of its own.
+
+Instead, `schema.obv3.declared` reports a declared `credentialSchema` that does
+not fit the credential:
+
+- `OB_DECLARED_SCHEMA_MISMATCH` — a known Open Badges 3.0 schema URL for the
+  other credential type, or one that does not accept the credential's VC
+  version.
+- `OB_DECLARED_SCHEMA_NOT_CHECKED` — a URL that is not a known Open Badges 3.0
+  schema, even alongside one that fits. It is not fetched or checked.
+
+Known URLs are the published schemas under
+`https://purl.imsglobal.org/spec/ob/v3p0/schema/` (`json/` and `json-ld/`, the
+strict and "Any" variants) and the `$id`s of the schemas in the specification.
+The check reports `skipped` when nothing is declared. Like every Open Badges
+check, neither changes `verified`.
+
+The bundled schemas are compiled with AJV once per process, on first use. AJV
+compiles with `new Function`, so a page whose Content Security Policy forbids
+`unsafe-eval` cannot run the schema checks; use `openBadgesSemanticSuite` there.
+Importing `/openbadges` alone never loads AJV or the schemas.
+
+The schemas follow the specification exactly, so they reject some forms that are
+equivalent in JSON-LD and that the semantic checks accept. For example,
+`image.type` must be the string `"Image"`; `["Image"]` fails `schema.obv3.json`
+with an error at `/image/type`.
+
+Maintainers refresh the bundled schemas by hand with
+`node scripts/refresh-ob-schemas.mjs` (add `--fixtures` to refresh the published
+copies the tests compare them with). Nothing in the build, the tests or CI
+fetches a schema.
 
 ### Problem types
 
@@ -1050,7 +1097,6 @@ OB-specific problem URIs live on `OpenBadgesProblemTypes` (also exported as
 
 ```ts
 import {
-  openBadgesSuite,
   OpenBadgesProblemTypes,
   type OpenBadgesProblemType
 } from '@digitalcredentials/verifier-core/openbadges';
@@ -1067,6 +1113,10 @@ switch (problem.type as OpenBadgesProblemType) {
     // ...
     break;
   case OpenBadgesProblemTypes.OB_UNKNOWN_ACHIEVEMENT_TYPE:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_DECLARED_SCHEMA_MISMATCH:
+  case OpenBadgesProblemTypes.OB_DECLARED_SCHEMA_NOT_CHECKED:
     // ...
     break;
 }
@@ -1130,9 +1180,9 @@ re-parsing.
 import { createVerifier } from '@digitalcredentials/verifier-core';
 import {
   obv3p0Recognizer,
-  obv3p0EndorsementRecognizer,
-  openBadgesSuite
+  obv3p0EndorsementRecognizer
 } from '@digitalcredentials/verifier-core/openbadges';
+import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges/schema';
 import type { Obv3p0OpenBadgeCredential } from '@digitalcredentials/verifier-core/openbadges';
 
 const verifier = createVerifier({
@@ -1339,10 +1389,17 @@ for (const r of result.results) {
 
 1.x checked Open Badges 3.0 credentials, and any listed `credentialSchema`,
 against JSON Schema by default. 2.0 does not. Add `openBadgesSuite` from
-`@digitalcredentials/verifier-core/openbadges` to `additionalSuites` to check
-Open Badges credentials (see
+`@digitalcredentials/verifier-core/openbadges/schema` to `additionalSuites` to
+check Open Badges credentials (see
 [Open Badges 3.0 verification](#open-badges-30-verification-opt-in-submodule)).
-JSON Schema validation of other credential types is not included.
+It validates against schemas bundled with the package and never fetches the URLs
+in `credentialSchema`. JSON Schema validation of other credential types is not
+included.
+
+Code that imports `openBadgesSuite`, `openBadgesSchemaSuite` or
+`obv3SchemaCheck` from `@digitalcredentials/verifier-core/openbadges` (for
+example, an Open Badges suite resolver in a verification service) imports them
+from `@digitalcredentials/verifier-core/openbadges/schema` instead.
 
 ## Install
 

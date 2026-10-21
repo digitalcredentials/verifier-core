@@ -32,12 +32,15 @@ for a field-by-field map.
   is always enforced, whatever proof purpose the presentation claims.
 - **`unsignedPresentation: true` only accepts a presentation that has no
   proof.** A proof that is present is always verified.
-- **No JSON Schema validation by default.** 1.x validated every
-  `credentialSchema` a credential listed, and Open Badges 3.0 credentials, and
-  reported it in `additionalInformation`. 2.0 runs no JSON Schema check unless
-  you add `openBadgesSchemaSuite` or `openBadgesSuite` from
-  `@digitalcredentials/verifier-core/openbadges`, and those apply only to
-  `OpenBadgeCredential`.
+- **No JSON Schema validation by default, and `credentialSchema` is no longer
+  followed.** 1.x validated every `credentialSchema` a credential listed, and
+  Open Badges 3.0 credentials, and reported it in `additionalInformation`. 2.0
+  runs no JSON Schema check unless you add `openBadgesSchemaSuite` or
+  `openBadgesSuite` from `@digitalcredentials/verifier-core/openbadges/schema`.
+  Those apply to `OpenBadgeCredential` and `EndorsementCredential`, and validate
+  against the Open Badges 3.0 schemas bundled with the package, chosen by
+  credential type and VC version. Nothing is fetched, and a credential's
+  `credentialSchema` never chooses the schema.
 - **Node.js 24 or later** (`engines.node` was `>=18`), because the dependencies
   require it.
 
@@ -90,20 +93,26 @@ for a field-by-field map.
   and status-list freshness.
 - **`timing`** option: attaches a `TaskTiming` to every check, summary and
   result. See [`docs/api/timing.md`](docs/api/timing.md).
-- **Open Badges 3.0** in the opt-in submodule
+- **Open Badges 3.0** in two opt-in submodules.
   `@digitalcredentials/verifier-core/openbadges`: `openBadgesSemanticSuite`
-  (Zod-based checks, no network), `openBadgesSchemaSuite` (JSON Schema, with the
-  published schemas cached), `openBadgesSuite` (both), the `obv3p0Recognizer` /
+  (Zod-based checks, no JSON Schema validator), the `obv3p0Recognizer` /
   `obv3p0EndorsementRecognizer` recognizers, the Zod schemas and
   `OpenBadgesProblemTypes`.
+  `@digitalcredentials/verifier-core/openbadges/schema`: `openBadgesSchemaSuite`
+  (JSON Schema validation against the four schemas in the Open Badges 3.0
+  specification, bundled and compiled once per process), `openBadgesSuite`
+  (both), `obv3SchemaCheck`, and `obv3DeclaredSchemaCheck`, which reports a
+  declared `credentialSchema` that does not fit the credential as
+  `OB_DECLARED_SCHEMA_MISMATCH` or `OB_DECLARED_SCHEMA_NOT_CHECKED`.
 - **Credential recognition**: `recognizers` parse a credential into a known
   profile and report it as `recognizedProfile` and
   `normalizedVerifiableCredential`.
 - `parseCredential` / `parsePresentation` and the `VerifiableCredential` /
   `VerifiablePresentation` types, and TypeScript types for the whole API
   exported from the package entry.
-- Package `exports` add the `./openbadges` subpath and `react-native` / `import`
-  conditions, and the package is marked `sideEffects: false`.
+- Package `exports` add the `./openbadges` and `./openbadges/schema` subpaths
+  and `react-native` / `import` conditions, and the package is marked
+  `sideEffects: false`.
 
 ### Removed
 

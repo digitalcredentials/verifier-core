@@ -44,7 +44,7 @@ flips `verified`:
 - `recognition.profile`
 - `cryptographic.status.list-issuer`
 - the Open Badges checks — the semantic `schema.obv3.*` checks and the
-  Open Badges JSON-schema check
+  JSON Schema checks `schema.obv3.json` and `schema.obv3.declared`
 - any caller-supplied check that leaves `fatal` unset
 
 So a credential whose only failing check is the registry lookup is
@@ -244,7 +244,7 @@ Suites without a `phase` tag are reported as `'unknown'` on
 | `cryptographic` | `core`, `proof`, `status` | — |
 | `trust` | `registry` | — |
 | `recognition` | `recognition` | — |
-| `semantic` | — | `openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite` (via `/openbadges` submodule) |
+| `semantic` | — | `openBadgesSemanticSuite` (via `/openbadges` submodule); `openBadgesSuite`, `openBadgesSchemaSuite` (via `/openbadges/schema` submodule) |
 | `unknown` | — | any caller-supplied suite without a `phase` tag |
 
 The phase is the natural top-level grouping for a UI. See
@@ -397,7 +397,7 @@ it emits, so it is always there. Every `SuiteSummary` has the matching
 > refactor.
 
 Every id the default suites, the parse-failure path and the
-`/openbadges` suites can produce:
+`/openbadges` and `/openbadges/schema` suites can produce:
 
 ```
 cryptographic.core
@@ -427,6 +427,7 @@ semantic.openbadges                             (openBadgesSuite)
   semantic.openbadges.schema.obv3.missing-result-status
   semantic.openbadges.schema.obv3.unknown-achievement-type
   semantic.openbadges.schema.obv3.json
+  semantic.openbadges.schema.obv3.declared
 semantic.openbadges.semantic                    (openBadgesSemanticSuite)
   semantic.openbadges.semantic.applies
   semantic.openbadges.semantic.schema.obv3.result-ref
@@ -436,6 +437,7 @@ semantic.openbadges.semantic                    (openBadgesSemanticSuite)
 semantic.openbadges.schema                      (openBadgesSchemaSuite)
   semantic.openbadges.schema.applies
   semantic.openbadges.schema.schema.obv3.json
+  semantic.openbadges.schema.schema.obv3.declared
 ```
 
 The three `*.applies` rows appear only when the suite was queued
