@@ -47,7 +47,7 @@ export {
 } from './unknown-achievement-type-check.js';
 export type { CreateObv3UnknownAchievementTypeCheckOptions } from './unknown-achievement-type-check.js';
 
-export { obv3SchemaCheck } from '../suites/schema/obv3/obv3-schema-check.js';
+export { obv3SchemaCheck } from './schema/obv3-schema-check.js';
 
 export { isOpenBadgeCredential, isEndorsementCredential } from './recognize.js';
 

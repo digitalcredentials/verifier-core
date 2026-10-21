@@ -43,25 +43,8 @@ import {
   ACHIEVEMENT_TYPE_EXT_PREFIX
 } from '../../src/openbadges/index.js';
 import { FakeCryptoService } from '../factories/services/fake-crypto-service.js';
-import {
-  FakeHttpGetService,
-  okJsonBody
-} from '../factories/services/fake-http-get-service.js';
+import { FakeHttpGetService } from '../factories/services/fake-http-get-service.js';
 import { sampleAchievementCredential } from './fixtures/sample-achievement-credential.js';
-
-const OBV3_V2_ACHIEVEMENT_SCHEMA_URL =
-  'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json';
-
-/** Permissive JSON Schema — accepts any object. Keeps the AJV check
- * exercised end-to-end without coupling this spec to schema details. */
-function acceptAllSchema($id: string): Record<string, unknown> {
-  return {
-    $id,
-    $schema: 'https://json-schema.org/draft/2019-09/schema',
-    type: 'object',
-    additionalProperties: true
-  };
-}
 
 function cloneCredential(): Record<string, unknown> {
   return structuredClone(sampleAchievementCredential);
@@ -131,11 +114,9 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
   });
 
   it('runs OB semantic + schema checks when openBadgesSuite is opted in', async () => {
-    const httpGetService = FakeHttpGetService({
-      [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: okJsonBody(
-        acceptAllSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL)
-      )
-    });
+    // The schema check validates against the bundled schema; an empty
+    // HTTP fake shows it fetches nothing.
+    const httpGetService = FakeHttpGetService({});
 
     const verifier = createVerifier({ ...fakeVerified, httpGetService });
     const result = await verifier.verifyCredential({
@@ -157,6 +138,7 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
 
     const failures = obSuiteResults.filter(r => r.outcome.status === 'failure');
     expect(failures, JSON.stringify(failures, null, 2)).toHaveLength(0);
+    expect(httpGetService.allCalls()).toEqual([]);
   });
 
   it('emits OB_INVALID_ACHIEVED_LEVEL on a mutated credential', async () => {

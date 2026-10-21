@@ -5,16 +5,15 @@
  * of these to a verify call's `additionalSuites`:
  *
  * - {@link openBadgesSemanticSuite} — fast, in-process Zod-based
- *   cross-field semantic checks. **No network access required.**
+ *   cross-field semantic checks. Loads no JSON Schema validator.
  *   Safe to enable in latency-sensitive contexts.
  * - {@link openBadgesSchemaSuite} — AJV-backed JSON Schema validation
- *   against the published OBv3 schemas. The four published OB 3.0
- *   schemas are fetched once per `cacheService` and compiled once per
- *   verifier; any other `credentialSchema` URL is fetched on every
- *   verification.
+ *   against the Open Badges 3.0 schemas bundled with this package,
+ *   chosen by the credential's type and VC version. Never fetches;
+ *   each schema is compiled once per process, on first use.
  * - {@link openBadgesSuite} — the union of the two above. Convenience
  *   for consumers who want full OB coverage and accept the schema
- *   suite's network cost.
+ *   suite's compile cost.
  *
  * None of these are part of the verifier's default suite set:
  * OpenBadges verification is fully opt-in, so a caller who does not
@@ -39,7 +38,7 @@ import { obv3ResultRefCheck } from './result-ref-check.js';
 import { obv3AchievedLevelCheck } from './achieved-level-check.js';
 import { obv3MissingResultStatusCheck } from './missing-result-status-check.js';
 import { obv3UnknownAchievementTypeCheck } from './unknown-achievement-type-check.js';
-import { obv3SchemaCheck } from '../suites/schema/obv3/obv3-schema-check.js';
+import { obv3SchemaCheck } from './schema/obv3-schema-check.js';
 import { isOpenBadgeCredential } from './recognize.js';
 
 /**
@@ -63,7 +62,7 @@ export const openBadgesSemanticSuite: VerificationSuite = {
   id: 'openbadges.semantic',
   name: 'OpenBadges Semantic',
   description:
-    'OpenBadges 3.0 cross-field semantic checks (no JSON Schema fetch).',
+    'OpenBadges 3.0 cross-field semantic checks (no JSON Schema validation).',
   phase: 'semantic',
   applies: appliesToOpenBadge,
   checks: [
@@ -77,7 +76,8 @@ export const openBadgesSemanticSuite: VerificationSuite = {
 export const openBadgesSchemaSuite: VerificationSuite = {
   id: 'openbadges.schema',
   name: 'OpenBadges JSON Schema',
-  description: 'AJV-backed validation against the published OBv3 JSON Schemas.',
+  description:
+    'AJV-backed validation against the bundled Open Badges 3.0 JSON Schemas.',
   phase: 'semantic',
   applies: appliesToOpenBadge,
   checks: [obv3SchemaCheck]
