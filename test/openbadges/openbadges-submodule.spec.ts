@@ -34,6 +34,7 @@ import {
   obv3UnknownAchievementTypeCheck,
   createObv3UnknownAchievementTypeCheck,
   obv3SchemaCheck,
+  obv3DeclaredSchemaCheck,
   isOpenBadgeCredential,
   isEndorsementCredential,
   OpenBadgesProblemTypes,
@@ -87,7 +88,10 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
         obv3UnknownAchievementTypeCheck
       ])
     );
-    expect(openBadgesSchemaSuite.checks).toContain(obv3SchemaCheck);
+    expect(openBadgesSchemaSuite.checks).toEqual([
+      obv3SchemaCheck,
+      obv3DeclaredSchemaCheck
+    ]);
 
     expect(isOpenBadgeCredential(sampleAchievementCredential)).toBe(true);
     expect(isEndorsementCredential(sampleAchievementCredential)).toBe(false);

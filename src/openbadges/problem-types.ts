@@ -60,7 +60,26 @@ export const Obv3ProblemTypes = {
    * issuer-defined extensions.
    */
   OB_UNKNOWN_ACHIEVEMENT_TYPE:
-    'https://www.w3.org/TR/vc-data-model#OB_UNKNOWN_ACHIEVEMENT_TYPE'
+    'https://www.w3.org/TR/vc-data-model#OB_UNKNOWN_ACHIEVEMENT_TYPE',
+
+  /**
+   * Synthesized — a `credentialSchema` entry names a known Open Badges
+   * 3.0 schema that does not fit the credential: a schema for the other
+   * OB credential type, or one that does not accept the credential's VC
+   * version. The credential is still validated against the schema that
+   * fits; the declaration is only reported.
+   */
+  OB_DECLARED_SCHEMA_MISMATCH:
+    'https://www.w3.org/TR/vc-data-model#OB_DECLARED_SCHEMA_MISMATCH',
+
+  /**
+   * Synthesized — a `credentialSchema` entry names a URL that is not a
+   * known Open Badges 3.0 schema. The verifier does not fetch or check
+   * it; the credential is validated against the Open Badges schema for
+   * its type and VC version instead.
+   */
+  OB_DECLARED_SCHEMA_NOT_CHECKED:
+    'https://www.w3.org/TR/vc-data-model#OB_DECLARED_SCHEMA_NOT_CHECKED'
 } as const;
 
 export type Obv3ProblemType =

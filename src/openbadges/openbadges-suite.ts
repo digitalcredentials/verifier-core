@@ -39,6 +39,7 @@ import { obv3AchievedLevelCheck } from './achieved-level-check.js';
 import { obv3MissingResultStatusCheck } from './missing-result-status-check.js';
 import { obv3UnknownAchievementTypeCheck } from './unknown-achievement-type-check.js';
 import { obv3SchemaCheck } from './schema/obv3-schema-check.js';
+import { obv3DeclaredSchemaCheck } from './schema/obv3-declared-schema-check.js';
 import { isOpenBadgeCredential } from './recognize.js';
 
 /**
@@ -80,7 +81,7 @@ export const openBadgesSchemaSuite: VerificationSuite = {
     'AJV-backed validation against the bundled Open Badges 3.0 JSON Schemas.',
   phase: 'semantic',
   applies: appliesToOpenBadge,
-  checks: [obv3SchemaCheck]
+  checks: [obv3SchemaCheck, obv3DeclaredSchemaCheck]
 };
 
 export const openBadgesSuite: VerificationSuite = {

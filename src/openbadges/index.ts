@@ -17,7 +17,7 @@
  *   {@link obv3AchievedLevelCheck},
  *   {@link obv3MissingResultStatusCheck},
  *   {@link obv3UnknownAchievementTypeCheck},
- *   {@link obv3SchemaCheck}.
+ *   {@link obv3SchemaCheck}, {@link obv3DeclaredSchemaCheck}.
  * - **Factory** for the achievement-type check with a caller-supplied
  *   vocab augment: {@link createObv3UnknownAchievementTypeCheck}.
  * - **Recognition helpers** for branching on credential shape:
@@ -48,6 +48,7 @@ export {
 export type { CreateObv3UnknownAchievementTypeCheckOptions } from './unknown-achievement-type-check.js';
 
 export { obv3SchemaCheck } from './schema/obv3-schema-check.js';
+export { obv3DeclaredSchemaCheck } from './schema/obv3-declared-schema-check.js';
 
 export { isOpenBadgeCredential, isEndorsementCredential } from './recognize.js';
 
