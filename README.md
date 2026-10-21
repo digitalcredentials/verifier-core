@@ -19,7 +19,7 @@
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
 - [Credential recognition + two-pass verification](#credential-recognition--two-pass-verification)
 - [Architecture](#architecture)
-- [Migration from earlier 1.0.0-beta.x](#migration-from-earlier-100-betax)
+- [Migration from earlier 1.x](#migration-from-earlier-1x)
 - [Install](#install)
 - [Contribute](#contribute)
 - [License](#license)
@@ -1285,10 +1285,10 @@ For internal architecture details — verification pipeline, suite model, type
 system, dependencies, and architectural direction — see
 [`docs/architecture.md`](docs/architecture.md).
 
-## Migration from earlier 1.0.0-beta.x
+## Migration from earlier 1.x
 
-2.0.0 is a rewrite. This section maps the last 1.x release, 1.0.0-beta.11, to
-2.0.0. `verifyCredential` and `verifyPresentation` keep their names; their
+2.0.0 is a major update. This section maps the last 1.x release, 1.0.0-beta.11, to
+2.0.0. `verifyCredential` and `verifyPresentation` keep their names, but their
 options and results change. Check ids below are the `CheckResult.id` values (see
 [verification results](docs/api/verification-results.md)).
 

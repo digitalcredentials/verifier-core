@@ -6,7 +6,7 @@ A complete rewrite relative to 1.0.0-beta.11. Verification now runs as suites of
 named checks, every check that ran is reported, and the result carries an
 overall `verified` verdict. `verifyCredential` and `verifyPresentation` keep
 their names, but their options and results have changed: see
-[Migration from earlier 1.0.0-beta.x](README.md#migration-from-earlier-100-betax)
+[Migration from earlier 1.x](README.md#migration-from-earlier-1x)
 for a field-by-field map.
 
 ### Breaking
@@ -22,7 +22,9 @@ for a field-by-field map.
 - **`verified` is a verdict.** 1.x reported each step and left the conclusion to
   the caller. In 2.0 a credential that is expired, not yet valid, revoked or
   suspended has `verified: false`, alongside a bad signature. An issuer that is
-  not in any registry is a warning: `verified` stays `true`.
+  not in any registry is a warning: `verified` stays `true`. A verifier may come
+  to their own conclusions based on the detailed results, if they deem a certain
+  `fatal` check not to invalidate the whole credential.
 - **`knownDIDRegistries` is replaced by
   `registries: EntityIdentityRegistry[]`**, and `reloadIssuerRegistry` is
   removed. The DCC known-registries list can be passed as `registries`
@@ -121,22 +123,19 @@ for a field-by-field map.
   `additionalInformation`, and `presentationResult` on presentations.
 - The `@digitalcredentials/issuer-registry-client` dependency.
 
-## 1.0.0-beta.11 - December 15 2025
+## 1.0.0-beta.11 - 2025-12-15
 
 ### Added
 
-- Returns staus list errors that had been incorrectly swallowed. See the README
+- Returns status list errors that had been incorrectly swallowed. See the README
   for new errors that are returned.
 
-## 1.0.0-beta.10 - October 24 2025
+## 1.0.0-beta.10 - 2025-10-24
 
 ### Added
 
 - Returns more informative results for json-ld safe-mode errors. See the README
   for details.
-
-## 1.0.0-beta.9 - October 2 2025
-
-### Added
-
 - Adds schema validation results to the returned verification results.
+
+Earlier preliminary releases are not recorded here.
